@@ -2,7 +2,10 @@ version: '3.8'
 
 services:
   gmweb:
-    build: .
+    build:
+      context: .
+      args:
+        ARCH: ${ARCH:-aarch64}
     environment:
       - VNC_PW=${VNC_PW:-password}
     volumes:
