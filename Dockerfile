@@ -35,7 +35,7 @@ RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
 RUN mkdir -p /home/kasm-user/.config/autostart
 RUN printf "[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;\n" > /home/kasm-user/.config/autostart/ext.desktop
 RUN printf "[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;\n" > /home/kasm-user/.config/autostart/chromium.desktop
-RUN printf "[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;\n" > /home/kasm-user/.config/autostart/terminal.desktop
+RUN printf "[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe/@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;\n" > /home/kasm-user/.config/autostart/terminal.desktop
 RUN rm /home/kasm-user/.npm -R; chown 1000 /home/kasm-user -R
 USER 1000
 RUN curl -fsSL https://claude.ai/install.sh | bash
