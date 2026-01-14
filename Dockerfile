@@ -32,7 +32,7 @@ RUN mkdir /home/kasm-user/Desktop/Uploads
 ENV PATH="/usr/local/nvm/versions/node/v23.11.1/bin:$PATH"
 RUN npm install -g @musistudio/claude-code-router
 RUN echo "npx -y gxe@latest AnEntrypoint/kasmproxy start" > $STARTUPDIR/custom_startup.sh
-RUN echo "npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe" >> $STARTUPDIR/custom_startup.sh
+RUN echo "sudo npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe" >> $STARTUPDIR/custom_startup.sh
 #RUN echo "cd ProxyPilot; ./proxypilot" >> $STARTUPDIR/custom_startup.sh
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
 RUN chmod +x /sbin/cc
