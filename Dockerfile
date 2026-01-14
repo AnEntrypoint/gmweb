@@ -15,7 +15,7 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | b
 RUN bash -c ". \$NVM_DIR/nvm.sh && nvm install 23.11.1 && nvm use 23.11.1 && nvm alias default 23.11.1"
 RUN ARCH=$(uname -m) && \
     TARGETARCH=$([ "$ARCH" = "x86_64" ] && echo "amd64" || echo "arm64") && \
-    DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | grep "proxypilot-linux-${TARGETARCH}" | grep -o '"browser_download_url":"[^"]*"' | cut -d'"' -f4 | head -1) && \
+    DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | grep "proxypilot-linux-${TARGETARCH}" | grep -o '"browser_download_url": "[^"]*"' | cut -d'"' -f4 | head -1) && \
     curl -L -o /usr/bin/proxypilot "$DOWNLOAD_URL" && \
     chmod +x /usr/bin/proxypilot
 RUN apt update && apt install -y curl software-properties-common apt-transport-https gnupg && \
