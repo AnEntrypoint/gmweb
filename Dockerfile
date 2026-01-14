@@ -11,7 +11,7 @@ RUN dpkg --configure -a
 RUN apt update
 
 # Install base system packages (stable layer)
-RUN apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates golang-go jq wget software-properties-common apt-transport-https gnupg
+RUN apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates golang-go jq wget software-properties-common apt-transport-https gnupg libreoffice
 RUN rm -rf /var/lib/apt/lists/*
 
 # Setup NVM and Node.js (stable - pinned version)
@@ -45,6 +45,7 @@ RUN echo '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce4-
 RUN echo '[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/chromium.desktop
 RUN echo '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe\\@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/ext.desktop
 RUN echo '[Desktop Entry]\nType=Application\nName=ProxyPilot\nExec=/usr/bin/proxypilot\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/proxypilot.desktop
+RUN echo '[Desktop Entry]\nType=Application\nName=LibreOffice\nExec=/usr/bin/libreoffice\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/libreoffice.desktop
 
 # Setup startup scripts (stable - service configuration)
 RUN echo "/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start" > $STARTUPDIR/custom_startup.sh
