@@ -49,10 +49,12 @@ RUN echo '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nEx
 # Setup startup scripts (stable - service configuration)
 RUN echo "/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start" > $STARTUPDIR/custom_startup.sh && \
     echo "cd /home/kasm-user; /usr/bin/proxypilot" >> $STARTUPDIR/custom_startup.sh && \
+    echo "/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe || true" >> $STARTUPDIR/custom_startup.sh && \
     echo "/home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true" >> $STARTUPDIR/custom_startup.sh && \
     echo "/home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true" >> $STARTUPDIR/custom_startup.sh && \
     echo "claude --dangerously-skip-permissions \$@" > /sbin/cc && \
     chmod +x /sbin/cc
+RUN mkdir -p /opt/google/chrome/extensions && chmod 777 /opt/google/chrome/extensions
 
 # Download dynamic binaries and configuration (volatile - fetched on each build)
 RUN ARCH=$(uname -m) && \
