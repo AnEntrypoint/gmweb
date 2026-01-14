@@ -37,10 +37,10 @@ RUN echo "cd /home/kasm-user; /usr/bin/proxypilot" >> $STARTUPDIR/custom_startup
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
 RUN chmod +x /sbin/cc
 RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
-RUN mkdir -p /home/kasm-user/.config/autostart && \
-    echo '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce4-terminal\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/terminal.desktop && \
-    echo '[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/chromium.desktop && \
-    echo '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe/@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/ext.desktop
+RUN mkdir -p /home/kasm-user/.config/autostart
+RUN echo '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce4-terminal\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/terminal.desktop
+RUN echo '[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/chromium.desktop
+RUN echo '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe/@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/ext.desktop
 RUN rm /home/kasm-user/.npm -R; chown 1000 /home/kasm-user -R
 USER 1000
 RUN curl -fsSL https://claude.ai/install.sh | bash
