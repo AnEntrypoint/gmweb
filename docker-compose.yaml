@@ -10,15 +10,19 @@ services:
       - VNC_PW=${VNC_PW:-password}
     volumes:
       - gmweb-home:/home/kasm-user
+      - gmweb-root:/root
       - gmweb-opt:/opt
       - gmweb-var:/var
       - gmweb-etc:/etc
       - gmweb-usr:/usr
+      - gmweb-srv:/srv
     labels:
       - traefik.enable=true
       - traefik.http.services.gmweb.loadbalancer.server.port=8000
 volumes:
   gmweb-home:
+    driver: local
+  gmweb-root:
     driver: local
   gmweb-opt:
     driver: local
@@ -27,4 +31,6 @@ volumes:
   gmweb-etc:
     driver: local
   gmweb-usr:
+    driver: local
+  gmweb-srv:
     driver: local
