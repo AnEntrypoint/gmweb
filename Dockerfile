@@ -42,9 +42,29 @@ RUN chown -R 1000:1000 /home/kasm-user
 RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
 
 # Create autostart desktop entries (stable - application launchers)
-RUN printf '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce4-terminal\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/terminal.desktop
-RUN printf '[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/chromium.desktop
-RUN printf '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/ext.desktop
+# All three files created atomically in single RUN for reliability
+RUN bash -c 'cat > /home/kasm-user/.config/autostart/terminal.desktop << '\''EOF'\''
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Exec=/usr/bin/xfce4-terminal
+OnlyShowIn=XFCE;
+EOF
+cat > /home/kasm-user/.config/autostart/chromium.desktop << '\''EOF'\''
+[Desktop Entry]
+Type=Application
+Name=Chromium
+Exec=/usr/bin/chromium
+OnlyShowIn=XFCE;
+EOF
+cat > /home/kasm-user/.config/autostart/ext.desktop << '\''EOF'\''
+[Desktop Entry]
+Type=Application
+Name=Chrome Extension Installer
+Exec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe
+OnlyShowIn=XFCE;
+EOF
+ls -la /home/kasm-user/.config/autostart/' && chmod 644 /home/kasm-user/.config/autostart/*.desktop
 
 # Setup startup scripts (stable - service configuration)
 RUN echo "echo '===== STARTUP $(date) =====' | tee -a /home/kasm-user/logs/startup.log" > $STARTUPDIR/custom_startup.sh
