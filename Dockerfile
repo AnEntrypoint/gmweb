@@ -36,6 +36,7 @@ RUN npm install -g @musistudio/claude-code-router
 # Setup home directory structure (relatively stable)
 RUN mkdir -p /home/kasm-user/Desktop/Uploads
 RUN mkdir -p /home/kasm-user/.config/autostart
+RUN mkdir -p /home/kasm-user/logs
 RUN chmod a+rw /home/kasm-user -R
 RUN chown -R 1000:1000 /home/kasm-user
 RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
@@ -46,13 +47,15 @@ RUN echo '[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromi
 RUN echo '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe\\@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;' | sed 's/\\n/\n/g' > /home/kasm-user/.config/autostart/ext.desktop
 
 # Setup startup scripts (stable - service configuration)
-RUN echo "/usr/bin/desktop_ready && /usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start" > $STARTUPDIR/custom_startup.sh
-RUN echo "/usr/bin/desktop_ready && nohup /usr/bin/proxypilot > /tmp/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "npm install -g @google/gemini-cli" >> $STARTUPDIR/custom_startup.sh
-RUN echo "sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extension.py || true" >> $STARTUPDIR/custom_startup.sh
-RUN echo "/home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true" >> $STARTUPDIR/custom_startup.sh
-RUN echo "/home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true" >> $STARTUPDIR/custom_startup.sh
-RUN echo "curl -fsSL https://claude.ai/install.sh | bash" >> $STARTUPDIR/custom_startup.sh
+RUN echo "echo '===== STARTUP $(date) =====' | tee -a /home/kasm-user/logs/startup.log" > $STARTUPDIR/custom_startup.sh
+RUN echo "/usr/bin/desktop_ready && nohup /usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "/usr/bin/desktop_ready && nohup /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup npm install -g @google/gemini-cli > /home/kasm-user/logs/gemini-cli.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extension.py > /home/kasm-user/logs/chromium-ext.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm > /home/kasm-user/logs/claude-marketplace.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup /home/kasm-user/.local/bin/claude plugin install -s user gm@gm > /home/kasm-user/logs/claude-plugin.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup bash -c 'curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "echo '===== STARTUP COMPLETE =====' | tee -a /home/kasm-user/logs/startup.log" >> $STARTUPDIR/custom_startup.sh
 RUN chmod +x $STARTUPDIR/custom_startup.sh
 
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
