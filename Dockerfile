@@ -29,7 +29,7 @@ RUN chown 1000 /home/kasm-user -R
 RUN mkdir /home/kasm-user/Desktop/Uploads
 ENV PATH="/usr/local/nvm/versions/node/v23.11.1/bin:$PATH"
 RUN npm install -g @musistudio/claude-code-router
-RUN wget -nc -O /home/user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
+RUN wget -nc -O /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
 RUN echo "/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start" > $STARTUPDIR/custom_startup.sh
 RUN echo "cd /home/kasm-user; /usr/bin/proxypilot" >> $STARTUPDIR/custom_startup.sh
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
