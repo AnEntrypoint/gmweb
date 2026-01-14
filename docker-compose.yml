@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   gmweb:
-    image: kasmweb/ubuntu-noble-dind-rootless:aarch64-1.18.0-rolling-daily
+    build: .
     container_name: gmweb-dev
 
     # Coolify environment variable support
