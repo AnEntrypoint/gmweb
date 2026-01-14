@@ -13,7 +13,8 @@ RUN echo 'export PATH="/usr/local/nvm:$PATH"' >> ~/.bashrc
 RUN mkdir /usr/local/nvm
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 RUN bash -c ". \$NVM_DIR/nvm.sh && nvm install 23.11.1 && nvm use 23.11.1 && nvm alias default 23.11.1"
-RUN curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | grep "browser_download_url.*linux-${TARGETARCH}\"" | cut -d '"' -f 4 | xargs curl -L -o /usr/bin/proxypilot
+ARG TARGETARCH
+RUN curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | grep "browser_download_url.*linux-${TARGETARCH}\"" | cut -d '"' -f 4 | xargs curl -L -o /usr/bin/proxypilot && chmod +x /usr/bin/proxypilot
 RUN chmod +x /usr/bin/proxypilot
 RUN apt update && apt install -y curl software-properties-common apt-transport-https gnupg && \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
