@@ -3,77 +3,13 @@ version: '3.8'
 services:
   gmweb:
     build: .
-    container_name: gmweb-dev
-
-    # Coolify environment variable support
+    ports:
+      - "8000:8000"
     environment:
       - VNC_PW=${VNC_PW:-password}
-      - KASM_GUAC_UID=${KASM_GUAC_UID:-1000}
-      - KASM_GUAC_GID=${KASM_GUAC_GID:-1000}
-      - DEBIAN_FRONTEND=noninteractive
-      - NODE_VERSION=${NODE_VERSION:-23.11.1}
-      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
-      - CLAUDE_TIMEOUT=${CLAUDE_TIMEOUT:-300}
-
-    # Port mappings for web access
-    ports:
-      - "${KASM_PORT:-6901}:6901"     # Kasm web UI (VNC over websocket)
-      - "${SSH_PORT:-22}:22"           # SSH access
-      - "${DOCKER_PORT:-2375}:2375"   # Docker daemon
-
-    # Volume mounts for persistence and code access
     volumes:
-      # User home directory
       - gmweb-home:/home/kasm-user
-      # Desktop uploads
-      - gmweb-uploads:/home/kasm-user/Desktop/Uploads
-      # Docker socket for DinD
-      - /var/run/docker.sock:/var/run/docker.sock:rw
-      # Optional: mount source code
-      - ${CODE_MOUNT_PATH:-.}:/home/kasm-user/code:rw
 
-    # Restart policy
-    restart: ${RESTART_POLICY:-unless-stopped}
-
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '${CPU_LIMIT:-4}'
-          memory: '${MEMORY_LIMIT:-8g}'
-        reservations:
-          cpus: '${CPU_RESERVED:-2}'
-          memory: '${MEMORY_RESERVED:-4g}'
-
-    # User configuration
-    user: ${CONTAINER_USER:-1000:1000}
-
-    # Security options
-    security_opt:
-      - seccomp:unconfined
-    cap_add:
-      - SYS_ADMIN
-      - NET_ADMIN
-
-    # Network
-    networks:
-      - gmweb-network
-
-    # Labels for Coolify and docker containers
-    labels:
-      - "coolify.managed=true"
-      - "com.docker.compose.project=${COMPOSE_PROJECT_NAME:-gmweb}"
-
-# Volumes for persistence
 volumes:
   gmweb-home:
     driver: local
-  gmweb-uploads:
-    driver: local
-
-# Networks
-networks:
-  gmweb-network:
-    driver: bridge
-    driver_opts:
-      com.docker.network.driver.mtu: 1450
