@@ -47,6 +47,7 @@ RUN printf '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce
     printf '[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/chromium.desktop && \
     printf '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/ext.desktop && \
     chmod 644 /home/kasm-user/.config/autostart/*.desktop && \
+    chown -R kasm-user:kasm-user /home/kasm-user/.config/autostart && \
     ls -la /home/kasm-user/.config/autostart/
 
 # Setup startup scripts (stable - service configuration)
