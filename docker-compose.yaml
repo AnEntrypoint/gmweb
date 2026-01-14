@@ -22,5 +22,15 @@ services:
 volumes:
   gmweb-home:
     driver: local
+  gmweb-root:
+    driver: local
+  gmweb-opt:
+    driver: local
+  gmweb-var:
+    driver: local
+  gmweb-etc:
+    driver: local
   gmweb-usr:
+    driver: local
+  gmweb-srv:
     driver: local
