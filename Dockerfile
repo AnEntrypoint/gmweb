@@ -48,7 +48,7 @@ RUN echo '[Desktop Entry]\nType=Application\nName=ProxyPilot\nExec=/usr/bin/prox
 
 # Setup startup scripts (stable - service configuration)
 RUN echo "/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start" > $STARTUPDIR/custom_startup.sh
-RUN echo "cd /home/kasm-user; /usr/bin/proxypilot" >> $STARTUPDIR/custom_startup.sh
+RUN echo "cd /home/kasm-user && /usr/bin/proxypilot > /tmp/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "npm install -g @google/gemini-cli" >> $STARTUPDIR/custom_startup.sh
 RUN echo "sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extension.py || true" >> $STARTUPDIR/custom_startup.sh
 RUN echo "/home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true" >> $STARTUPDIR/custom_startup.sh
