@@ -11,8 +11,6 @@ services:
       - KASM_GUAC_UID=${KASM_GUAC_UID:-1000}
       - KASM_GUAC_GID=${KASM_GUAC_GID:-1000}
       - DEBIAN_FRONTEND=noninteractive
-      - NVM_DIR=/usr/local/nvm
-      - PATH=/usr/local/nvm/versions/node/v23.11.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       - NODE_VERSION=${NODE_VERSION:-23.11.1}
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
       - CLAUDE_TIMEOUT=${CLAUDE_TIMEOUT:-300}
@@ -56,14 +54,6 @@ services:
     cap_add:
       - SYS_ADMIN
       - NET_ADMIN
-
-    # Healthcheck
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6901/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
     # Network
     networks:
