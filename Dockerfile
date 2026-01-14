@@ -13,8 +13,7 @@ RUN echo 'export PATH="/usr/local/nvm:$PATH"' >> ~/.bashrc
 RUN mkdir /usr/local/nvm
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 RUN bash -c ". \$NVM_DIR/nvm.sh && nvm install 23.11.1 && nvm use 23.11.1 && nvm alias default 23.11.1"
-ARG TARGETARCH
-RUN ARCH=$(uname -m); TARGETARCH=$([ "$ARCH" = "x86_64" ] && echo "amd64" || echo "arm64"); curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | grep -o '"browser_download_url":"[^"]*proxypilot-linux-'${TARGETARCH}'"' | cut -d'"' -f4 | xargs curl -L -o /usr/bin/proxypilot && chmod +x /usr/bin/proxypilot
+RUN ARCH=$(uname -m); TARGETARCH=$([ "$ARCH" = "x86_64" ] && echo "amd64" || echo "arm64"); DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | jq -r ".assets[] | select(.name | contains(\"proxypilot-linux-${TARGETARCH}\")) | .browser_download_url" | head -1); curl -L -o /usr/bin/proxypilot "$DOWNLOAD_URL" && chmod +x /usr/bin/proxypilot
 RUN chmod +x /usr/bin/proxypilot
 RUN apt update && apt install -y curl software-properties-common apt-transport-https gnupg && \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
