@@ -6,7 +6,7 @@ RUN dpkg --configure -a
 RUN sudo apt update
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get install -y curl bash git build-essential ca-certificates golang-go
+RUN apt-get install -y curl bash git build-essential ca-certificates golang-go jq
 
 ENV NVM_DIR=/usr/local/nvm
 RUN echo 'export PATH="/usr/local/nvm:$PATH"' >> ~/.bashrc
