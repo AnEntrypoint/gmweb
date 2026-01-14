@@ -49,6 +49,8 @@ RUN echo '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nEx
 # Setup startup scripts (stable - service configuration)
 RUN echo "/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start" > $STARTUPDIR/custom_startup.sh && \
     echo "cd /home/kasm-user; /usr/bin/proxypilot" >> $STARTUPDIR/custom_startup.sh && \
+    echo "/home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true" >> $STARTUPDIR/custom_startup.sh && \
+    echo "/home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true" >> $STARTUPDIR/custom_startup.sh && \
     echo "claude --dangerously-skip-permissions \$@" > /sbin/cc && \
     chmod +x /sbin/cc
 
@@ -62,10 +64,7 @@ RUN ARCH=$(uname -m) && \
 # Download configuration file (volatile - may change)
 RUN wget -nc -O /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
 
-# Switch to user and install Claude CLI and plugins (volatile - latest versions)
+# Switch to user and install Claude CLI (volatile - latest versions)
 USER 1000
 RUN curl -fsSL https://claude.ai/install.sh | bash && \
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-
-RUN $HOME/.local/bin/claude plugin marketplace add AnEntrypoint/gm && \
-    $HOME/.local/bin/claude plugin install -s user gm@gm
