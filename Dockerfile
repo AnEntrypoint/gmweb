@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 ARG ARCH=aarch64
-FROM kasmweb/ubuntu-noble-dind-rootless:${ARCH}-1.18.0-rolling-daily
+FROM kasmweb/ubuntu-noble-dind-rootless:${ARCH}-1.18.0
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
