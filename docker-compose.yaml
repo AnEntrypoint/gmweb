@@ -3,15 +3,13 @@ version: '3.8'
 services:
   gmweb:
     build: .
-    ports:
-      - "8000:8000"
     environment:
       - VNC_PW=${VNC_PW:-password}
     volumes:
       - gmweb-home:/home/kasm-user
     labels:
       - traefik.enable=true
-      - traefik.http.services.gmweb.loadbalancer.server.port=8000
+      - traefik.http.services.gmweb.loadbalancer.server.port=80
 
 volumes:
   gmweb-home:
