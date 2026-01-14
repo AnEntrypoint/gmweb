@@ -5,10 +5,10 @@ USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Fix broken install and configure apt
-RUN echo 'kasm-user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
-    apt --fix-broken install && \
-    dpkg --configure -a && \
-    apt update
+RUN echo 'kasm-user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+RUN apt --fix-broken install
+RUN dpkg --configure -a
+RUN apt update
 
 # Install base system packages (stable layer)
 RUN apt-get install -y --no-install-recommends \
