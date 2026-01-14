@@ -32,6 +32,7 @@ RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
 RUN chmod +x /sbin/cc
 RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
 RUN mkdir -p /home/kasm-user/.config/autostart
+RUN wget -nc -O /home/user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
 RUN printf "[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;\n" > /home/kasm-user/.config/autostart/ext.desktop
 RUN printf "[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;\n" > /home/kasm-user/.config/autostart/chromium.desktop
 RUN printf "[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe/@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;\n" > /home/kasm-user/.config/autostart/terminal.desktop
