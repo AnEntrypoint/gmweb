@@ -1,4 +1,5 @@
-FROM kasmweb/ubuntu-noble-dind-rootless:aarch64-1.18.0-rolling-daily
+ARG ARCH=aarch64
+FROM kasmweb/ubuntu-noble-dind-rootless:${ARCH}-1.18.0-rolling-daily
 USER root
 RUN echo 'kasm-user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 RUN apt --fix-broken install
