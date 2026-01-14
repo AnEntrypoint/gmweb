@@ -11,7 +11,7 @@ RUN dpkg --configure -a
 RUN apt update
 
 # Install base system packages (stable layer)
-RUN apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates golang-go jq wget software-properties-common apt-transport-https gnupg
+RUN apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates jq wget software-properties-common apt-transport-https gnupg
 RUN rm -rf /var/lib/apt/lists/*
 
 # Setup NVM and Node.js (stable - pinned version)
