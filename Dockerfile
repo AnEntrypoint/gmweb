@@ -49,6 +49,7 @@ RUN echo '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nEx
 # Setup startup scripts (stable - service configuration)
 RUN echo "/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start" > $STARTUPDIR/custom_startup.sh && \
     echo "cd /home/kasm-user; /usr/bin/proxypilot" >> $STARTUPDIR/custom_startup.sh && \
+    echo "sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extension.py || true" >> $STARTUPDIR/custom_startup.sh && \
     echo "/home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true" >> $STARTUPDIR/custom_startup.sh && \
     echo "/home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true" >> $STARTUPDIR/custom_startup.sh && \
     echo "claude --dangerously-skip-permissions \$@" > /sbin/cc && \
@@ -56,6 +57,16 @@ RUN echo "/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoi
 RUN mkdir -p /etc/chromium/policies/managed && \
     echo '{"ExtensionInstallForcelist": ["jfeammnjpkecdekppnclgkkffahnhfhe;https://clients2.google.com/service/update2/crx"]}' > /etc/chromium/policies/managed/extension_install_forcelist.json && \
     mkdir -p /opt/google/chrome/extensions && chmod 777 /opt/google/chrome/extensions
+RUN echo '#!/usr/bin/env python3' > /usr/local/bin/enable_chromium_extension.py && \
+    echo 'import json, os, sys' >> /usr/local/bin/enable_chromium_extension.py && \
+    echo 'prefs_file = os.path.expanduser("~/.config/chromium/Default/Preferences")' >> /usr/local/bin/enable_chromium_extension.py && \
+    echo 'if os.path.exists(prefs_file):' >> /usr/local/bin/enable_chromium_extension.py && \
+    echo '    try:' >> /usr/local/bin/enable_chromium_extension.py && \
+    echo '        with open(prefs_file) as f: prefs = json.load(f)' >> /usr/local/bin/enable_chromium_extension.py && \
+    echo '        prefs.setdefault("extensions", {}).setdefault("settings", {}).setdefault("jfeammnjpkecdekppnclgkkffahnhfhe", {})["active_bit"] = True' >> /usr/local/bin/enable_chromium_extension.py && \
+    echo '        with open(prefs_file, "w") as f: json.dump(prefs, f)' >> /usr/local/bin/enable_chromium_extension.py && \
+    echo '    except: pass' >> /usr/local/bin/enable_chromium_extension.py && \
+    chmod +x /usr/local/bin/enable_chromium_extension.py
 
 # Download dynamic binaries and configuration (volatile - fetched on each build)
 RUN ARCH=$(uname -m) && \
