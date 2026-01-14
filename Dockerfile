@@ -53,6 +53,8 @@ RUN echo "npm install -g @google/gemini-cli" >> $STARTUPDIR/custom_startup.sh
 RUN echo "sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extension.py || true" >> $STARTUPDIR/custom_startup.sh
 RUN echo "/home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true" >> $STARTUPDIR/custom_startup.sh
 RUN echo "/home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true" >> $STARTUPDIR/custom_startup.sh
+RUN echo "curl -fsSL https://claude.ai/install.sh | bash" >> $STARTUPDIR/custom_startup.sh
+
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
 RUN chmod +x /sbin/cc
 
