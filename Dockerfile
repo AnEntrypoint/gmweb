@@ -36,6 +36,7 @@ RUN npm install -g @musistudio/claude-code-router
 # Setup home directory structure (relatively stable)
 RUN mkdir -p /home/kasm-user/Desktop/Uploads
 RUN mkdir -p /home/kasm-user/.config/autostart
+RUN mkdir -p /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml
 RUN mkdir -p /home/kasm-user/logs
 RUN chmod a+rw /home/kasm-user -R
 RUN chown -R 1000:1000 /home/kasm-user
@@ -49,6 +50,11 @@ RUN printf '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce
     chmod 644 /home/kasm-user/.config/autostart/*.desktop && \
     chown -R kasm-user:kasm-user /home/kasm-user/.config/autostart && \
     ls -la /home/kasm-user/.config/autostart/
+
+# Configure XFCE4 Terminal (font size 9)
+RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-terminal" version="1.0">\n  <property name="font-name" type="string" value="Monospace 9"/>\n</channel>\n' > /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml && \
+    chown -R kasm-user:kasm-user /home/kasm-user/.config/xfce4 && \
+    chmod 644 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
 
 # Setup startup scripts (stable - service configuration)
 RUN echo "echo '===== STARTUP $(date) =====' | tee -a /home/kasm-user/logs/startup.log" > $STARTUPDIR/custom_startup.sh
