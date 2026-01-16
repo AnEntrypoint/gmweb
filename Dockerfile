@@ -88,19 +88,19 @@ RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-termi
 
 # Setup startup scripts (stable - service configuration)
 RUN echo "echo '===== STARTUP $(date) =====' | tee -a /home/kasm-user/logs/startup.log" > $STARTUPDIR/custom_startup.sh
-RUN echo "/usr/bin/desktop_ready && nohup bash -c 'export VNC_PW=\"\$(grep -az \"^VNC_PW=\" /proc/1/environ | cut -d= -f2-)\" && /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start' > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "/usr/bin/desktop_ready && nohup /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup npm install -g @google/gemini-cli > /home/kasm-user/logs/gemini-cli.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup npm install -g wrangler > /home/kasm-user/logs/wrangler.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup bash -c 'curl https://sdk.cloud.google.com | bash' > /home/kasm-user/logs/gcloud-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "/usr/bin/desktop_ready && nohup sudo -u kasm-user bash -c 'export VNC_PW=\"\$(grep -az \"^VNC_PW=\" /proc/1/environ | cut -d= -f2-)\" && /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start' > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "/usr/bin/desktop_ready && nohup sudo -u kasm-user /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user npm install -g @google/gemini-cli > /home/kasm-user/logs/gemini-cli.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user npm install -g wrangler > /home/kasm-user/logs/wrangler.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user bash -c 'curl https://sdk.cloud.google.com | bash' > /home/kasm-user/logs/gcloud-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup apt-get update && apt-get install -y scrot > /home/kasm-user/logs/scrot-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extension.py > /home/kasm-user/logs/chromium-ext.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm > /home/kasm-user/logs/claude-marketplace.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup /home/kasm-user/.local/bin/claude plugin install -s user gm@gm > /home/kasm-user/logs/claude-plugin.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup bash -c 'curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup bash -c 'cd /home/kasm-user/webssh2 && WEBSSH2_SSH_HOST=localhost WEBSSH2_SSH_PORT=22 WEBSSH2_USER_NAME=kasm-user WEBSSH2_USER_PASSWORD=kasm npm start' > /home/kasm-user/logs/webssh2.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup bash -c 'cd /home/kasm-user/node-file-manager-esm && PORT=9998 npm start -- -d /home/kasm-user/Desktop' > /home/kasm-user/logs/node-file-manager-esm.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "mkdir -p /run/sshd && nohup sudo bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | sudo chpasswd; fi && /usr/sbin/sshd' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm > /home/kasm-user/logs/claude-marketplace.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user /home/kasm-user/.local/bin/claude plugin install -s user gm@gm > /home/kasm-user/logs/claude-plugin.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user bash -c 'curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user bash -c 'cd /home/kasm-user/webssh2 && WEBSSH2_SSH_HOST=localhost WEBSSH2_SSH_PORT=22 WEBSSH2_USER_NAME=kasm-user WEBSSH2_USER_PASSWORD=kasm npm start' > /home/kasm-user/logs/webssh2.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user bash -c 'cd /home/kasm-user/node-file-manager-esm && PORT=9998 npm start -- -d /home/kasm-user/Desktop' > /home/kasm-user/logs/node-file-manager-esm.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "mkdir -p /run/sshd && nohup bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | chpasswd; fi && /usr/sbin/sshd' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'sudo -u kasm-user tmux new-session -d -s main -x 120 -y 30; sleep 1; sudo -u kasm-user tmux new-window -t main -n sshd' > /home/kasm-user/logs/tmux.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "echo '===== STARTUP COMPLETE =====' | tee -a /home/kasm-user/logs/startup.log" >> $STARTUPDIR/custom_startup.sh
 RUN chmod +x $STARTUPDIR/custom_startup.sh
