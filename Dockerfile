@@ -18,6 +18,7 @@ RUN rm -rf /var/lib/apt/lists/*
 ENV NVM_DIR=/usr/local/local/nvm
 RUN mkdir -p /usr/local/local/nvm
 RUN echo 'export PATH="/usr/local/local/nvm:$PATH"' >> ~/.bashrc
+RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 RUN bash -c ". $NVM_DIR/nvm.sh && nvm install 23.11.1 && nvm use 23.11.1 && nvm alias default 23.11.1"
 
@@ -138,5 +139,4 @@ RUN chmod 777 /opt/google/chrome/extensions
 
 # Switch to user and install Claude CLI (volatile - latest versions)
 USER 1000
-RUN curl -fsSL https://claude.ai/install.sh | bash
-RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+
