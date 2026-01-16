@@ -97,7 +97,7 @@ RUN echo "nohup /home/kasm-user/.local/bin/claude plugin install -s user gm@gm >
 RUN echo "nohup bash -c 'curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'cd /home/kasm-user/webssh2 && npm start' > /home/kasm-user/logs/webssh2.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'cd /home/kasm-user/node-file-manager-esm && PORT=9998 npm start' > /home/kasm-user/logs/node-file-manager-esm.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | chpasswd; fi && mkdir -p /run/sshd && /usr/sbin/sshd -D' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "mkdir -p /run/sshd && nohup sudo bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | sudo chpasswd; fi && /usr/sbin/sshd' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'sudo -u kasm-user tmux new-session -d -s main -x 120 -y 30; sleep 1; sudo -u kasm-user tmux new-window -t main -n sshd' > /home/kasm-user/logs/tmux.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "echo '===== STARTUP COMPLETE =====' | tee -a /home/kasm-user/logs/startup.log" >> $STARTUPDIR/custom_startup.sh
 RUN chmod +x $STARTUPDIR/custom_startup.sh
