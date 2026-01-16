@@ -44,10 +44,10 @@ RUN mkdir -p /run/sshd && \
     /usr/bin/ssh-keygen -A && \
     echo 'kasm-user:kasm' | chpasswd
 
-# Configure tmux globally - discard buffer history to prevent buildup
-RUN printf 'set -g history-limit 0\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\nset-option -g set-titles on\n' > /etc/tmux.conf && \
+# Configure tmux globally - keep a few pages of history to prevent pause on full buffer
+RUN printf 'set -g history-limit 2000\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\nset-option -g set-titles on\n' > /etc/tmux.conf && \
     mkdir -p /home/kasm-user/.tmux && \
-    printf 'set -g history-limit 0\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\n' > /home/kasm-user/.tmux.conf && \
+    printf 'set -g history-limit 2000\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\n' > /home/kasm-user/.tmux.conf && \
     chown kasm-user:kasm-user /home/kasm-user/.tmux.conf
 
 # Setup home directory structure (relatively stable)
