@@ -102,6 +102,9 @@ RUN chmod +x /usr/bin/proxypilot
 # Download configuration file (volatile - may change)
 RUN wget -nc -O /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
 
+# Create cache directory for Claude CLI before switching to user
+RUN mkdir -p /home/kasm-user/.cache && chown -R kasm-user:kasm-user /home/kasm-user/.cache
+
 # Switch to user and install Claude CLI (volatile - latest versions)
 USER 1000
 RUN curl -fsSL https://claude.ai/install.sh | bash
