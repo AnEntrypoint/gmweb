@@ -15,13 +15,13 @@ RUN apt-get install -y --no-install-recommends curl bash git build-essential ca-
 RUN rm -rf /var/lib/apt/lists/*
 
 # Setup NVM and Node.js (stable - pinned version)
-ENV NVM_DIR=/usr/local/nvm
-RUN mkdir -p /usr/local/nvm
-RUN echo 'export PATH="/usr/local/nvm:$PATH"' >> ~/.bashrc
+ENV NVM_DIR=/usr/local/local/nvm
+RUN mkdir -p /usr/local/local/nvm
+RUN echo 'export PATH="/usr/local/local/nvm:$PATH"' >> ~/.bashrc
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 RUN bash -c ". $NVM_DIR/nvm.sh && nvm install 23.11.1 && nvm use 23.11.1 && nvm alias default 23.11.1"
 
-ENV PATH="/usr/local/nvm/versions/node/v23.11.1/bin:$PATH"
+ENV PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$PATH"
 
 # Install GitHub CLI (stable - setup only)
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -90,7 +90,7 @@ RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-termi
 
 # Setup startup scripts (stable - service configuration)
 RUN echo "echo '===== STARTUP $(date) =====' | tee -a /home/kasm-user/logs/startup.log" > $STARTUPDIR/custom_startup.sh
-RUN echo "/usr/bin/desktop_ready && nohup bash -c 'export VNC_PW=\"\$(grep -az \"^VNC_PW=\" /proc/1/environ | cut -d= -f2-)\" && /usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start' > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "/usr/bin/desktop_ready && nohup bash -c 'export VNC_PW=\"\$(grep -az \"^VNC_PW=\" /proc/1/environ | cut -d= -f2-)\" && /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start' > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "/usr/bin/desktop_ready && nohup /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup npm install -g @google/gemini-cli > /home/kasm-user/logs/gemini-cli.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup npm install -g wrangler > /home/kasm-user/logs/wrangler.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
