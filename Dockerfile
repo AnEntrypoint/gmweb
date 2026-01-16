@@ -11,7 +11,7 @@ RUN dpkg --configure -a
 RUN apt update
 
 # Install base system packages (stable layer)
-RUN apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates jq wget software-properties-common apt-transport-https gnupg
+RUN apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates jq wget software-properties-common apt-transport-https gnupg openssh-server openssh-client tmux
 RUN rm -rf /var/lib/apt/lists/*
 
 # Setup NVM and Node.js (stable - pinned version)
@@ -33,6 +33,18 @@ RUN rm -rf /var/lib/apt/lists/*
 # Install npm global packages (stable - pinned versions)
 RUN npm install -g @musistudio/claude-code-router
 
+# Configure SSH for password authentication
+RUN mkdir -p /run/sshd && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+
+# Configure tmux globally - discard buffer history to prevent buildup
+RUN printf 'set -g history-limit 0\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\nset-option -g set-titles on\n' > /etc/tmux.conf && \
+    mkdir -p /home/kasm-user/.tmux && \
+    printf 'set -g history-limit 0\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\n' > /home/kasm-user/.tmux.conf && \
+    chown kasm-user:kasm-user /home/kasm-user/.tmux.conf
+
 # Setup home directory structure (relatively stable)
 RUN mkdir -p /home/kasm-user/Desktop/Uploads
 RUN mkdir -p /home/kasm-user/.config/autostart
@@ -41,6 +53,9 @@ RUN mkdir -p /home/kasm-user/logs
 RUN chmod a+rw /home/kasm-user -R
 RUN chown -R 1000:1000 /home/kasm-user
 RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
+
+# Configure bashrc for auto-tmux attach on terminal start
+RUN printf '\n# Auto-attach to tmux session\nif [ -z "$TMUX" ] && [ "$TERM" != "dumb" ]; then\n    exec tmux attach-session -t main || exec tmux new-session -s main\nfi\n' >> /home/kasm-user/.bashrc
 
 # Setup webssh2 (stable - web-based SSH client)
 ENV WEBSSH2_LISTEN_PORT=9999
@@ -79,6 +94,8 @@ RUN echo "nohup /home/kasm-user/.local/bin/claude plugin install -s user gm@gm >
 RUN echo "nohup bash -c 'curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'cd /home/kasm-user/webssh2 && npm start' > /home/kasm-user/logs/webssh2.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'cd /home/kasm-user/node-file-manager-esm && PORT=9998 npm start' > /home/kasm-user/logs/node-file-manager-esm.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | chpasswd; fi && mkdir -p /run/sshd && /usr/sbin/sshd -D' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup bash -c 'sudo -u kasm-user tmux new-session -d -s main -x 120 -y 30; sleep 1; sudo -u kasm-user tmux new-window -t main -n sshd' > /home/kasm-user/logs/tmux.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "echo '===== STARTUP COMPLETE =====' | tee -a /home/kasm-user/logs/startup.log" >> $STARTUPDIR/custom_startup.sh
 RUN chmod +x $STARTUPDIR/custom_startup.sh
 
