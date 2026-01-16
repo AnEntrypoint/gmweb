@@ -34,6 +34,7 @@
 - Log file: `/home/kasm-user/logs/webssh2.log`
 - User: kasm-user (not root)
 - Configuration: Uses environment variables (12-factor app principle)
+- **Important**: ENV WEBSSH2_LISTEN_PORT is set at build time and inherited by all RUN commands and startup
 
 ### Potential Issues and Recovery
 
