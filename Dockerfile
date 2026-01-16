@@ -93,6 +93,9 @@ RUN echo "echo '===== STARTUP $(date) =====' | tee -a /home/kasm-user/logs/start
 RUN echo "/usr/bin/desktop_ready && nohup /usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "/usr/bin/desktop_ready && nohup /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup npm install -g @google/gemini-cli > /home/kasm-user/logs/gemini-cli.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup npm install -g wrangler > /home/kasm-user/logs/wrangler.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup bash -c 'curl https://sdk.cloud.google.com | bash' > /home/kasm-user/logs/gcloud-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup apt-get update && apt-get install -y scrot > /home/kasm-user/logs/scrot-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extension.py > /home/kasm-user/logs/chromium-ext.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm > /home/kasm-user/logs/claude-marketplace.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup /home/kasm-user/.local/bin/claude plugin install -s user gm@gm > /home/kasm-user/logs/claude-plugin.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
