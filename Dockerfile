@@ -51,7 +51,6 @@ RUN printf 'set -g history-limit 2000\nset -g terminal-overrides "xterm*:smcup@:
     chown kasm-user:kasm-user /home/kasm-user/.tmux.conf
 
 # Setup home directory structure (relatively stable)
-RUN mkdir -p /home/kasm-user/Desktop/Uploads
 RUN mkdir -p /home/kasm-user/.config/autostart
 RUN mkdir -p /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml
 RUN mkdir -p /home/kasm-user/logs
@@ -91,7 +90,7 @@ RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-termi
 # Setup startup scripts (stable - service configuration)
 RUN echo "echo '===== STARTUP $(date) =====' | tee -a /home/kasm-user/logs/startup.log" > $STARTUPDIR/custom_startup.sh
 RUN echo "/usr/bin/desktop_ready && nohup bash -c 'export VNC_PW=\"\$(grep -az \"^VNC_PW=\" /proc/1/environ | cut -d= -f2-)\" && /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/kasmproxy start' > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "/usr/bin/desktop_ready && nohup /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+#RUN echo "/usr/bin/desktop_ready && nohup /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup npm install -g @google/gemini-cli > /home/kasm-user/logs/gemini-cli.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup npm install -g wrangler > /home/kasm-user/logs/wrangler.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'curl https://sdk.cloud.google.com | bash' > /home/kasm-user/logs/gcloud-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
@@ -102,8 +101,7 @@ RUN echo "nohup /home/kasm-user/.local/bin/claude plugin install -s user gm@gm >
 RUN echo "nohup bash -c 'curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'cd /home/kasm-user/webssh2 && WEBSSH2_SSH_HOST=localhost WEBSSH2_SSH_PORT=22 WEBSSH2_USER_NAME=kasm-user WEBSSH2_USER_PASSWORD=kasm npm start' > /home/kasm-user/logs/webssh2.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'cd /home/kasm-user/node-file-manager-esm && PORT=9998 npm start -- -d /home/kasm-user/Desktop' > /home/kasm-user/logs/node-file-manager-esm.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "mkdir -p /run/sshd && nohup sudo bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | sudo chpasswd; fi && /usr/sbin/sshd' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup bash -c 'sudo -u kasm-user tmux new-session -d -s main -x 120 -y 30; sleep 1; sudo -u kasm-user tmux new-window -t main -n sshd' > /home/kasm-user/logs/tmux.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+#RUN echo "mkdir -p /run/sshd && nohup sudo bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | sudo chpasswd; fi && /usr/sbin/sshd' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "echo '===== STARTUP COMPLETE =====' | tee -a /home/kasm-user/logs/startup.log" >> $STARTUPDIR/custom_startup.sh
 RUN chmod +x $STARTUPDIR/custom_startup.sh
 
@@ -117,26 +115,26 @@ RUN mkdir -p /opt/google/chrome/extensions
 RUN chmod 777 /opt/google/chrome/extensions
 
 # Create extension enablement Python script
-RUN echo '#!/usr/bin/env python3' > /usr/local/bin/enable_chromium_extension.py
-RUN echo 'import json, os, sys' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo 'prefs_file = os.path.expanduser("~/.config/chromium/Default/Preferences")' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo 'if os.path.exists(prefs_file):' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '    try:' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '        with open(prefs_file) as f: prefs = json.load(f)' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '        prefs.setdefault("extensions", {}).setdefault("settings", {}).setdefault("jfeammnjpkecdekppnclgkkffahnhfhe", {})["active_bit"] = True' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '        with open(prefs_file, "w") as f: json.dump(prefs, f)' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '    except: pass' >> /usr/local/bin/enable_chromium_extension.py
-RUN chmod +x /usr/local/bin/enable_chromium_extension.py
+#RUN echo '#!/usr/bin/env python3' > /usr/local/bin/enable_chromium_extension.py
+#RUN echo 'import json, os, sys' >> /usr/local/bin/enable_chromium_extension.py
+#RUN echo 'prefs_file = os.path.expanduser("~/.config/chromium/Default/Preferences")' >> /usr/local/bin/enable_chromium_extension.py
+#RUN echo 'if os.path.exists(prefs_file):' >> /usr/local/bin/enable_chromium_extension.py
+#RUN echo '    try:' >> /usr/local/bin/enable_chromium_extension.py
+#RUN echo '        with open(prefs_file) as f: prefs = json.load(f)' >> /usr/local/bin/enable_chromium_extension.py
+#RUN echo '        prefs.setdefault("extensions", {}).setdefault("settings", {}).setdefault("jfeammnjpkecdekppnclgkkffahnhfhe", {})["active_bit"] = True' >> /usr/local/bin/enable_chromium_extension.py
+#RUN echo '        with open(prefs_file, "w") as f: json.dump(prefs, f)' >> /usr/local/bin/enable_chromium_extension.py
+#RUN echo '    except: pass' >> /usr/local/bin/enable_chromium_extension.py
+#RUN chmod +x /usr/local/bin/enable_chromium_extension.py
 
 # Download dynamic binaries and configuration (volatile - fetched on each build)
-RUN ARCH=$(uname -m) && TARGETARCH=$([ "$ARCH" = "x86_64" ] && echo "amd64" || echo "arm64") && DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | grep "proxypilot-linux-${TARGETARCH}" | grep -o '"browser_download_url": "[^"]*"' | cut -d'"' -f4 | head -1) && curl -L -o /usr/bin/proxypilot "$DOWNLOAD_URL"
-RUN chmod +x /usr/bin/proxypilot
+#RUN ARCH=$(uname -m) && TARGETARCH=$([ "$ARCH" = "x86_64" ] && echo "amd64" || echo "arm64") && DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | grep "proxypilot-linux-${TARGETARCH}" | grep -o '"browser_download_url": "[^"]*"' | cut -d'"' -f4 | head -1) && curl -L -o /usr/bin/proxypilot "$DOWNLOAD_URL"
+#RUN chmod +x /usr/bin/proxypilot
 
 # Download configuration file (volatile - may change)
-RUN wget -nc -O /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
+#RUN wget -nc -O /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
 
 # Create cache directory for Claude CLI before switching to user
-RUN mkdir -p /home/kasm-user/.cache && chown -R kasm-user:kasm-user /home/kasm-user/.cache
+#RUN mkdir -p /home/kasm-user/.cache && chown -R kasm-user:kasm-user /home/kasm-user/.cache
 
 # Switch to user and install Claude CLI (volatile - latest versions)
 USER 1000
