@@ -12,7 +12,7 @@
 - System uses Node v23.11.1 via NVM (pinned in Dockerfile line 22)
 - webssh2 is compatible with this version
 - npm version: 10.9.2
-- Production dependencies only (110 packages)
+- Production dependencies only (267 packages including transitive dependencies)
 
 ### Startup Service Pattern
 - All services use `nohup` for background execution
@@ -49,7 +49,7 @@
 1. ✓ Repository clones successfully from GitHub
 2. ✓ package.json is valid JSON
 3. ✓ npm install --production completes without errors
-4. ✓ node_modules directory created with 110+ packages
+4. ✓ node_modules directory created with 267 packages
 5. ✓ npm start script present and callable
 6. ✓ Startup script follows nohup pattern matching 7 other services
 
