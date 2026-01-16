@@ -14,6 +14,12 @@
 - npm version: 10.9.2
 - Production dependencies only (267 packages including transitive dependencies)
 
+### Claude CLI Installation
+- Cache directory `/home/kasm-user/.cache` must be created as root BEFORE switching to USER 1000
+- Without pre-creation, Claude install fails with `EACCES: permission denied` on mkdir
+- Solution: Create cache dir with chown as root, then switch user
+- This was discovered during deployment and fixed in Dockerfile line 106
+
 ### Startup Service Pattern
 - All services use `nohup` for background execution
 - Services run in parallel, not sequential
