@@ -14,6 +14,7 @@ A Docker-based environment for web development and browser automation with integ
 
 ### Web Services
 - **webssh2** - Web-based SSH client (port 9999)
+- **node-file-manager-esm** - File manager web interface (port 9998)
 
 ## Architecture
 

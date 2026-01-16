@@ -36,12 +36,26 @@
 - Configuration: Uses environment variables (12-factor app principle)
 - **Important**: ENV WEBSSH2_LISTEN_PORT is set at build time and inherited by all RUN commands and startup
 
+### node-file-manager-esm Service Specifics
+- Runs from `/home/kasm-user/node-file-manager-esm`
+- Entry point: `npm start` (executes bin/node-file-manager-esm.mjs)
+- Listen port: 9998 (configured via ENV PORT in Dockerfile line 52)
+- Log file: `/home/kasm-user/logs/node-file-manager-esm.log`
+- User: kasm-user (not root)
+- Configuration: Uses environment variable PORT (12-factor app principle)
+- **Important**: ENV PORT is set at build time and inherited by all RUN commands and startup
+
 ### Potential Issues and Recovery
 
 #### Issue: webssh2 fails to start
 - **Check**: `/home/kasm-user/logs/webssh2.log` for error details
 - **Cause**: Port 9999 already in use or startup environment variable not set
 - **Fix**: Change ENV WEBSSH2_LISTEN_PORT value in Dockerfile line 46 to alternative port
+
+#### Issue: node-file-manager-esm fails to start
+- **Check**: `/home/kasm-user/logs/node-file-manager-esm.log` for error details
+- **Cause**: Port 9998 already in use or startup environment variable not set
+- **Fix**: Change ENV PORT value in Dockerfile line 52 to alternative port
 
 #### Issue: npm start doesn't work in nohup context
 - **Current approach**: Verified `npm start` script exists in package.json
@@ -67,3 +81,7 @@
 - [ ] `/home/kasm-user/logs/webssh2.log` is created and has content
 - [ ] Port 9999 is listening (verify with: netstat -tlnp | grep 9999)
 - [ ] Can connect via web browser to webssh2 interface (http://localhost:9999)
+- [ ] node-file-manager-esm service appears in ps output after container starts
+- [ ] `/home/kasm-user/logs/node-file-manager-esm.log` is created and has content
+- [ ] Port 9998 is listening (verify with: netstat -tlnp | grep 9998)
+- [ ] Can connect via web browser to file manager (http://localhost:9998)
