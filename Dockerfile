@@ -56,9 +56,6 @@ RUN mkdir -p /home/kasm-user/Desktop/Uploads
 RUN mkdir -p /home/kasm-user/.config/autostart
 RUN mkdir -p /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml
 RUN mkdir -p /home/kasm-user/logs
-RUN chmod a+rw /home/kasm-user -R
-RUN chown -R 1000:1000 /home/kasm-user
-RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
 
 # Configure bashrc for auto-tmux attach on terminal start
 #RUN printf '\n# Auto-attach to tmux session\nif [ -z "$TMUX" ] && [ "$TERM" != "dumb" ]; then\n    exec tmux attach-session -t main || exec tmux new-session -s main\nfi\n' >> /home/kasm-user/.profile
@@ -138,7 +135,8 @@ RUN wget -nc -O /home/kasm-user/config.yaml https://raw.githubusercontent.com/Fi
 
 # Create cache directory for Claude CLI before switching to user
 RUN mkdir -p /home/kasm-user/.cache && chown -R kasm-user:kasm-user /home/kasm-user/.cache
-
+RUN chmod a+rw /home/kasm-user -R
+RUN chown -R 1000:1000 /home/kasm-user
 # Switch to user and install Claude CLI (volatile - latest versions)
 USER 1000
 #RUN curl -fsSL https://claude.ai/install.sh | bash
