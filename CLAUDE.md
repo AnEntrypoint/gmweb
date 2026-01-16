@@ -36,10 +36,12 @@
   - `UsePAM: no` - Direct password authentication without PAM
   - `PasswordAuthentication: yes` - Password auth enabled
   - `PubkeyAuthentication: yes` - SSH keys supported
-- **Auto-connect feature**: webssh2 supports auto-connect via `/host/` path prefix
-  - Example: `http://localhost:9999/ssh/host/localhost/22/kasm-user` will auto-connect
-  - Default path `/ssh` shows login form (manual entry required)
-- **Verified**: SSH authentication tested via webssh2 UI and CLI
+- **Auto-connect feature**:
+  - `/ssh` root path opens terminal directly with auto-connect (no login form)
+  - Auto-connect uses default credentials: kasm-user@localhost:22 with password "kasm"
+  - Implementation: Root route handler sets session credentials and triggers auto-connect
+  - Patch applied during Docker build (lines 71-108)
+- **Verified**: SSH authentication tested via webssh2 UI and CLI, auto-connect confirmed working
 
 ### webssh2 Service Specifics
 - Runs from `/home/kasm-user/webssh2`
