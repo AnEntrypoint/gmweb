@@ -29,18 +29,13 @@
 - **Important**: Services cannot communicate via stdio; use ports/sockets
 
 ### VNC_PW Environment Variable Propagation
-- **Status**: ✓ Fixed (January 16, 2026)
 - **Issue**: VNC_PW was set during Docker build but not available to kasmproxy at runtime
 - **Root cause**: Startup script didn't explicitly export VNC_PW to subprocess
 - **Solution**: Modified kasmproxy startup to explicitly export VNC_PW (Dockerfile line 93)
 - **Implementation**: Changed from direct npx call to bash -c with explicit `export VNC_PW="${VNC_PW}"` before npx command
 - **Variable flow**: Docker ENV → custom_startup.sh parent process → bash -c subprocess → kasmproxy NPX process
-- **Backward compatible**: Works with or without VNC_PW set (variable is exported but optional)
-- **No regressions**: desktop_ready signal, nohup, and logging all preserved
-- **Verification**: Tested bash variable expansion and subprocess inheritance patterns
 
 ### webssh2 SSH Authentication
-- **Status**: ✓ Fixed and verified working
 - **Password**: `kasm` (set during Docker build at line 45)
 - **Username**: `kasm-user`
 - **SSH Configuration**:
@@ -53,7 +48,6 @@
   - Default credentials: kasm-user@localhost:22 with password "kask"
   - When implemented: `/ssh` opens terminal directly with no login form
   - See implementation notes in routes-v2.ts line 267-283
-- **Verified**: SSH authentication working, auto-connect feature tested in running instance
 
 ### webssh2 Service Specifics
 - Runs from `/home/kasm-user/webssh2`
@@ -76,11 +70,9 @@
 ### Potential Issues and Recovery
 
 #### Issue: SSH authentication fails with "All configured authentication methods failed"
-- **Status**: ✓ FIXED
 - **Root cause**: PAM was enabled but not properly configured for password auth
 - **Solution**: Disable PAM (`UsePAM no`) and set default password for kasm-user
-- **Fixed in**: Dockerfile lines 42-45
-- **Verification**: SSH authentication now works via both CLI and webssh2 web UI
+- **Location**: Dockerfile lines 42-45
 
 #### Issue: webssh2 fails to start
 - **Check**: `/home/kasm-user/logs/webssh2.log` for error details
@@ -93,7 +85,7 @@
 - **Fix**: Change ENV PORT value in Dockerfile line 52 to alternative port
 
 #### Issue: npm start doesn't work in nohup context
-- **Current approach**: Verified `npm start` script exists in package.json
+- **Approach**: `npm start` script exists in package.json
 - **Fallback**: Could use `node bin/www` directly if npm start fails
 - **Recovery**: Edit startup script in Dockerfile line 73
 
@@ -101,49 +93,3 @@
 - **Prevention**: chown -R kasm-user:kasm-user applied at build time
 - **Check**: `ls -la /home/kasm-user/webssh2` should show kasm-user:kasm-user
 - **Root cause**: Build layer caching or layer execution order
-
-### Testing Verification Performed
-1. ✓ Repository clones successfully from GitHub
-2. ✓ package.json is valid JSON
-3. ✓ npm install --production completes without errors
-4. ✓ node_modules directory created with 267 packages
-5. ✓ npm start script present and callable
-6. ✓ Startup script follows nohup pattern matching 7 other services
-
-### Deployment Findings (Verified)
-**January 16, 2026 - Services Successfully Running**
-- ✓ webssh2 service running on port 9999
-  - Process: `node dist/index.js` (PID 7875)
-  - Port listening: `tcp 0.0.0.0:9999`
-  - HTTP response: `404 Not Found` (service operational)
-  - Started via: `nohup bash -c 'cd /home/kasm-user/webssh2 && WEBSSH2_LISTEN_PORT=9999 npm start'`
-
-- ✓ node-file-manager-esm service running on port 9998
-  - Process: `node ./bin/node-file-manager-esm.mjs --log` (PID 7800)
-  - Port listening: `tcp6 :::9998`
-  - HTTP response: `302 Found` redirect to /files (service operational)
-  - Started via: `nohup bash -c 'cd /home/kasm-user/node-file-manager-esm && PORT=9998 npm start'`
-
-**Installation & Startup Procedure (Post-Deployment)**
-When container starts without pre-built services:
-```bash
-# Clone repositories
-cd /home/kasm-user
-git clone https://github.com/billchurch/webssh2.git webssh2
-git clone https://github.com/BananaAcid/node-file-manager-esm.git node-file-manager-esm
-
-# Install dependencies
-cd webssh2 && npm install --production
-cd ../node-file-manager-esm && npm install --production
-
-# Start services with environment variables
-nohup bash -c 'cd /home/kasm-user/webssh2 && WEBSSH2_LISTEN_PORT=9999 npm start' > /home/kasm-user/logs/webssh2.log 2>&1 &
-nohup bash -c 'cd /home/kasm-user/node-file-manager-esm && PORT=9998 npm start' > /home/kasm-user/logs/node-file-manager-esm.log 2>&1 &
-```
-
-### Deployment Checklist
-- [x] Docker build includes webssh2 and node-file-manager-esm setup
-- [x] webssh2 service running and listening on port 9999
-- [x] node-file-manager-esm service running and listening on port 9998
-- [x] Both services responding to HTTP requests
-- [x] Services can be accessed via `curl http://localhost:9999` and `curl http://localhost:9998`
