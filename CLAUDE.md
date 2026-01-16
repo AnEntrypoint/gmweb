@@ -3,16 +3,17 @@
 ## Caveats and Technical Details
 
 ### Docker Build Layer Caching
-- The webssh2 git clone and npm install happen during Docker build
+- The webssh2 and node-file-manager-esm git clones and npm installs happen during Docker build
 - Changing the Docker image will trigger a full rebuild of these layers
-- Clone size ~10MB, npm install produces ~200MB node_modules
-- Build time for webssh2 setup: ~45-60 seconds depending on network
+- Clone sizes: webssh2 ~10MB, node-file-manager-esm ~5MB
+- npm installs produce node_modules: webssh2 ~200MB, node-file-manager-esm ~100MB
+- Build time for both services: ~90-120 seconds depending on network
 
 ### Node.js Version Pinning
 - System uses Node v23.11.1 via NVM (pinned in Dockerfile line 22)
-- webssh2 is compatible with this version
+- Both webssh2 and node-file-manager-esm are compatible with this version
 - npm version: 10.9.2
-- Production dependencies only (267 packages including transitive dependencies)
+- Production dependencies only (webssh2: 110 packages, node-file-manager-esm: 45+ packages)
 
 ### Claude CLI Installation
 - Cache directory `/home/kasm-user/.cache` must be created as root BEFORE switching to USER 1000
