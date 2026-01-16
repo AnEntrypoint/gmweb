@@ -28,6 +28,19 @@
 - No dependency ordering between services
 - **Important**: Services cannot communicate via stdio; use ports/sockets
 
+### webssh2 SSH Authentication
+- **Status**: ✓ Fixed and verified working
+- **Password**: `kasm` (set during Docker build at line 45)
+- **Username**: `kasm-user`
+- **SSH Configuration**:
+  - `UsePAM: no` - Direct password authentication without PAM
+  - `PasswordAuthentication: yes` - Password auth enabled
+  - `PubkeyAuthentication: yes` - SSH keys supported
+- **Auto-connect feature**: webssh2 supports auto-connect via `/host/` path prefix
+  - Example: `http://localhost:9999/ssh/host/localhost/22/kasm-user` will auto-connect
+  - Default path `/ssh` shows login form (manual entry required)
+- **Verified**: SSH authentication tested via webssh2 UI and CLI
+
 ### webssh2 Service Specifics
 - Runs from `/home/kasm-user/webssh2`
 - Entry point: `npm start` (executes index.js)
@@ -47,6 +60,13 @@
 - **Important**: ENV PORT is set at build time and inherited by all RUN commands and startup
 
 ### Potential Issues and Recovery
+
+#### Issue: SSH authentication fails with "All configured authentication methods failed"
+- **Status**: ✓ FIXED
+- **Root cause**: PAM was enabled but not properly configured for password auth
+- **Solution**: Disable PAM (`UsePAM no`) and set default password for kasm-user
+- **Fixed in**: Dockerfile lines 42-45
+- **Verification**: SSH authentication now works via both CLI and webssh2 web UI
 
 #### Issue: webssh2 fails to start
 - **Check**: `/home/kasm-user/logs/webssh2.log` for error details
