@@ -28,6 +28,17 @@
 - No dependency ordering between services
 - **Important**: Services cannot communicate via stdio; use ports/sockets
 
+### VNC_PW Environment Variable Propagation
+- **Status**: ✓ Fixed (January 16, 2026)
+- **Issue**: VNC_PW was set during Docker build but not available to kasmproxy at runtime
+- **Root cause**: Startup script didn't explicitly export VNC_PW to subprocess
+- **Solution**: Modified kasmproxy startup to explicitly export VNC_PW (Dockerfile line 93)
+- **Implementation**: Changed from direct npx call to bash -c with explicit `export VNC_PW="${VNC_PW}"` before npx command
+- **Variable flow**: Docker ENV → custom_startup.sh parent process → bash -c subprocess → kasmproxy NPX process
+- **Backward compatible**: Works with or without VNC_PW set (variable is exported but optional)
+- **No regressions**: desktop_ready signal, nohup, and logging all preserved
+- **Verification**: Tested bash variable expansion and subprocess inheritance patterns
+
 ### webssh2 SSH Authentication
 - **Status**: ✓ Fixed and verified working
 - **Password**: `kasm` (set during Docker build at line 45)
