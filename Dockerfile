@@ -39,7 +39,8 @@ RUN mkdir -p /run/sshd && \
     sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
     grep -q '^PasswordAuthentication yes' /etc/ssh/sshd_config || echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config && \
     sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
-    sed -i 's/^#UsePAM yes/UsePAM yes/' /etc/ssh/sshd_config
+    sed -i 's/^#UsePAM yes/UsePAM yes/' /etc/ssh/sshd_config && \
+    /usr/bin/ssh-keygen -A
 
 # Configure tmux globally - discard buffer history to prevent buildup
 RUN printf 'set -g history-limit 0\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\nset-option -g set-titles on\n' > /etc/tmux.conf && \
