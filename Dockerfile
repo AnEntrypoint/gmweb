@@ -42,6 +42,11 @@ RUN chmod a+rw /home/kasm-user -R
 RUN chown -R 1000:1000 /home/kasm-user
 RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
 
+# Setup webssh2 (stable - web-based SSH client)
+RUN git clone https://github.com/billchurch/webssh2.git /home/kasm-user/webssh2
+RUN cd /home/kasm-user/webssh2 && npm install --production
+RUN chown -R kasm-user:kasm-user /home/kasm-user/webssh2
+
 # Create autostart desktop entries (stable - application launchers)
 # All three files created atomically in single RUN for reliability
 RUN printf '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce4-terminal\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/terminal.desktop && \
@@ -65,6 +70,7 @@ RUN echo "nohup sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extensi
 RUN echo "nohup /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm > /home/kasm-user/logs/claude-marketplace.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup /home/kasm-user/.local/bin/claude plugin install -s user gm@gm > /home/kasm-user/logs/claude-plugin.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup bash -c 'cd /home/kasm-user/webssh2 && npm start' > /home/kasm-user/logs/webssh2.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "echo '===== STARTUP COMPLETE =====' | tee -a /home/kasm-user/logs/startup.log" >> $STARTUPDIR/custom_startup.sh
 RUN chmod +x $STARTUPDIR/custom_startup.sh
 
