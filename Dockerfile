@@ -68,45 +68,6 @@ RUN git clone https://github.com/billchurch/webssh2.git /home/kasm-user/webssh2
 RUN cd /home/kasm-user/webssh2 && npm install --production
 RUN chown -R kasm-user:kasm-user /home/kasm-user/webssh2
 
-# Patch webssh2 routes to auto-connect with default credentials on /ssh
-RUN cat > /tmp/patch-webssh2-routes.js << 'PATCH_EOF'
-const fs = require('fs');
-const routesFile = '/home/kasm-user/webssh2/app/routes/routes-v2.ts';
-let content = fs.readFileSync(routesFile, 'utf8');
-
-// Replace the root route handler to set up auto-connect with default credentials
-const oldRoot = `router.get('/', asyncRouteHandler(async (req: Request, res: Response) => {
-    const expressReq = req as unknown as ExpressRequest
-    debug('GET / - Root route accessed')
-
-    processAuthParameters(expressReq.query, expressReq.session)
-    await handleConnection(expressReq as unknown as Request & { session?: AuthSession; sessionID?: string }, res)
-  }))`;
-
-const newRoot = `router.get('/', asyncRouteHandler(async (req: Request, res: Response) => {
-    const expressReq = req as unknown as ExpressRequest
-    debug('GET / - Root route, auto-connecting with defaults')
-    expressReq.session.sshCredentials = {
-      host: 'localhost',
-      port: 22,
-      username: 'kasm-user',
-      password: 'kasm',
-      term: '',
-      usedBasicAuth: true
-    }
-    await handleConnection(expressReq as unknown as Request & { session?: AuthSession; sessionID?: string }, res)
-  }))`;
-
-if (content.includes(oldRoot)) {
-  content = content.replace(oldRoot, newRoot);
-  fs.writeFileSync(routesFile, content);
-  console.log('✓ Patched webssh2 routes for auto-connect');
-} else {
-  console.log('⚠ Could not find root route handler to patch');
-}
-PATCH_EOF
-node /tmp/patch-webssh2-routes.js && rm /tmp/patch-webssh2-routes.js
-
 # Setup node-file-manager-esm (stable - file manager web interface)
 ENV PORT=9998
 RUN git clone https://github.com/BananaAcid/node-file-manager-esm.git /home/kasm-user/node-file-manager-esm
