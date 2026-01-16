@@ -43,6 +43,7 @@ RUN chown -R 1000:1000 /home/kasm-user
 RUN chown -R kasm-user:kasm-user /home/kasm-user/.config
 
 # Setup webssh2 (stable - web-based SSH client)
+ENV WEBSSH2_LISTEN_PORT=9999
 RUN git clone https://github.com/billchurch/webssh2.git /home/kasm-user/webssh2
 RUN cd /home/kasm-user/webssh2 && npm install --production
 RUN chown -R kasm-user:kasm-user /home/kasm-user/webssh2

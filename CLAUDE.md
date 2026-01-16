@@ -29,17 +29,18 @@
 
 ### webssh2 Service Specifics
 - Runs from `/home/kasm-user/webssh2`
-- Entry point: `npm start` (executes bin/www)
-- Default port: 2222 (check webssh2 config.json if changed)
+- Entry point: `npm start` (executes index.js)
+- Listen port: 9999 (configured via ENV WEBSSH2_LISTEN_PORT in Dockerfile line 46)
 - Log file: `/home/kasm-user/logs/webssh2.log`
 - User: kasm-user (not root)
+- Configuration: Uses environment variables (12-factor app principle)
 
 ### Potential Issues and Recovery
 
 #### Issue: webssh2 fails to start
 - **Check**: `/home/kasm-user/logs/webssh2.log` for error details
-- **Cause**: Port 2222 already in use or config.json missing
-- **Fix**: Modify config.json in webssh2 directory or change port
+- **Cause**: Port 9999 already in use or startup environment variable not set
+- **Fix**: Change ENV WEBSSH2_LISTEN_PORT value in Dockerfile line 46 to alternative port
 
 #### Issue: npm start doesn't work in nohup context
 - **Current approach**: Verified `npm start` script exists in package.json
@@ -63,5 +64,5 @@
 - [ ] Docker build completes without errors
 - [ ] webssh2 service appears in ps output after container starts
 - [ ] `/home/kasm-user/logs/webssh2.log` is created and has content
-- [ ] Port 2222 is listening (or configured port if changed)
-- [ ] Can connect via web browser to webssh2 interface
+- [ ] Port 9999 is listening (verify with: netstat -tlnp | grep 9999)
+- [ ] Can connect via web browser to webssh2 interface (http://localhost:9999)

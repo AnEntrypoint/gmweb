@@ -13,7 +13,7 @@ A Docker-based environment for web development and browser automation with integ
 - **xfce4-terminal** - Desktop terminal emulator
 
 ### Web Services
-- **webssh2** - Web-based SSH client (port 2222 by default)
+- **webssh2** - Web-based SSH client (port 9999)
 
 ## Architecture
 
