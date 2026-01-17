@@ -143,14 +143,6 @@ else
 fi
 
 # ============================================================================
-# Fix runtime permissions (volume-mounted directories)
-# ============================================================================
-
-# Fix permissions on mounted volumes (runs as root at startup)
-# Note: Desktop/Downloads symlink is created by KasmWeb, do not interfere
-chmod 755 /home/kasm-user/{Desktop,Desktop/Uploads} 2>/dev/null || true
-
-# ============================================================================
 # Start supervisor
 # ============================================================================
 

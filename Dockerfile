@@ -41,23 +41,11 @@ RUN bash /opt/gmweb-startup/install.sh
 # Setup custom startup hook permissions
 RUN chmod +x /dockerstartup/custom_startup.sh
 
-# Create default profile directory structure
-# KasmWeb copies /home/kasm-default-profile to /home/kasm-user on startup
-# Only create directories - let KasmWeb create the symlinks itself
-# This prevents permission conflicts during profile verification
-RUN mkdir -p /home/kasm-default-profile/Desktop \
-             /home/kasm-default-profile/Downloads \
-             /home/kasm-default-profile/Uploads && \
-    chmod 755 /home/kasm-default-profile \
-              /home/kasm-default-profile/Desktop \
-              /home/kasm-default-profile/Downloads \
-              /home/kasm-default-profile/Uploads && \
-    chown -R 1000:1000 /home/kasm-default-profile
-
-# NOTE: Do NOT create anything in /home/kasm-user
-# KasmWeb manages the entire /home/kasm-user directory at startup
-# Only system-level (/usr, /etc, /opt) installations above are done
-# User-specific setup (configs, WebSSH2, etc.) is done in custom_startup.sh
+# NOTE: KasmWeb natively manages /home/kasm-user and /home/kasm-default-profile
+# Do NOT pre-create directories or modify these paths
+# KasmWeb profile initialization handles everything automatically
+# Our job: provide system-level software (/opt, /usr, /etc) only
+# User-specific setup: handled by custom_startup.sh after KasmWeb initializes
 
 # Switch to user (kasm-user = UID 1000)
 USER 1000
