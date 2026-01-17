@@ -11,14 +11,20 @@ export default {
   dependencies: [],
 
   async start(env) {
+    // Create combined environment with VNC_PW
+    const processEnv = {
+      ...env,
+      VNC_PW: env.VNC_PW || 'password'
+    };
+
     const ps = spawn('bash', ['-c', `
       mkdir -p /run/sshd
-      if [ -n "${env.VNC_PW}" ]; then
-        echo "kasm-user:${env.VNC_PW}" | chpasswd
+      if [ -n "$VNC_PW" ]; then
+        echo "kasm-user:$VNC_PW" | chpasswd
       fi
       /usr/sbin/sshd
     `], {
-      env: { ...env },
+      env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });

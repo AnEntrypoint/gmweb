@@ -11,12 +11,21 @@ export default {
   dependencies: [],
 
   async start(env) {
+    // Create combined environment for webssh2
+    const processEnv = {
+      ...env,
+      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+      WEBSSH2_SSH_HOST: 'localhost',
+      WEBSSH2_SSH_PORT: '22',
+      WEBSSH2_USER_NAME: 'kasm-user',
+      WEBSSH2_USER_PASSWORD: 'kasm'
+    };
+
     const ps = spawn('bash', ['-c', `
-      export PATH="${env.PATH}"
       cd /home/kasm-user/webssh2
-      WEBSSH2_SSH_HOST=localhost WEBSSH2_SSH_PORT=22 WEBSSH2_USER_NAME=kasm-user WEBSSH2_USER_PASSWORD=kasm npm start
+      npm start
     `], {
-      env: { ...env },
+      env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });

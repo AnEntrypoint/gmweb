@@ -11,12 +11,18 @@ export default {
   dependencies: [],
 
   async start(env) {
+    // Create combined environment for file-manager
+    const processEnv = {
+      ...env,
+      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+      PORT: '9998'
+    };
+
     const ps = spawn('bash', ['-c', `
-      export PATH="${env.PATH}"
       cd /home/kasm-user/node-file-manager-esm
-      PORT=9998 npm start -- -d /home/kasm-user/Desktop
+      npm start -- -d /home/kasm-user/Desktop
     `], {
-      env: { ...env },
+      env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });

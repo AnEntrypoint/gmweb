@@ -11,12 +11,19 @@ export default {
   dependencies: [],
 
   async start(env) {
+    // Create combined environment for kasmproxy
+    const processEnv = {
+      ...env,
+      VNC_PW: env.VNC_PW || 'password',
+      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+    };
+
     const ps = spawn('bash', ['-c', `
-      export VNC_PW="${env.VNC_PW || 'password'}"
-      export PATH="${env.PATH}"
+      export VNC_PW="$VNC_PW"
+      export PATH="$PATH"
       npx -y gxe@latest AnEntrypoint/kasmproxy start
     `], {
-      env: { ...env },
+      env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });

@@ -71,7 +71,11 @@ export class Supervisor {
 
       // Start all services
       for (const service of sorted) {
-        if (!this.config.services[service.name]?.enabled) {
+        // Check if service is explicitly disabled (default is enabled)
+        const serviceConfig = this.config.services?.[service.name];
+        const isEnabled = serviceConfig?.enabled !== false;
+
+        if (!isEnabled) {
           this.log('INFO', `Skipping disabled service: ${service.name}`);
           continue;
         }
@@ -123,7 +127,10 @@ export class Supervisor {
     while (this.running) {
       try {
         for (const [name, service] of this.services) {
-          if (!this.config.services[name]?.enabled) continue;
+          // Check if service is explicitly disabled (default is enabled)
+          const serviceConfig = this.config.services?.[name];
+          const isEnabled = serviceConfig?.enabled !== false;
+          if (!isEnabled) continue;
 
           try {
             const healthy = await service.health();
