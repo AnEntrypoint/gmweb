@@ -1,5 +1,6 @@
 // Immortal Supervisor: Never crashes, always recovers
 // Follows gm:state:machine mandatory rules
+// UPDATED: Prioritizes kasmproxy startup - starts first, blocks others until healthy
 
 import { spawnSync, spawn, execSync } from 'child_process';
 import { existsSync, appendFileSync } from 'fs';
@@ -15,6 +16,7 @@ export class Supervisor {
       baseBackoffDelay: 5000,
       maxBackoffDelay: 60000,
       logDirectory: '/home/kasm-user/logs',
+      kasmproxyStartupTimeout: 120000, // 2 minutes max to wait for kasmproxy
       ...config
     };
 
@@ -22,6 +24,7 @@ export class Supervisor {
     this.running = true;
     this.restartAttempts = new Map();
     this.processes = new Map();
+    this.kasmproxyHealthy = false;
 
     // Global error handlers - never let anything crash
     process.on('uncaughtException', (err) => {
@@ -59,18 +62,40 @@ export class Supervisor {
         await this.waitForDesktop();
       }
 
-      // Resolve dependencies and sort services
+      // Setup environment once
+      this.env = await this.getEnvironment();
+
+      // CRITICAL: Start kasmproxy FIRST and wait for it to be healthy
+      const kasmproxy = this.services.get('kasmproxy');
+      if (kasmproxy) {
+        this.log('INFO', '=== CRITICAL: Starting kasmproxy first ===');
+        try {
+          await this.startService(kasmproxy);
+
+          // Wait for kasmproxy to be healthy (blocks other services)
+          await this.waitForKasmproxyHealthy();
+          this.kasmproxyHealthy = true;
+          this.log('INFO', 'kasmproxy is healthy - proceeding with other services');
+        } catch (err) {
+          this.log('ERROR', 'Failed to start kasmproxy', err);
+          this.log('WARN', 'Attempting recovery...');
+          await sleep(2000);
+          await this.startService(kasmproxy);
+        }
+      }
+
+      // Resolve dependencies and sort remaining services
       const sorted = this.topologicalSort();
       if (!sorted) {
         this.log('ERROR', 'Circular dependency detected');
         return;
       }
 
-      // Setup environment once
-      this.env = await this.getEnvironment();
-
-      // Start all services
+      // Start all other services (kasmproxy already started)
       for (const service of sorted) {
+        // Skip kasmproxy - already started
+        if (service.name === 'kasmproxy') continue;
+
         // Check if service is explicitly disabled (default is enabled)
         const serviceConfig = this.config.services?.[service.name];
         const isEnabled = serviceConfig?.enabled !== false;
@@ -99,6 +124,29 @@ export class Supervisor {
       await sleep(5000);
       await this.start();
     }
+  }
+
+  async waitForKasmproxyHealthy() {
+    const startTime = Date.now();
+    const timeout = this.config.kasmproxyStartupTimeout;
+
+    this.log('INFO', 'Waiting for kasmproxy to be healthy...');
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const kasmproxy = this.services.get('kasmproxy');
+        if (kasmproxy && await kasmproxy.health()) {
+          this.log('INFO', 'kasmproxy is healthy!');
+          return;
+        }
+      } catch (err) {
+        // Continue waiting
+      }
+
+      await sleep(2000);
+    }
+
+    this.log('WARN', 'kasmproxy health check timeout after ' + Math.round((Date.now() - startTime) / 1000) + 's - continuing anyway');
   }
 
   async startService(service) {

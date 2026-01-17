@@ -11,7 +11,10 @@ RUN dpkg --configure -a
 RUN apt update
 
 # Install base system packages (stable layer)
-RUN apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates jq wget software-properties-common apt-transport-https gnupg openssh-server openssh-client tmux
+RUN apt-get install -y --no-install-recommends \
+    curl bash git build-essential ca-certificates jq wget \
+    software-properties-common apt-transport-https gnupg openssh-server \
+    openssh-client tmux lsof
 RUN rm -rf /var/lib/apt/lists/*
 
 # Setup NVM and Node.js (stable - pinned version)
@@ -29,9 +32,6 @@ RUN apt update
 RUN apt-get install -y --no-install-recommends gh
 RUN rm -rf /var/lib/apt/lists/*
 
-# Install npm global packages (stable - pinned versions)
-RUN npm install -g @musistudio/claude-code-router
-
 # Configure SSH for password authentication
 RUN mkdir -p /run/sshd && \
     sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
@@ -43,7 +43,7 @@ RUN mkdir -p /run/sshd && \
     /usr/bin/ssh-keygen -A && \
     echo 'kasm-user:kasm' | chpasswd
 
-# Configure tmux globally - keep a few pages of history to prevent pause on full buffer
+# Configure tmux globally
 RUN printf 'set -g history-limit 2000\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\nset-option -g set-titles on\n' > /etc/tmux.conf && \
     mkdir -p /home/kasm-user/.tmux && \
     printf 'set -g history-limit 2000\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\n' > /home/kasm-user/.tmux.conf && \
@@ -55,8 +55,10 @@ RUN mkdir -p /home/kasm-user/.config/autostart
 RUN mkdir -p /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml
 RUN mkdir -p /home/kasm-user/logs
 
-# Configure bashrc for auto-tmux attach on terminal start
-#RUN printf '\n# Auto-attach to tmux session\nif [ -z "$TMUX" ] && [ "$TERM" != "dumb" ]; then\n    exec tmux attach-session -t main || exec tmux new-session -s main\nfi\n' >> /home/kasm-user/.profile
+# Configure XFCE4 Terminal (font size 9)
+RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-terminal" version="1.0">\n  <property name="font-name" type="string" value="Monospace 9"/>\n</channel>\n' > /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml && \
+    chown -R kasm-user:kasm-user /home/kasm-user/.config/xfce4 && \
+    chmod 644 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
 
 # Setup webssh2 (stable - web-based SSH client)
 ENV WEBSSH2_LISTEN_PORT=9999
@@ -70,19 +72,11 @@ RUN git clone https://github.com/BananaAcid/node-file-manager-esm.git /home/kasm
 RUN cd /home/kasm-user/node-file-manager-esm && npm install --production
 RUN chown -R kasm-user:kasm-user /home/kasm-user/node-file-manager-esm
 
-# Create autostart desktop entries (stable - application launchers)
-# All three files created atomically in single RUN for reliability
-RUN printf '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce4-terminal\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/terminal.desktop && \
-    printf '[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/chromium.desktop && \
-    printf '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nExec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe\nOnlyShowIn=XFCE;\n' > /home/kasm-user/.config/autostart/ext.desktop && \
-    chmod 644 /home/kasm-user/.config/autostart/*.desktop && \
-    chown -R kasm-user:kasm-user /home/kasm-user/.config/autostart && \
-    ls -la /home/kasm-user/.config/autostart/
-
-# Configure XFCE4 Terminal (font size 9)
-RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-terminal" version="1.0">\n  <property name="font-name" type="string" value="Monospace 9"/>\n</channel>\n' > /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml && \
-    chown -R kasm-user:kasm-user /home/kasm-user/.config/xfce4 && \
-    chmod 644 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
+# Create cache and temp directories for Claude CLI before switching to user
+RUN mkdir -p /home/kasm-user/.cache /home/kasm-user/.tmp && \
+    chown -R kasm-user:kasm-user /home/kasm-user/.cache /home/kasm-user/.tmp
+RUN chmod a+rw /home/kasm-user -R
+RUN chown -R 1000:1000 /home/kasm-user
 
 # Copy modular startup system (from project root startup/ directory)
 COPY startup/ /home/kasm-user/gmweb-startup/
@@ -96,38 +90,9 @@ COPY docker/custom_startup.sh /dockerstartup/custom_startup.sh
 RUN chmod +x /dockerstartup/custom_startup.sh && \
     chown kasm-user:kasm-user /dockerstartup/custom_startup.sh
 
+# Create simple wrapper for Claude CLI
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
 RUN chmod +x /sbin/cc
 
-# Setup Chromium policies
-RUN mkdir -p /etc/chromium/policies/managed
-RUN echo '{"ExtensionInstallForcelist": ["jfeammnjpkecdekppnclgkkffahnhfhe;https://clients2.google.com/service/update2/crx"]}' > /etc/chromium/policies/managed/extension_install_forcelist.json
-RUN mkdir -p /opt/google/chrome/extensions
-RUN chmod 777 /opt/google/chrome/extensions
-
-# Create extension enablement Python script
-RUN echo '#!/usr/bin/env python3' > /usr/local/bin/enable_chromium_extension.py
-RUN echo 'import json, os, sys' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo 'prefs_file = os.path.expanduser("~/.config/chromium/Default/Preferences")' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo 'if os.path.exists(prefs_file):' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '    try:' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '        with open(prefs_file) as f: prefs = json.load(f)' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '        prefs.setdefault("extensions", {}).setdefault("settings", {}).setdefault("jfeammnjpkecdekppnclgkkffahnhfhe", {})["active_bit"] = True' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '        with open(prefs_file, "w") as f: json.dump(prefs, f)' >> /usr/local/bin/enable_chromium_extension.py
-RUN echo '    except: pass' >> /usr/local/bin/enable_chromium_extension.py
-RUN chmod +x /usr/local/bin/enable_chromium_extension.py
-
-# Download dynamic binaries and configuration (volatile - fetched on each build)
-RUN ARCH=$(uname -m) && TARGETARCH=$([ "$ARCH" = "x86_64" ] && echo "amd64" || echo "arm64") && DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | grep "proxypilot-linux-${TARGETARCH}" | grep -o '"browser_download_url": "[^"]*"' | cut -d'"' -f4 | head -1) && curl -L -o /usr/bin/proxypilot "$DOWNLOAD_URL"
-RUN chmod +x /usr/bin/proxypilot
-
-# Download configuration file (volatile - may change)
-RUN wget -nc -O /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
-
-# Create cache and temp directories for Claude CLI before switching to user
-RUN mkdir -p /home/kasm-user/.cache /home/kasm-user/.tmp && chown -R kasm-user:kasm-user /home/kasm-user/.cache /home/kasm-user/.tmp
-RUN chmod a+rw /home/kasm-user -R
-RUN chown -R 1000:1000 /home/kasm-user
-# Switch to user and install Claude CLI (volatile - latest versions)
+# Switch to user - all runtime services start here
 USER 1000
-#RUN curl -fsSL https://claude.ai/install.sh | bash

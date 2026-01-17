@@ -1,8 +1,7 @@
 #!/bin/bash
-# KasmWeb Custom Startup Script
-# Launches the gmweb modular supervisor system
-# Configurable via environment variables
-# This script must complete and exit so KasmWeb can continue initialization
+# KasmWeb Custom Startup Script - Optimized for fast boot
+# Launches the gmweb modular supervisor system with nohup and exits immediately
+# KasmWeb continues initialization while supervisor runs in background
 
 set -e
 
@@ -37,12 +36,24 @@ if [ ! -x "$GMWEB_NODE_PATH" ]; then
     exit 1
 fi
 
-# Start supervisor in background
+# Check if supervisor already running (idempotent - survives container restart)
+SUPERVISOR_PID_FILE="$GMWEB_LOG_DIR/.supervisor.pid"
+if [ -f "$SUPERVISOR_PID_FILE" ]; then
+    OLD_PID=$(cat "$SUPERVISOR_PID_FILE")
+    if kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "Supervisor already running (PID: $OLD_PID) - skipping restart" | tee -a "$GMWEB_LOG_DIR/startup.log"
+        exit 0
+    fi
+fi
+
+# Start supervisor in background with nohup and exit IMMEDIATELY
+# This allows KasmWeb to continue initializing without blocking
 cd "$GMWEB_STARTUP_DIR"
-"$GMWEB_NODE_PATH" index.js > "$GMWEB_SUPERVISOR_LOG" 2>&1 &
+nohup "$GMWEB_NODE_PATH" index.js >> "$GMWEB_SUPERVISOR_LOG" 2>&1 &
 
 SUPERVISOR_PID=$!
-echo "gmweb supervisor started (PID: $SUPERVISOR_PID)" | tee -a "$GMWEB_LOG_DIR/startup.log"
+echo "$SUPERVISOR_PID" > "$SUPERVISOR_PID_FILE"
+echo "gmweb supervisor started (PID: $SUPERVISOR_PID) - exiting to unblock KasmWeb" | tee -a "$GMWEB_LOG_DIR/startup.log"
 
-# Exit successfully so KasmWeb startup completes
+# Exit successfully - DO NOT WAIT - KasmWeb needs to continue
 exit 0
