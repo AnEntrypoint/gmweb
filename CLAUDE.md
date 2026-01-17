@@ -294,3 +294,53 @@ volumes:
   - claude-data:/home/kasm-user/.claude
 ```
 Note: This doesn't preserve `.claude.json` (sibling file) or CLI versions in `.local/share/claude`.
+
+## NVM Directory Ownership
+
+### Build vs Boot Ownership Issue
+NVM is installed during docker build as root/kasm-recorder. Services running as kasm-user cannot write to NVM directories for global npm installs.
+
+**Symptom:** `EACCES: permission denied, mkdir '/usr/local/local/nvm/versions/node/v23.11.1/lib/node_modules/@google'`
+
+**Fix:** `custom_startup.sh` runs `sudo chown -R kasm-user:kasm-user /usr/local/local/nvm` at boot.
+
+## Gemini CLI Installation
+
+### Use npx Wrapper Instead of Global Install
+Global `npm install -g @google/gemini-cli` is unreliable due to:
+- Parallel install attempts from supervisor restarts corrupt npm state
+- Large dependency tree (~400 packages) prone to extraction failures
+- Interrupted installs leave partial state that breaks subsequent attempts
+
+**Solution:** Create a wrapper script that uses npx:
+```bash
+#!/bin/bash
+exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y @google/gemini-cli "$@"
+```
+
+**Benefits:**
+- npx caches the package after first run (~/.npm/_npx/)
+- No corruption from parallel installs
+- Always gets working version
+- Wrapper at `/usr/local/local/nvm/versions/node/v23.11.1/bin/gemini` is in PATH
+
+## Supervisor Logging
+
+### Per-Service Log Files
+Supervisor creates separate log files for each service:
+
+```
+/home/kasm-user/logs/
+├── supervisor.log           # Main orchestration log
+├── startup.log              # Boot-time custom_startup.sh log
+├── LOG_INDEX.txt            # Reference guide for log files
+└── services/
+    ├── <service-name>.log   # stdout/stderr for each service
+    └── <service-name>.err   # stderr only (errors/warnings)
+```
+
+**Usage:**
+- `tail -f supervisor.log` - Watch supervisor activity
+- `tail -f services/*.log` - Watch all service output
+- `grep ERROR *.log` - Find errors across all logs
+- Check `services/<name>.err` for service-specific errors

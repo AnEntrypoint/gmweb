@@ -3,8 +3,9 @@
 // UPDATED: Prioritizes kasmproxy startup - starts first, blocks others until healthy
 
 import { spawnSync, spawn, execSync } from 'child_process';
-import { existsSync, appendFileSync } from 'fs';
+import { existsSync, appendFileSync, mkdirSync, writeFileSync } from 'fs';
 import { promisify } from 'util';
+import { join } from 'path';
 
 const sleep = promisify(setTimeout);
 
@@ -25,6 +26,9 @@ export class Supervisor {
     this.restartAttempts = new Map();
     this.processes = new Map();
     this.kasmproxyHealthy = false;
+
+    // Setup log directories
+    this.setupLogDirectories();
 
     // Global error handlers - never let anything crash
     process.on('uncaughtException', (err) => {
@@ -150,10 +154,20 @@ export class Supervisor {
   }
 
   async startService(service) {
-    this.log('INFO', `Starting service: ${service.name}`);
+    this.log('INFO', `Starting service`, null, service.name);
 
     try {
       const result = await service.start(this.env);
+
+      // Attach output handlers to capture service logs
+      if (result.process) {
+        result.process.stdout?.on('data', (data) => {
+          this.logServiceOutput(service.name, 'stdout', data);
+        });
+        result.process.stderr?.on('data', (data) => {
+          this.logServiceOutput(service.name, 'stderr', data);
+        });
+      }
 
       this.processes.set(service.name, {
         pid: result.pid,
@@ -164,9 +178,9 @@ export class Supervisor {
       });
 
       this.restartAttempts.set(service.name, 0);
-      this.log('INFO', `Service started: ${service.name} (PID: ${result.pid})`);
+      this.log('INFO', `Service started (PID: ${result.pid})`, null, service.name);
     } catch (err) {
-      this.log('ERROR', `Service startup failed: ${service.name}`, err);
+      this.log('ERROR', `Service startup failed`, err, service.name);
       throw err;
     }
   }
@@ -183,11 +197,11 @@ export class Supervisor {
           try {
             const healthy = await service.health();
             if (!healthy) {
-              this.log('WARN', `Health check failed: ${name}`);
+              this.log('WARN', `Health check failed`, null, name);
               await this.restartService(service);
             }
           } catch (err) {
-            this.log('ERROR', `Health check error for ${name}`, err);
+            this.log('ERROR', `Health check error`, err, name);
             await this.restartService(service);
           }
         }
@@ -204,7 +218,7 @@ export class Supervisor {
     const attempts = this.restartAttempts.get(service.name) || 0;
 
     if (attempts >= this.config.maxRestartAttempts) {
-      this.log('WARN', `Max restart attempts reached for ${service.name}`);
+      this.log('WARN', `Max restart attempts reached (${attempts})`, null, service.name);
       return;
     }
 
@@ -213,7 +227,7 @@ export class Supervisor {
       this.config.maxBackoffDelay
     );
 
-    this.log('INFO', `Restarting ${service.name} (attempt ${attempts + 1}, delay ${delay}ms)`);
+    this.log('INFO', `Restarting (attempt ${attempts + 1}, delay ${delay}ms)`, null, service.name);
 
     try {
       // Stop existing process
@@ -222,7 +236,7 @@ export class Supervisor {
         try {
           await handle.cleanup();
         } catch (err) {
-          this.log('WARN', `Cleanup failed for ${service.name}`, err);
+          this.log('WARN', `Cleanup failed`, err, service.name);
         }
       }
 
@@ -232,7 +246,7 @@ export class Supervisor {
       await this.startService(service);
       this.restartAttempts.set(service.name, 0);
     } catch (err) {
-      this.log('ERROR', `Restart failed for ${service.name}`, err);
+      this.log('ERROR', `Restart failed`, err, service.name);
       this.restartAttempts.set(service.name, attempts + 1);
     }
   }
@@ -321,17 +335,96 @@ export class Supervisor {
     return env;
   }
 
-  log(level, msg, err = null) {
+  setupLogDirectories() {
+    try {
+      const baseDir = this.config.logDirectory;
+      mkdirSync(baseDir, { recursive: true });
+      mkdirSync(join(baseDir, 'services'), { recursive: true });
+
+      // Create log index file for easy reference
+      const indexPath = join(baseDir, 'LOG_INDEX.txt');
+      const indexContent = `GMWEB Log Directory
+====================
+Generated: ${new Date().toISOString()}
+
+Log Files:
+- supervisor.log     : Main supervisor orchestration log
+- startup.log        : Boot-time custom_startup.sh log
+- services/          : Per-service logs (one file per service)
+
+Per-Service Logs:
+  services/<service-name>.log   : stdout/stderr and events for each service
+  services/<service-name>.err   : stderr only (errors and warnings)
+
+Tips:
+- Use 'tail -f supervisor.log' to watch supervisor activity
+- Use 'tail -f services/*.log' to watch all service output
+- Use 'grep ERROR *.log' to find errors across all logs
+`;
+      writeFileSync(indexPath, indexContent);
+    } catch (e) {
+      // Ignore - will try again on first log
+    }
+  }
+
+  log(level, msg, err = null, serviceName = null) {
     const timestamp = new Date().toISOString();
     const message = err ? `${msg}: ${err.message}` : msg;
-    console.log(`[${timestamp}] [${level}] ${message}`);
+    const prefix = serviceName ? `[${serviceName}]` : '[supervisor]';
+    const formattedMsg = `[${timestamp}] [${level.padEnd(5)}] ${prefix} ${message}`;
 
-    // Persist to log file
+    console.log(formattedMsg);
+
+    // Persist to main supervisor log
     try {
-      const logPath = `${this.config.logDirectory}/supervisor.log`;
-      appendFileSync(logPath, `${timestamp} [${level}] ${message}\n`);
+      const logPath = join(this.config.logDirectory, 'supervisor.log');
+      appendFileSync(logPath, formattedMsg + '\n');
     } catch (e) {
       // Silence log file errors
+    }
+
+    // Also log to service-specific file if serviceName provided
+    if (serviceName) {
+      try {
+        const serviceLogPath = join(this.config.logDirectory, 'services', `${serviceName}.log`);
+        appendFileSync(serviceLogPath, formattedMsg + '\n');
+
+        // Log errors to separate .err file for easy filtering
+        if (level === 'ERROR' || level === 'WARN') {
+          const serviceErrPath = join(this.config.logDirectory, 'services', `${serviceName}.err`);
+          appendFileSync(serviceErrPath, formattedMsg + '\n');
+        }
+      } catch (e) {
+        // Silence
+      }
+    }
+  }
+
+  // Log service output (stdout/stderr) to dedicated service log
+  logServiceOutput(serviceName, stream, data) {
+    const timestamp = new Date().toISOString();
+    const lines = data.toString().trim().split('\n');
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const prefix = stream === 'stderr' ? 'ERR' : 'OUT';
+      const formattedMsg = `[${timestamp}] [${prefix}] ${line}`;
+
+      try {
+        const serviceLogPath = join(this.config.logDirectory, 'services', `${serviceName}.log`);
+        appendFileSync(serviceLogPath, formattedMsg + '\n');
+
+        // Also log stderr to .err file
+        if (stream === 'stderr') {
+          const serviceErrPath = join(this.config.logDirectory, 'services', `${serviceName}.err`);
+          appendFileSync(serviceErrPath, formattedMsg + '\n');
+        }
+      } catch (e) {
+        // Silence
+      }
+
+      // Also print to console with service prefix
+      console.log(`[${serviceName}:${prefix.toLowerCase()}] ${line}`);
     }
   }
 

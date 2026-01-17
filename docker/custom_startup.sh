@@ -47,6 +47,17 @@ if [ ! -d /home/kasm-user/.npm ]; then
 fi
 
 # ============================================================================
+# Fix NVM directory permissions (may be owned by kasm-recorder from build)
+# ============================================================================
+# Required for npm global installs (gemini-cli, wrangler, etc.)
+
+if [ -d /usr/local/local/nvm ]; then
+  log "Fixing NVM directory permissions..."
+  sudo chown -R kasm-user:kasm-user /usr/local/local/nvm
+  log "✓ NVM permissions fixed"
+fi
+
+# ============================================================================
 # Fix Claude Code UI permissions (root-owned from build time)
 # ============================================================================
 # The claudecodeui directory is created as root during docker build
