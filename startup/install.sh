@@ -1,13 +1,11 @@
 #!/bin/bash
-# gmweb Installation Script - ALL setup steps
+# gmweb Installation Script - SYSTEM PACKAGES ONLY
 # Runs ONCE during docker build time (RUN bash install.sh in Dockerfile)
+# DO NOT create anything in /home/kasm-user - KasmWeb manages that at startup
 # Idempotent checks NOT needed (runs only once)
 # All output captured by docker build
 
 set -e
-
-LOG_DIR="/home/kasm-user/logs"
-mkdir -p "$LOG_DIR"
 
 log() {
   echo "[gmweb-install] $@"
@@ -88,93 +86,17 @@ log "✓ GitHub CLI installed"
 
 log "Configuring tmux..."
 
-# Global tmux.conf
+# Global tmux.conf (system-wide)
 sudo printf 'set -g history-limit 2000\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\nset-option -g set-titles on\n' | sudo tee /etc/tmux.conf > /dev/null
 
-# User tmux.conf
-mkdir -p ~/.tmux
-printf 'set -g history-limit 2000\nset -g terminal-overrides "xterm*:smcup@:rmcup@"\nset-option -g allow-rename off\n' > ~/.tmux.conf
-
-log "✓ tmux configured"
+# User tmux.conf will be created in custom_startup.sh at boot
+log "✓ Global tmux configured (user config at boot time)"
 
 # ============================================================================
-# 5. HOME DIRECTORY STRUCTURE
+# 5. USER HOME SETUP (moved to custom_startup.sh - DO NOT create here)
 # ============================================================================
 
-log "Setting up home directory structure..."
-
-# Create directories (do NOT create Desktop/Downloads/Downloads - KasmWeb manages these)
-mkdir -p ~/Desktop/Uploads
-mkdir -p ~/.config/autostart
-mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml
-mkdir -p ~/logs
-
-# Ensure proper permissions for KasmWeb to manage Desktop and Downloads
-chmod 755 ~/Desktop
-
-log "✓ Home directories created"
-
-# ============================================================================
-# 6. XFCE4 TERMINAL CONFIGURATION
-# ============================================================================
-
-log "Configuring XFCE4 Terminal..."
-
-printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-terminal" version="1.0">\n  <property name="font-name" type="string" value="Monospace 9"/>\n</channel>\n' > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
-chmod 644 ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
-
-log "✓ XFCE4 Terminal configured"
-
-# ============================================================================
-# 7. XFCE4 DESKTOP ENTRIES
-# ============================================================================
-
-log "Creating XFCE4 desktop entries..."
-
-# Terminal entry
-printf '[Desktop Entry]\nType=Application\nName=Terminal\nExec=/usr/bin/xfce4-terminal\nOnlyShowIn=XFCE;\n' > ~/.config/autostart/terminal.desktop
-
-# Chromium entry
-printf '[Desktop Entry]\nType=Application\nName=Chromium\nExec=/usr/bin/chromium\nOnlyShowIn=XFCE;\n' > ~/.config/autostart/chromium.desktop
-
-# Chrome Extension Installer entry
-printf '[Desktop Entry]\nType=Application\nName=Chrome Extension Installer\nExec=bash -c "chromium --install-extension=cnobjgjejhbkcjbakdkdkhchpijecafo"\nOnlyShowIn=XFCE;\n' > ~/.config/autostart/ext.desktop
-
-chmod 644 ~/.config/autostart/*.desktop
-
-log "✓ Desktop entries created"
-
-# ============================================================================
-# 8. WEBSSH2 SETUP
-# ============================================================================
-
-log "Setting up WebSSH2..."
-
-if [ ! -d ~/webssh2 ]; then
-  git clone https://github.com/billchurch/webssh2.git ~/webssh2
-fi
-
-cd ~/webssh2
-npm install --production
-cd -
-
-log "✓ WebSSH2 installed"
-
-# ============================================================================
-# 9. FILE MANAGER SETUP
-# ============================================================================
-
-log "Setting up File Manager..."
-
-if [ ! -d ~/node-file-manager-esm ]; then
-  git clone https://github.com/BananaAcid/node-file-manager-esm.git ~/node-file-manager-esm
-fi
-
-cd ~/node-file-manager-esm
-npm install --production
-cd -
-
-log "✓ File Manager installed"
+log "Skipping user home setup - handled by custom_startup.sh at boot"
 
 # ============================================================================
 # 10. PROXYPILOT DOWNLOAD
@@ -200,25 +122,10 @@ else
 fi
 
 # ============================================================================
-# 11. COMPREHENSIVE PERMISSIONS FIX
+# 11. PERMISSIONS (moved to custom_startup.sh)
 # ============================================================================
 
-log "Setting comprehensive permissions..."
-
-# Ensure all home directories properly owned
-sudo chown -R kasm-user:kasm-user /home/kasm-user
-
-# Set directory permissions (755 = rwxr-xr-x, 600 = rw-------)
-chmod 755 /home/kasm-user{,/.config,/.config/{autostart,xfce4,xfce4/xfconf,xfce4/xfconf/xfce-perchannel-xml},/Desktop,/Desktop/Uploads,/Downloads,/logs}
-mkdir -p ~/.cache ~/.tmp
-chmod 755 ~/.cache ~/.tmp
-chmod 600 ~/.bashrc 2>/dev/null || true
-chmod 644 ~/.config/autostart/*.desktop 2>/dev/null || true
-
-# Fix permissions recursively on service directories
-find ~/{webssh2,node-file-manager-esm} -type d 2>/dev/null -exec chmod 755 {} \;
-
-log "✓ Permissions normalized"
+log "Permissions are set at boot time by custom_startup.sh"
 
 # ============================================================================
 # COMPLETION

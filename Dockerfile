@@ -42,10 +42,10 @@ RUN bash /home/kasm-user/gmweb-startup/install.sh
 # Setup custom startup hook permissions
 RUN chmod +x /dockerstartup/custom_startup.sh
 
-# Create Desktop directory (KasmWeb manages Downloads and Desktop/Downloads symlink)
-RUN mkdir -p /home/kasm-user/Desktop && \
-    chmod 777 /home/kasm-user/Desktop && \
-    chown 1000:1000 /home/kasm-user/Desktop
+# NOTE: Do NOT create anything in /home/kasm-user
+# KasmWeb manages the entire /home/kasm-user directory at startup
+# Only system-level (/usr, /etc, /opt) installations above are done
+# User-specific setup (configs, WebSSH2, etc.) is done in custom_startup.sh
 
 # Switch to user (kasm-user = UID 1000)
 USER 1000
