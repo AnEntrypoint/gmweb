@@ -24,20 +24,19 @@ ENV PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$PATH"
 
 # Clone gmweb repo to get startup system and custom startup hook
 RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
-    cp -r /tmp/gmweb/startup /home/kasm-user/gmweb-startup && \
+    cp -r /tmp/gmweb/startup /opt/gmweb-startup && \
     cp /tmp/gmweb/docker/custom_startup.sh /dockerstartup/custom_startup.sh && \
     rm -rf /tmp/gmweb
 
-# Setup startup system
-RUN cd /home/kasm-user/gmweb-startup && \
+# Setup startup system (in /opt, system-level, not user home)
+RUN cd /opt/gmweb-startup && \
     npm install --production && \
-    chmod +x /home/kasm-user/gmweb-startup/install.sh && \
-    chmod +x /home/kasm-user/gmweb-startup/start.sh && \
-    chmod +x /home/kasm-user/gmweb-startup/index.js && \
-    chown -R 1000:1000 /home/kasm-user/gmweb-startup
+    chmod +x /opt/gmweb-startup/install.sh && \
+    chmod +x /opt/gmweb-startup/start.sh && \
+    chmod +x /opt/gmweb-startup/index.js
 
 # RUN install.sh at BUILD TIME (installs all system packages and software)
-RUN bash /home/kasm-user/gmweb-startup/install.sh
+RUN bash /opt/gmweb-startup/install.sh
 
 # Setup custom startup hook permissions
 RUN chmod +x /dockerstartup/custom_startup.sh

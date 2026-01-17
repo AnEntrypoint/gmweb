@@ -156,10 +156,10 @@ chmod 755 /home/kasm-user/{Desktop,Desktop/Uploads} 2>/dev/null || true
 
 log "Starting gmweb supervisor..."
 
-if [ -f /home/kasm-user/gmweb-startup/start.sh ]; then
-  bash /home/kasm-user/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
+if [ -f /opt/gmweb-startup/start.sh ]; then
+  bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
 else
-  log "ERROR: start.sh not found"
+  log "ERROR: start.sh not found at /opt/gmweb-startup/start.sh"
   exit 1
 fi
 
