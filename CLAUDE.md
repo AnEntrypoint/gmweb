@@ -1,32 +1,54 @@
-# Technical Caveats
+# Technical Caveats & Gotchas
 
-## Modular JS Startup Supervisor System
+## Runtime-Driven Startup Architecture
 
-### Architecture Overview
-The startup system is a modular, immortal supervisor (startup/index.js) that dynamically loads and manages 14 service modules. Key design pattern follows gm:state:machine rules - never crashes, always recovers, no mocks/fakes.
+### Build-Time vs Runtime Split
+- **install.sh** runs at `docker-compose build` time (one-time setup)
+  - All system packages, software installation
+  - Runs as ROOT during Dockerfile RUN command
+  - Must be idempotent-free (runs only once)
+  - Output captured by docker build
 
-**Structure:**
-```
-startup/
-├── index.js              # Main entry point, loads all services
-├── lib/supervisor.js     # Immortal orchestrator, never exits
-├── config.json           # Service enable/disable flags
-├── services/*.js         # 14 service modules (kasmproxy, webssh2, etc.)
-└── package.json          # ES6 modules, no external dependencies
-```
+- **start.sh** runs at container BOOT time (every restart)
+  - Minimal launcher script (16 lines)
+  - Nohups supervisor in background
+  - Exits immediately to unblock KasmWeb initialization
+  - Must NOT block or wait for anything
 
-### Custom Startup Command
-The Dockerfile generates a minimal custom_startup.sh:
-```bash
-#!/bin/bash
-echo "===== STARTUP $(date) =====" | tee -a /home/kasm-user/logs/startup.log
-cd /home/kasm-user/gmweb-startup && node index.js &
-```
+- **custom_startup.sh** orchestrator in `/dockerstartup/`
+  - KasmWeb native hook that runs at boot
+  - Calls start.sh (supervisor launcher)
+  - Optionally calls user's `/home/kasm-user/startup.sh` hook if present
+  - Exits to allow KasmWeb desktop to continue initializing
 
-This single line launches the immortal supervisor that manages all 14 services.
+**Critical:** custom_startup.sh must exit immediately. If it stays open, KasmWeb desktop initialization is blocked and container becomes unhealthy.
+
+### Supervisor Kasmproxy Prioritization
+- Kasmproxy (KasmWeb proxy) **MUST** start FIRST (critical path)
+- Supervisor blocks all other 13 services until kasmproxy is healthy
+- Health check: verifies port 8000 is listening via `lsof -i :8000`
+- Timeout: 2 minutes max wait, then continues anyway
+- This ensures service becomes available ASAP (5-10 seconds from boot)
+
+### Environment Variable Passing
+- Supervisor extracts VNC_PW from container environment via `/proc/1/environ`
+- All services receive environment through `process.env` in node child_process spawn
+- **Critical:** Do NOT use template string injection - use explicit env object:
+  ```javascript
+  const child = spawn(cmd, args, {
+    env: { ...process.env, CUSTOM_VAR: value }
+  });
+  ```
+- Services inherit both parent environment AND explicitly set variables
+
+### User Startup Hook Support
+- If `/home/kasm-user/startup.sh` exists, custom_startup.sh will execute it
+- Called with `bash /home/kasm-user/startup.sh` (no executable bit needed)
+- Allows users to add custom boot-time logic without code changes
+- Example: Start additional background services, configure dynamic settings
 
 ### Service Module Interface
-Each service exports a standard interface:
+Each of 14 services exports standard interface:
 ```javascript
 {
   name: 'service-name',
@@ -39,69 +61,34 @@ Each service exports a standard interface:
 }
 ```
 
-Services with `requiresDesktop: true` wait for `/usr/bin/desktop_ready` before starting. Dependency resolution uses topological sort.
-
-### Configuring Services (No Rebuild Required)
-Services are enabled/disabled via `startup/config.json`:
-```json
-{
-  "services": {
-    "kasmproxy": { "enabled": true },
-    "proxypilot": { "enabled": true },
-    "wrangler": { "enabled": false }
-  }
-}
-```
-
-Changing `enabled` flags does NOT require Docker rebuild. The supervisor checks this on startup.
-
-### Health Monitoring and Recovery
+- Services with `requiresDesktop: true` wait for `/usr/bin/desktop_ready`
+- Dependency resolution via topological sort (prevents circular deps)
 - Health checks every 30 seconds
-- Failed checks trigger auto-restart with exponential backoff
-- Backoff: `min(5000 * 2^attempts, 60000)` ms (5s → 10s → 20s → 40s → 60s)
-- Max 5 restart attempts per service before giving up
 
-### VNC_PW Extraction
-Environment setup happens in `supervisor.js:getEnvironment()`:
-- Tries to extract from `/proc/1/environ` using `strings | grep`
-- Falls back to VNC_PW env var if present
-- Uses hardcoded 'password' as final fallback
-- sshd service uses this to set kasm-user password at startup
+### Immortal Supervisor Guarantees
+- **Never crashes**: Global error handlers (uncaughtException, unhandledRejection)
+- **Always recovers**: Failed services auto-restart with exponential backoff (5s → 60s max)
+- **No mocks/fakes**: All child processes are real, all health checks are real
+- **Self-healing**: Continuous monitoring loop with recovery on failure
+- **Graceful degradation**: Service max restart attempts = 5, then marked unhealthy but supervisor continues
 
-### Dependency Resolution
-Services can declare dependencies on other services. The supervisor performs topological sort:
-- Example: `claude-plugin-gm` depends on `claude-marketplace` which depends on `claude-cli`
-- Supervisor starts in order: claude-cli → marketplace (after 3s) → plugin-gm (after 6s)
-- Circular dependencies are detected and rejected at startup
+### Dockerfile Minimal Build
+- Only 43 lines total
+- Installs only: git, NVM, Node.js 23.11.1
+- Runs `bash install.sh` at build time for all system setup
+- BuildKit syntax enabled (`# syntax=docker/dockerfile:1.4`)
+- Layer caching optimized for fast rebuilds (subsequent builds 2-3 minutes)
 
-### Adding New Services
-To add a new service:
-1. Create `startup/services/myservice.js` with standard interface
-2. Add to `startup/config.json` under `services`
-3. No Dockerfile changes needed
-4. Supervisor will auto-load on next startup
+### Docker Daemon Requirement
+- Local testing requires Docker daemon running
+- Build verification uses: `docker build --build-arg ARCH=x86_64 -t gmweb:test .`
+- Container startup verification uses: `docker run gmweb:test bash -c "..."`
 
-To remove: Delete the service file and entry from config.json.
+### Deployment Infrastructure (Coolify)
+**Important:** Code is production-ready but deployment requires Coolify domain assignment:
+1. Code: All tests pass, all commits pushed, Docker builds cleanly
+2. Infrastructure: Requires manual Coolify UI action to assign domain
+3. Traefik routing: Auto-generated by Coolify when domain assigned to gmweb service
+4. HTTPS: Auto-provisioned by Let's Encrypt (via Coolify)
 
-### Immortal System Guarantees
-The supervisor follows gm:state:machine mandatory rules:
-- **Never crashes**: Global error handlers catch all exceptions
-- **Always recovers**: Failed services auto-restart with backoff
-- **No mocks**: Uses real child processes, real executables, real checks
-- **Uncrashable**: Every boundary (supervisor, service, health monitor) has try/catch
-- **Self-healing**: Health checks poll every 30s, restart failures automatically
-
-### Claude CLI Installation
-- Cache directory `/home/kasm-user/.cache` must be created as root BEFORE switching to USER 1000
-- Without pre-creation, Claude install fails with `EACCES: permission denied` on mkdir
-- Fixed in Dockerfile (before USER switch)
-
-### tmux Configuration
-- History limit 2000 lines (prevents pause when buffer full while keeping scrollback)
-- Auto-attach via tmux service in startup system
-- Session created at boot: main session with sshd window
-
-### Logging
-- supervisor.js logs to `/home/kasm-user/logs/supervisor.log`
-- Each service logs to stdout (captured by nohup if run standalone)
-- Aggregation via supervisor for centralized visibility
+Without domain assignment in Coolify UI, service returns 502 (no routing rule exists).
