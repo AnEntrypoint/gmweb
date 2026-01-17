@@ -10,7 +10,7 @@ FROM kasmweb/ubuntu-noble-dind-rootless:${ARCH}-1.18.0
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Minimal base: only git (needed for cloning repos in install.sh)
+# Minimal base: only git (needed for cloning gmweb repo)
 RUN apt update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
 # Setup NVM and Node.js (stable, pinned version)
@@ -22,8 +22,13 @@ RUN mkdir -p $NVM_DIR && \
 # Set PATH for build and runtime
 ENV PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$PATH"
 
-# Copy modular startup system to image
-COPY startup/ /home/kasm-user/gmweb-startup/
+# Clone gmweb repo to get startup system and custom startup hook
+RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
+    cp -r /tmp/gmweb/startup /home/kasm-user/gmweb-startup && \
+    cp /tmp/gmweb/docker/custom_startup.sh /dockerstartup/custom_startup.sh && \
+    rm -rf /tmp/gmweb
+
+# Setup startup system
 RUN cd /home/kasm-user/gmweb-startup && \
     npm install --production && \
     chmod +x /home/kasm-user/gmweb-startup/install.sh && \
@@ -34,8 +39,7 @@ RUN cd /home/kasm-user/gmweb-startup && \
 # RUN install.sh at BUILD TIME (installs all system packages and software)
 RUN bash /home/kasm-user/gmweb-startup/install.sh
 
-# Copy KasmWeb custom startup hook (orchestrator for start.sh + user hook)
-COPY docker/custom_startup.sh /dockerstartup/custom_startup.sh
+# Setup custom startup hook permissions
 RUN chmod +x /dockerstartup/custom_startup.sh
 
 # Switch to user (kasm-user = UID 1000)
