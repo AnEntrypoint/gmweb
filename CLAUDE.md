@@ -1,22 +1,66 @@
 # Technical Caveats & Gotchas
 
+## KasmWeb Integration - Critical Principles
+
+### DO NOT interfere with KasmWeb initialization
+KasmWeb's profile setup is flawless and self-contained. Any attempt to pre-create directories, set permissions, or create symlinks in `/home/kasm-user` or `/home/kasm-default-profile` during build time will interfere with profile verification and cause startup failures.
+
+**Rule: Let KasmWeb do its job unchanged.**
+
+### .bashrc File Existence Matters (KasmWeb Profile Marker)
+- KasmWeb checks if `.bashrc` exists to determine if user profile has been initialized
+- If `.bashrc` exists at startup, KasmWeb skips default profile setup
+- **NEVER create or modify `.bashrc` during build time**
+- Only modify `.bashrc` at BOOT time in `custom_startup.sh` with first-boot detection
+
+### Directory Structure: Build vs Boot Split
+- **Build time (`install.sh`):** System packages ONLY (`/usr`, `/etc`, `/opt`)
+  - Do NOT create anything in `/home/kasm-user`
+  - Do NOT create anything in `/home/kasm-default-profile`
+  - Do NOT modify `.bashrc`
+  - Let Dockerfile ONLY handle system-level setup
+
+- **Boot time (`custom_startup.sh`):** User-specific setup ONLY
+  - Runs after KasmWeb completes profile initialization
+  - Create config files, directories, application setup
+  - Use first-boot marker files to prevent duplicate setup on restarts
+  - Example marker: `/home/kasm-user/.gmweb-bashrc-setup` for .bashrc setup
+
+### KasmWeb Manages These Automatically
+KasmWeb will create these directories with correct permissions and symlinks:
+- `/home/kasm-user/Desktop`
+- `/home/kasm-user/Downloads`
+- `/home/kasm-user/Uploads`
+- `/home/kasm-user/Desktop/Downloads` (symlink → ../Downloads)
+- `/home/kasm-user/Desktop/Uploads` (symlink → ../Uploads)
+
+**Do NOT pre-create these. Do NOT create symlinks for these. Let KasmWeb handle it.**
+
 ## Runtime-Driven Startup Architecture
 
-### Build-Time vs Runtime Split
+### Build-Time System Setup
 - **install.sh** runs at `docker-compose build` time (one-time setup)
   - All system packages, software installation
   - Runs as ROOT during Dockerfile RUN command
-  - Must be idempotent-free (runs only once)
+  - Must NOT create anything in `/home/kasm-user`
+  - Must NOT modify `.bashrc`
   - Output captured by docker build
 
+- **Startup system location: `/opt/gmweb-startup`** (NOT `/home/kasm-user`)
+  - Supervisor (index.js), start.sh, service modules
+  - Located in system-level directory (safe from KasmWeb overwrites)
+  - All references point to `/opt/gmweb-startup` in Dockerfile and custom_startup.sh
+
+### Boot-Time Runtime Startup
 - **start.sh** runs at container BOOT time (every restart)
   - Minimal launcher script (16 lines)
-  - Nohups supervisor in background
+  - Nohups supervisor from `/opt/gmweb-startup/index.js` in background
   - Exits immediately to unblock KasmWeb initialization
   - Must NOT block or wait for anything
 
 - **custom_startup.sh** orchestrator in `/dockerstartup/`
-  - KasmWeb native hook that runs at boot
+  - KasmWeb native hook that runs at boot (after profile verification)
+  - Sets up user-specific configuration (first boot only)
   - Calls start.sh (supervisor launcher)
   - Optionally calls user's `/home/kasm-user/startup.sh` hook if present
   - Exits to allow KasmWeb desktop to continue initializing
@@ -73,10 +117,11 @@ Each of 14 services exports standard interface:
 - **Graceful degradation**: Service max restart attempts = 5, then marked unhealthy but supervisor continues
 
 ### Dockerfile Minimal Build
-- Only 46 lines total
+- ~51 lines total
 - Clones gmweb repo from GitHub during build
 - Installs only: git, NVM, Node.js 23.11.1
-- Runs `bash install.sh` at build time for all system setup
+- Runs `bash install.sh` at build time for system packages
+- Copies startup system to `/opt/gmweb-startup` (NOT `/home/kasm-user`)
 - BuildKit syntax enabled (`# syntax=docker/dockerfile:1.4`)
 - Layer caching optimized for fast rebuilds (subsequent builds 2-3 minutes)
 
@@ -84,7 +129,7 @@ Each of 14 services exports standard interface:
 **Important:** Dockerfile clones the repo instead of copying build context:
 ```dockerfile
 RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
-    cp -r /tmp/gmweb/startup /home/kasm-user/gmweb-startup && \
+    cp -r /tmp/gmweb/startup /opt/gmweb-startup && \
     cp /tmp/gmweb/docker/custom_startup.sh /dockerstartup/custom_startup.sh && \
     rm -rf /tmp/gmweb
 ```
