@@ -228,15 +228,24 @@ spawn(ttydPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'tmux', 'new-sessio
 **Why this configuration:**
 - `-T xterm-256color` tells ttyd to report this terminal type to the shell
 - `TERM=xterm-256color` in environment ensures child processes inherit it
-- `tmux new-session -A -s main` attaches to existing session or creates new one
+- `tmux new-session -A -s main bash` attaches to existing session or creates new one with bash
 
 ### Shared tmux Session (/ssh and GUI Terminal)
 Both the `/ssh` web terminal and the XFCE GUI terminal share the same tmux session named "main":
 
-- **ttyd (webssh2.js):** `tmux new-session -A -s main`
-- **XFCE autostart:** `xfce4-terminal -e "tmux new-session -A -s main"`
+- **ttyd (webssh2.js):** `tmux new-session -A -s main bash`
+- **XFCE autostart:** `xfce4-terminal -e "tmux new-session -A -s main bash"`
 
 This allows users to seamlessly switch between web and GUI terminals while maintaining the same session state. The `-A` flag attaches to existing session if it exists.
+
+### tmux Must Start bash Explicitly
+The tmux command must explicitly specify `bash` as the shell to run:
+
+**Why:** Without explicit `bash`, tmux uses the default shell which may not source `.bashrc`, resulting in missing PATH entries (NVM, gemini, etc.).
+
+**Symptom:** User has to type `bash` manually after opening terminal to get proper PATH.
+
+**Fix:** Always append `bash` to the tmux command: `tmux new-session -A -s main bash`
 
 ### Shell Functions vs Aliases for Argument Passing
 When creating command shortcuts that need to pass arguments, use shell functions instead of aliases:
