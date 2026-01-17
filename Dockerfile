@@ -95,9 +95,9 @@ RUN echo "nohup sudo -u kasm-user npm install -g wrangler > /home/kasm-user/logs
 RUN echo "nohup sudo -u kasm-user bash -c 'curl https://sdk.cloud.google.com | bash' > /home/kasm-user/logs/gcloud-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup apt-get update && apt-get install -y scrot > /home/kasm-user/logs/scrot-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup sudo -u kasm-user python3 /usr/local/bin/enable_chromium_extension.py > /home/kasm-user/logs/chromium-ext.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup sudo -u kasm-user bash -c 'curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup sudo -u kasm-user /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm > /home/kasm-user/logs/claude-marketplace.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
-RUN echo "nohup sudo -u kasm-user /home/kasm-user/.local/bin/claude plugin install -s user gm@gm > /home/kasm-user/logs/claude-plugin.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user bash -c 'export TMPDIR=/home/kasm-user/.tmp && curl -fsSL https://claude.ai/install.sh | bash' > /home/kasm-user/logs/claude-install.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user bash -c 'sleep 3 && export TMPDIR=/home/kasm-user/.tmp && /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm' > /home/kasm-user/logs/claude-marketplace.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
+RUN echo "nohup sudo -u kasm-user bash -c 'sleep 6 && export TMPDIR=/home/kasm-user/.tmp && /home/kasm-user/.local/bin/claude plugin install -s user gm@gm' > /home/kasm-user/logs/claude-plugin.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup sudo -u kasm-user bash -c 'export PATH=\"/usr/local/local/nvm/versions/node/v23.11.1/bin:\$PATH\" && cd /home/kasm-user/webssh2 && WEBSSH2_SSH_HOST=localhost WEBSSH2_SSH_PORT=22 WEBSSH2_USER_NAME=kasm-user WEBSSH2_USER_PASSWORD=kasm npm start' > /home/kasm-user/logs/webssh2.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup sudo -u kasm-user bash -c 'export PATH=\"/usr/local/local/nvm/versions/node/v23.11.1/bin:\$PATH\" && cd /home/kasm-user/node-file-manager-esm && PORT=9998 npm start -- -d /home/kasm-user/Desktop' > /home/kasm-user/logs/node-file-manager-esm.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "mkdir -p /run/sshd && nohup bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | chpasswd; fi && /usr/sbin/sshd' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
@@ -133,8 +133,8 @@ RUN chmod +x /usr/bin/proxypilot
 # Download configuration file (volatile - may change)
 RUN wget -nc -O /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml
 
-# Create cache directory for Claude CLI before switching to user
-RUN mkdir -p /home/kasm-user/.cache && chown -R kasm-user:kasm-user /home/kasm-user/.cache
+# Create cache and temp directories for Claude CLI before switching to user
+RUN mkdir -p /home/kasm-user/.cache /home/kasm-user/.tmp && chown -R kasm-user:kasm-user /home/kasm-user/.cache /home/kasm-user/.tmp
 RUN chmod a+rw /home/kasm-user -R
 RUN chown -R 1000:1000 /home/kasm-user
 # Switch to user and install Claude CLI (volatile - latest versions)
