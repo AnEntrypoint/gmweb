@@ -47,6 +47,30 @@ if [ ! -d /home/kasm-user/.npm ]; then
 fi
 
 # ============================================================================
+# Setup .bashrc PATH (first boot only)
+# ============================================================================
+# Add NVM and local bin paths to .bashrc for interactive shells
+# Uses marker file to prevent duplicate entries on container restarts
+
+BASHRC_MARKER="/home/kasm-user/.gmweb-bashrc-setup"
+if [ ! -f "$BASHRC_MARKER" ]; then
+  log "Setting up .bashrc PATH configuration..."
+
+  # Add NVM and local paths to .bashrc
+  cat >> /home/kasm-user/.bashrc << 'BASHRC_EOF'
+
+# gmweb PATH setup
+export NVM_DIR="/usr/local/local/nvm"
+export PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$HOME/.local/bin:$PATH"
+BASHRC_EOF
+
+  touch "$BASHRC_MARKER"
+  log "✓ .bashrc PATH configured"
+else
+  log "✓ .bashrc already configured (skipping)"
+fi
+
+# ============================================================================
 # Start supervisor
 # ============================================================================
 
