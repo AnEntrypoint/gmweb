@@ -27,8 +27,9 @@ export default {
 
     // Start ttyd on port 9999 with tmux session (shared with GUI terminal)
     // -T xterm-256color ensures color terminal type
-    // tmux new-session -A -s main: attach to 'main' session or create if not exists
-    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'tmux', 'new-session', '-A', '-s', 'main'], {
+    // tmux new-session -A -s main bash: attach to 'main' session or create with bash shell
+    // Explicit bash ensures .bashrc is sourced and PATH is configured
+    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'tmux', 'new-session', '-A', '-s', 'main', 'bash'], {
       env: { ...env, TERM: 'xterm-256color' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true

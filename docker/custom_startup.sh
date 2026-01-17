@@ -156,12 +156,13 @@ if [ ! -d "$AUTOSTART_DIR" ]; then
   log "Setting up XFCE autostart..."
   mkdir -p "$AUTOSTART_DIR"
 
-  # Autostart terminal with shared tmux session
+  # Autostart terminal with shared tmux session running bash
+  # Explicit bash ensures .bashrc is sourced and PATH is configured
   cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=Terminal
-Exec=xfce4-terminal -e "tmux new-session -A -s main"
+Exec=xfce4-terminal -e "tmux new-session -A -s main bash"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
