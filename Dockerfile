@@ -22,8 +22,12 @@ RUN mkdir -p $NVM_DIR && \
 # Set PATH for build and runtime
 ENV PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$PATH"
 
+# Cache-bust to force fresh git clone (ensures latest code from GitHub)
+ARG BUILD_DATE=unknown
+
 # Clone gmweb repo to get startup system and custom startup hook
-RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
+# BuildKit cache-busting: Changes to BUILD_DATE force rebuild without layer cache
+RUN git clone --depth 1 https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
     cp -r /tmp/gmweb/startup /opt/gmweb-startup && \
     cp /tmp/gmweb/docker/custom_startup.sh /dockerstartup/custom_startup.sh && \
     rm -rf /tmp/gmweb
