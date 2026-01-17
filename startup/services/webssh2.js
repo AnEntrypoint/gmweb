@@ -25,9 +25,11 @@ export default {
       };
     }
 
-    // Start ttyd on port 9999 with bash shell
-    const ps = spawn(binaryPath, ['-p', '9999', '-W', 'bash'], {
-      env: { ...env },
+    // Start ttyd on port 9999 with bash login shell (for color support)
+    // -T xterm-256color ensures color terminal type
+    // bash -l loads .bashrc for aliases and color prompt
+    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-l'], {
+      env: { ...env, TERM: 'xterm-256color' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });

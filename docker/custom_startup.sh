@@ -99,8 +99,8 @@ if [ ! -f "$BASHRC_MARKER" ]; then
 export NVM_DIR="/usr/local/local/nvm"
 export PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$HOME/.local/bin:$PATH"
 
-# Claude Code alias with --dangerously-skip-permissions
-alias ccode='claude --dangerously-skip-permissions'
+# Claude Code function with --dangerously-skip-permissions (passes all args)
+ccode() { claude --dangerously-skip-permissions "$@"; }
 BASHRC_EOF
 
   touch "$BASHRC_MARKER"
@@ -130,7 +130,31 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART_EOF
 
-  log "✓ XFCE autostart configured"
+  # Autostart Claude Code UI in browser
+  cat > "$AUTOSTART_DIR/claude-code-ui.desktop" << 'AUTOSTART_EOF'
+[Desktop Entry]
+Type=Application
+Name=Claude Code UI
+Exec=firefox http://localhost/ui
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+StartupDelay=5
+AUTOSTART_EOF
+
+  # Autostart File Manager in browser
+  cat > "$AUTOSTART_DIR/file-manager.desktop" << 'AUTOSTART_EOF'
+[Desktop Entry]
+Type=Application
+Name=File Manager
+Exec=firefox http://localhost/files
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+StartupDelay=5
+AUTOSTART_EOF
+
+  log "✓ XFCE autostart configured (3 apps)"
 else
   log "✓ XFCE autostart already configured (skipping)"
 fi
