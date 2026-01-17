@@ -15,12 +15,14 @@ export default {
     const processEnv = {
       ...env,
       VNC_PW: env.VNC_PW || 'password',
-      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+      LISTEN_PORT: '8000'
     };
 
     const ps = spawn('bash', ['-c', `
       export VNC_PW="$VNC_PW"
       export PATH="$PATH"
+      export LISTEN_PORT="$LISTEN_PORT"
       npx -y gxe@latest AnEntrypoint/kasmproxy start
     `], {
       env: processEnv,
