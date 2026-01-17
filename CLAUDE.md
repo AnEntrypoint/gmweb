@@ -187,29 +187,56 @@ Applications installed to `/opt/` during docker build are owned by root. Service
 ### Kasmproxy Path Routing
 Routes through kasmproxy on port 80:
 - `/ui` → port 9997 (Claude Code UI) - path stripped to `/`
+- `/api` → port 9997 (Claude Code UI API) - path kept as-is
+- `/ws` → port 9997 (Claude Code UI WebSocket) - path kept as-is
 - `/files` → port 9998 (file-manager) - path stripped to `/`
 - `/ssh` → port 9999 (ttyd terminal) - path stripped to `/`
 - `/` → port 6901 (KasmVNC)
 
 **HTML Rewriting:** For `/ui` only, absolute paths like `/assets/` are rewritten to `/ui/assets/` so browser requests route correctly through proxy. This does NOT apply to `/files` or `/ssh`.
 
+**Authentication:** Claude Code UI (port 9997) has its own authentication system. Kasmproxy skips basic auth for all routes to port 9997 (`/ui`, `/api`, `/ws`).
+
+### Claude Code UI Basename Fix (Critical)
+When Claude Code UI is accessed via `/ui` prefix, React Router needs a `basename` prop to match routes correctly. Without this fix, login succeeds but the app crashes because routes don't match.
+
+**Symptom:** Login works, token is stored, but page goes blank with empty `#root` div.
+
+**Fix:** `install.sh` patches `App.jsx` after cloning to add:
+```javascript
+function getBasename() {
+  const path = window.location.pathname;
+  if (path.startsWith('/ui')) return '/ui';
+  return '/';
+}
+// Then: <Router basename={basename}>
+```
+
+This fix is applied via `sed` in `install.sh` to survive rebuilds.
+
 ## Terminal and Shell Configuration
 
 ### ttyd Color Terminal Support
-For ttyd web terminal to display colors properly, both terminal type AND login shell are required:
+For ttyd web terminal to display colors properly, both terminal type AND tmux are required:
 
 ```javascript
-spawn(ttydPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-l'], {
+spawn(ttydPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'tmux', 'new-session', '-A', '-s', 'main'], {
   env: { ...env, TERM: 'xterm-256color' }
 });
 ```
 
-**Why both are needed:**
+**Why this configuration:**
 - `-T xterm-256color` tells ttyd to report this terminal type to the shell
 - `TERM=xterm-256color` in environment ensures child processes inherit it
-- `bash -l` (login shell) loads `.bashrc` which contains color prompt settings
+- `tmux new-session -A -s main` attaches to existing session or creates new one
 
-Without all three, terminal will not show colors.
+### Shared tmux Session (/ssh and GUI Terminal)
+Both the `/ssh` web terminal and the XFCE GUI terminal share the same tmux session named "main":
+
+- **ttyd (webssh2.js):** `tmux new-session -A -s main`
+- **XFCE autostart:** `xfce4-terminal -e "tmux new-session -A -s main"`
+
+This allows users to seamlessly switch between web and GUI terminals while maintaining the same session state. The `-A` flag attaches to existing session if it exists.
 
 ### Shell Functions vs Aliases for Argument Passing
 When creating command shortcuts that need to pass arguments, use shell functions instead of aliases:
