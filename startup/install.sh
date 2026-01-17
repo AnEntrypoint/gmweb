@@ -104,9 +104,15 @@ log "✓ tmux configured"
 log "Setting up home directory structure..."
 
 mkdir -p ~/Desktop/Uploads
+mkdir -p ~/Desktop/Downloads
+mkdir -p ~/Downloads
 mkdir -p ~/.config/autostart
 mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml
 mkdir -p ~/logs
+
+# Ensure proper permissions for KasmWeb symlink creation
+chmod 755 ~/Desktop
+chmod 755 ~/Downloads
 
 log "✓ Home directories created"
 
