@@ -84,17 +84,15 @@ RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-termi
     chown -R kasm-user:kasm-user /home/kasm-user/.config/xfce4 && \
     chmod 644 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
 
-# Copy startup system files from build context
+# Copy modular startup system
 COPY startup/ /home/kasm-user/gmweb-startup/
 RUN cd /home/kasm-user/gmweb-startup && npm install --production && \
     chmod +x /home/kasm-user/gmweb-startup/index.js && \
     chown -R kasm-user:kasm-user /home/kasm-user/gmweb-startup
 
-# Setup startup system with modular JS supervisor
-# Create startup script that launches supervisor in background then exits
-# KasmWeb expects /dockerstartup/custom_startup.sh
-RUN printf '#!/bin/bash\necho "===== STARTUP $(date) =====" | tee -a /home/kasm-user/logs/startup.log\ncd /home/kasm-user/gmweb-startup && /usr/local/local/nvm/versions/node/v23.11.1/bin/node index.js > /home/kasm-user/logs/supervisor.log 2>&1 &\necho "gmweb supervisor started (PID: $!)"\nexit 0\n' > /dockerstartup/custom_startup.sh && \
-    chmod +x /dockerstartup/custom_startup.sh && \
+# Copy KasmWeb startup hook
+COPY docker/custom_startup.sh /dockerstartup/custom_startup.sh
+RUN chmod +x /dockerstartup/custom_startup.sh && \
     chown kasm-user:kasm-user /dockerstartup/custom_startup.sh
 
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
