@@ -15,14 +15,12 @@ export default {
     const processEnv = {
       ...env,
       VNC_PW: env.VNC_PW || 'password',
-      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      LISTEN_PORT: '8000'
+      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     };
 
     const ps = spawn('bash', ['-c', `
       export VNC_PW="$VNC_PW"
       export PATH="$PATH"
-      export LISTEN_PORT="$LISTEN_PORT"
       npx -y gxe@latest AnEntrypoint/kasmproxy start
     `], {
       env: processEnv,
@@ -59,10 +57,10 @@ export default {
   },
 
   async health() {
-    // Check if port 8000 is listening (process shows as MainThread, not kasmproxy)
+    // Check if port 80 is listening (kasmproxy default port)
     try {
       const { execSync } = await import('child_process');
-      execSync('lsof -i :8000 | grep -q LISTEN', { stdio: 'pipe' });
+      execSync('lsof -i :80 | grep -q LISTEN', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;
