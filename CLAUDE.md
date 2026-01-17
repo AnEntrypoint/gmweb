@@ -193,7 +193,7 @@ Routes through kasmproxy on port 80:
 - `/ssh` → port 9999 (ttyd terminal) - path stripped to `/`
 - `/` → port 6901 (KasmVNC)
 
-**HTML Rewriting:** For `/ui` only, absolute paths like `/assets/` are rewritten to `/ui/assets/` so browser requests route correctly through proxy. This does NOT apply to `/files` or `/ssh`.
+**HTML Rewriting:** For `/ui` only, absolute paths like `/assets/`, `/icons/`, and `/favicon` are rewritten to `/ui/assets/`, `/ui/icons/`, etc. so browser requests route correctly through proxy. This does NOT apply to `/files` or `/ssh`.
 
 **Authentication:** Claude Code UI (port 9997) has its own authentication system. Kasmproxy skips basic auth for all routes to port 9997 (`/ui`, `/api`, `/ws`).
 
