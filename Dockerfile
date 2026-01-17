@@ -17,9 +17,6 @@ RUN rm -rf /var/lib/apt/lists/*
 # Setup NVM and Node.js (stable - pinned version)
 ENV NVM_DIR=/usr/local/local/nvm
 RUN mkdir -p /usr/local/local/nvm
-RUN echo 'export PATH="/usr/local/local/nvm:$PATH"' >> ~/.profile
-RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
-RUN echo 'chmod +x ~./.profile'
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 RUN bash -c ". $NVM_DIR/nvm.sh && nvm install 23.11.1 && nvm use 23.11.1 && nvm alias default 23.11.1"
 
@@ -88,7 +85,14 @@ RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-termi
     chmod 644 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
 
 # Setup startup scripts (stable - service configuration)
-RUN echo "echo '===== STARTUP $(date) =====' | tee -a /home/kasm-user/logs/startup.log" > $STARTUPDIR/custom_startup.sh
+RUN cat > $STARTUPDIR/custom_startup.sh << 'STARTUP_SCRIPT'
+# Setup environment once on first boot (idempotent check)
+if ! grep -q 'GMWeb Environment Setup' /home/kasm-user/.bashrc 2>/dev/null; then
+  sudo -u kasm-user bash -c 'printf "\n# GMWeb Environment Setup\nexport PATH=\"/usr/local/local/nvm/versions/node/v23.11.1/bin:\$PATH\"\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> /home/kasm-user/.bashrc'
+fi
+
+echo '===== STARTUP '"$(date)"' =====' | tee -a /home/kasm-user/logs/startup.log
+STARTUP_SCRIPT
 RUN echo "/usr/bin/desktop_ready && nohup sudo -u kasm-user bash -c 'export VNC_PW=\"\$(strings /proc/1/environ | grep \"^VNC_PW=\" | cut -d= -f2-)\" && export PATH=\"/usr/local/local/nvm/versions/node/v23.11.1/bin:\$PATH\" && npx -y gxe@latest AnEntrypoint/kasmproxy start' > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "/usr/bin/desktop_ready && nohup sudo -u kasm-user /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup sudo -u kasm-user npm install -g @google/gemini-cli > /home/kasm-user/logs/gemini-cli.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
