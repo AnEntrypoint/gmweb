@@ -154,7 +154,40 @@ X-GNOME-Autostart-enabled=true
 StartupDelay=5
 AUTOSTART_EOF
 
-  log "✓ XFCE autostart configured (3 apps)"
+  # Autostart Chromium browser
+  cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
+[Desktop Entry]
+Type=Application
+Name=Chromium
+Exec=/usr/bin/chromium
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+AUTOSTART_EOF
+
+  # Autostart Chrome Extension Installer (ProxyPilot extension)
+  cat > "$AUTOSTART_DIR/ext.desktop" << 'AUTOSTART_EOF'
+[Desktop Entry]
+Type=Application
+Name=Chrome Extension Installer
+Exec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+AUTOSTART_EOF
+
+  # Autostart ProxyPilot
+  cat > "$AUTOSTART_DIR/proxypilot.desktop" << 'AUTOSTART_EOF'
+[Desktop Entry]
+Type=Application
+Name=ProxyPilot
+Exec=/usr/bin/proxypilot
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+AUTOSTART_EOF
+
+  log "✓ XFCE autostart configured (7 apps)"
 else
   log "✓ XFCE autostart already configured (skipping)"
 fi

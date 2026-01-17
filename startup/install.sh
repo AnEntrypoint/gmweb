@@ -129,6 +129,40 @@ else
 fi
 
 # ============================================================================
+# 10b. CHROMIUM EXTENSION POLICIES
+# ============================================================================
+
+log "Setting up Chromium extension policies..."
+
+sudo mkdir -p /etc/chromium/policies/managed
+echo '{"ExtensionInstallForcelist": ["jfeammnjpkecdekppnclgkkffahnhfhe;https://clients2.google.com/service/update2/crx"]}' | sudo tee /etc/chromium/policies/managed/extension_install_forcelist.json > /dev/null
+sudo mkdir -p /opt/google/chrome/extensions
+sudo chmod 777 /opt/google/chrome/extensions
+
+log "✓ Chromium extension policies configured"
+
+# ============================================================================
+# 10c. CHROMIUM EXTENSION ENABLER SCRIPT
+# ============================================================================
+
+log "Creating Chromium extension enabler script..."
+
+sudo tee /usr/local/bin/enable_chromium_extension.py > /dev/null << 'PYEOF'
+#!/usr/bin/env python3
+import json, os, sys
+prefs_file = os.path.expanduser("~/.config/chromium/Default/Preferences")
+if os.path.exists(prefs_file):
+    try:
+        with open(prefs_file) as f: prefs = json.load(f)
+        prefs.setdefault("extensions", {}).setdefault("settings", {}).setdefault("jfeammnjpkecdekppnclgkkffahnhfhe", {})["active_bit"] = True
+        with open(prefs_file, "w") as f: json.dump(prefs, f)
+    except: pass
+PYEOF
+sudo chmod +x /usr/local/bin/enable_chromium_extension.py
+
+log "✓ Chromium extension enabler script created"
+
+# ============================================================================
 # 11. TTYD WEB TERMINAL
 # ============================================================================
 
