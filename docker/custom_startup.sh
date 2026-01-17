@@ -1,8 +1,8 @@
 #!/bin/bash
 # KasmWeb Custom Startup Script - Minimal Orchestrator
-# Purpose: Start gmweb supervisor and exit
+# Purpose: Clean up stale state, start gmweb supervisor, exit
 # Does NOT interfere with KasmWeb profile initialization
-# All user-specific setup is delegated to supervisor or second boot
+# Cleans only stale entries from previous failed deployments
 
 set -e
 
@@ -14,6 +14,24 @@ log() {
 }
 
 log "===== CUSTOM STARTUP $(date) ====="
+
+# ============================================================================
+# Clean up stale state from previous failed deployments
+# ============================================================================
+# If Desktop/Downloads exists as a DIRECTORY (not symlink), remove it
+# This prevents KasmWeb profile verification from getting stuck
+# We ONLY remove the specific conflict, not interfering with KasmWeb setup
+
+if [ -d /home/kasm-user/Desktop/Downloads ] && [ ! -L /home/kasm-user/Desktop/Downloads ]; then
+  log "Cleaning stale Desktop/Downloads directory from previous deployment..."
+  rm -rf /home/kasm-user/Desktop/Downloads
+  log "✓ Stale directory removed, KasmWeb can now create symlink"
+fi
+
+# ============================================================================
+# Start supervisor
+# ============================================================================
+
 log "Starting gmweb supervisor..."
 
 if [ -f /opt/gmweb-startup/start.sh ]; then
