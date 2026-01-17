@@ -69,8 +69,8 @@ KasmWeb will create these directories with correct permissions and symlinks:
 
 ### Supervisor Kasmproxy Prioritization
 - Kasmproxy (KasmWeb proxy) **MUST** start FIRST (critical path)
-- Supervisor blocks all other 13 services until kasmproxy is healthy
-- Health check: verifies port 8000 is listening via `lsof -i :8000`
+- Supervisor blocks all other services until kasmproxy is healthy
+- Health check: verifies port 80 is listening via `lsof -i :80`
 - Timeout: 2 minutes max wait, then continues anyway
 - This ensures service becomes available ASAP (5-10 seconds from boot)
 
@@ -150,3 +150,30 @@ RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
 4. HTTPS: Auto-provisioned by Let's Encrypt (via Coolify)
 
 Without domain assignment in Coolify UI, service returns 502 (no routing rule exists).
+
+## /opt Directory Ownership Pattern
+
+### Root-Owned at Build, User-Owned at Boot
+Applications installed to `/opt/` during docker build are owned by root. Services running as kasm-user need write access for:
+- Database files (SQLite)
+- Temp files (Vite compilation)
+- Log files
+- Cache directories
+
+**Pattern:** Add `chown -R kasm-user:kasm-user /opt/<app>` to `custom_startup.sh`
+
+### Claude Code UI Specific Requirements
+- **Location:** `/opt/claudecodeui`
+- **Must run production mode:** `node server/index.js` (NOT `npm run dev`)
+- **Requires pre-built dist:** `npm run build` must run at install time
+- **Vite temp files:** If directory is root-owned, Vite fails with EACCES on `.timestamp-*.mjs` files
+- **Fix:** `custom_startup.sh` runs `chown -R kasm-user:kasm-user /opt/claudecodeui` at boot
+
+### Kasmproxy Path Routing
+Routes through kasmproxy on port 80:
+- `/ui` → port 9997 (Claude Code UI) - path stripped to `/`
+- `/files` → port 9998 (file-manager) - path stripped to `/`
+- `/ssh` → port 9999 (ttyd terminal) - path stripped to `/`
+- `/` → port 6901 (KasmVNC)
+
+**HTML Rewriting:** For `/ui` only, absolute paths like `/assets/` are rewritten to `/ui/assets/` so browser requests route correctly through proxy. This does NOT apply to `/files` or `/ssh`.
