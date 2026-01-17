@@ -57,10 +57,10 @@ export default {
   },
 
   async health() {
-    // Check if kasmproxy process is running and port 8000 is open
+    // Check if port 8000 is listening (process shows as MainThread, not kasmproxy)
     try {
       const { execSync } = await import('child_process');
-      execSync('lsof -i :8000 | grep -q kasmproxy', { stdio: 'pipe' });
+      execSync('lsof -i :8000 | grep -q LISTEN', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;
