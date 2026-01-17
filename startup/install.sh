@@ -202,15 +202,41 @@ else
 fi
 
 # ============================================================================
-# 11. CACHE AND PERMISSIONS
+# 11. COMPREHENSIVE PERMISSIONS FIX
 # ============================================================================
 
-log "Setting up cache directories and permissions..."
+log "Setting comprehensive permissions..."
 
+# Ensure all home directories are properly owned and readable
+sudo chown -R kasm-user:kasm-user /home/kasm-user
+
+# Set directory permissions (755 = rwxr-xr-x)
+chmod 755 /home/kasm-user
+chmod 755 /home/kasm-user/.config
+chmod 755 /home/kasm-user/.config/autostart
+chmod 755 /home/kasm-user/.config/xfce4
+chmod 755 /home/kasm-user/.config/xfce4/xfconf
+chmod 755 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml
+chmod 755 /home/kasm-user/Desktop
+chmod 755 /home/kasm-user/Desktop/Uploads
+chmod 755 /home/kasm-user/Downloads
+chmod 755 /home/kasm-user/logs
+
+# Ensure web server directories have proper ownership
+[ -d ~/webssh2 ] && chmod 755 ~/webssh2 && find ~/webssh2 -type d -exec chmod 755 {} \;
+[ -d ~/node-file-manager-esm ] && chmod 755 ~/node-file-manager-esm && find ~/node-file-manager-esm -type d -exec chmod 755 {} \;
+
+# Cache and temp
 mkdir -p ~/.cache ~/.tmp
 chmod 755 ~/.cache ~/.tmp
 
-log "✓ Cache directories ready"
+# .bashrc should be readable and writable by owner only
+chmod 600 ~/.bashrc 2>/dev/null || true
+
+# Desktop entries readable
+chmod 644 ~/.config/autostart/*.desktop 2>/dev/null || true
+
+log "✓ Permissions normalized"
 
 # ============================================================================
 # 12. .bashrc ENVIRONMENT SETUP
