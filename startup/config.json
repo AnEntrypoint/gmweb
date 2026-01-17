@@ -52,6 +52,10 @@
       "enabled": true,
       "type": "web"
     },
+    "claude-code-ui": {
+      "enabled": true,
+      "type": "web"
+    },
     "sshd": {
       "enabled": true,
       "type": "system"

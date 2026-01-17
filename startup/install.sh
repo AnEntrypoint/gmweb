@@ -148,7 +148,23 @@ else
 fi
 
 # ============================================================================
-# 12. PERMISSIONS (moved to custom_startup.sh)
+# 12. CLAUDE CODE UI
+# ============================================================================
+
+log "Installing Claude Code UI..."
+
+if [ -d /opt/claudecodeui ]; then
+  log "Claude Code UI already exists, skipping clone"
+else
+  git clone https://github.com/siteboon/claudecodeui /opt/claudecodeui
+  cd /opt/claudecodeui
+  npm install
+  cd -
+  log "✓ Claude Code UI installed"
+fi
+
+# ============================================================================
+# 13. PERMISSIONS (moved to custom_startup.sh)
 # ============================================================================
 
 log "Permissions are set at boot time by custom_startup.sh"
