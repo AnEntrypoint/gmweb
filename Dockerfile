@@ -42,12 +42,12 @@ RUN bash /home/kasm-user/gmweb-startup/install.sh
 # Setup custom startup hook permissions
 RUN chmod +x /dockerstartup/custom_startup.sh
 
-# Fix Desktop/Downloads permissions before KasmWeb profile verification
-# These must be writable for KasmWeb to create symlinks on startup
-RUN chmod 777 /home/kasm-user/Desktop /home/kasm-user/Downloads 2>/dev/null || true
-
-# Remove conflicting Desktop/Downloads directory if it exists
-RUN rm -rf /home/kasm-user/Desktop/Downloads 2>/dev/null || true
+# Ensure directory structure exists with maximum permissions
+# These fixes must survive volume mount for KasmWeb profile verification
+RUN mkdir -p /home/kasm-user/Desktop /home/kasm-user/Downloads && \
+    chmod -R 777 /home/kasm-user/Desktop /home/kasm-user/Downloads && \
+    rm -rf /home/kasm-user/Desktop/Downloads && \
+    chown -R 1000:1000 /home/kasm-user/Desktop /home/kasm-user/Downloads
 
 # Switch to user (kasm-user = UID 1000)
 USER 1000
