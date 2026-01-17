@@ -109,6 +109,21 @@ Each of 14 services exports standard interface:
 - Dependency resolution via topological sort (prevents circular deps)
 - Health checks every 30 seconds
 
+### Health Check Pattern (Critical)
+**Always use `grep LISTEN` not process name in health checks.**
+
+Node processes spawned via `npx` show as `MainThrea` in `lsof`, not `node`. Health checks like `lsof -i :PORT | grep node` will always fail.
+
+**Correct pattern:**
+```bash
+lsof -i :9998 | grep -q LISTEN
+```
+
+**Wrong pattern:**
+```bash
+lsof -i :9998 | grep -q node  # FAILS - process shows as MainThrea
+```
+
 ### Immortal Supervisor Guarantees
 - **Never crashes**: Global error handlers (uncaughtException, unhandledRejection)
 - **Always recovers**: Failed services auto-restart with exponential backoff (5s → 60s max)
