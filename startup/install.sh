@@ -129,7 +129,26 @@ else
 fi
 
 # ============================================================================
-# 11. PERMISSIONS (moved to custom_startup.sh)
+# 11. TTYD WEB TERMINAL
+# ============================================================================
+
+log "Downloading ttyd (web terminal)..."
+
+ARCH=$(uname -m)
+TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
+
+TTYD_URL="https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}"
+log "Downloading ttyd from: $TTYD_URL"
+if curl -fL -o /tmp/ttyd "$TTYD_URL" 2>/dev/null; then
+  sudo mv /tmp/ttyd /usr/bin/ttyd
+  sudo chmod +x /usr/bin/ttyd
+  log "✓ ttyd installed"
+else
+  log "WARNING: ttyd download failed - web terminal will be unavailable"
+fi
+
+# ============================================================================
+# 12. PERMISSIONS (moved to custom_startup.sh)
 # ============================================================================
 
 log "Permissions are set at boot time by custom_startup.sh"

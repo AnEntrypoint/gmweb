@@ -1,5 +1,7 @@
-// WebSSH2 service - web-based SSH client
+// Web terminal service using ttyd
+// ttyd is a simple web-based terminal that exposes a shell over HTTP/WebSocket
 import { spawn } from 'child_process';
+import { existsSync } from 'fs';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
@@ -11,18 +13,21 @@ export default {
   dependencies: [],
 
   async start(env) {
-    // Create combined environment for webssh2
-    // Use npx to run webssh2-server package directly (no clone needed)
-    const processEnv = {
-      ...env,
-      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      LISTEN: '0.0.0.0:9999'
-    };
+    const binaryPath = '/usr/bin/ttyd';
 
-    const ps = spawn('bash', ['-c', `
-      npx -y webssh2-server
-    `], {
-      env: processEnv,
+    // Check if ttyd binary exists
+    if (!existsSync(binaryPath)) {
+      console.log('[webssh2] ttyd binary not found - service unavailable');
+      return {
+        pid: null,
+        process: null,
+        cleanup: async () => {}
+      };
+    }
+
+    // Start ttyd on port 9999 with bash shell
+    const ps = spawn(binaryPath, ['-p', '9999', '-W', 'bash'], {
+      env: { ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
@@ -54,10 +59,10 @@ export default {
   },
 
   async health() {
-    // Check if webssh2 port 9999 is listening
+    // Check if port 9999 is listening
     try {
       const { execSync } = await import('child_process');
-      execSync('lsof -i :9999 | grep -q node', { stdio: 'pipe' });
+      execSync('lsof -i :9999 | grep -q LISTEN', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;

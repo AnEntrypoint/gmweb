@@ -62,12 +62,41 @@ if [ ! -f "$BASHRC_MARKER" ]; then
 # gmweb PATH setup
 export NVM_DIR="/usr/local/local/nvm"
 export PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$HOME/.local/bin:$PATH"
+
+# Claude Code alias with --dangerously-skip-permissions
+alias ccode='claude --dangerously-skip-permissions'
 BASHRC_EOF
 
   touch "$BASHRC_MARKER"
   log "✓ .bashrc PATH configured"
 else
   log "✓ .bashrc already configured (skipping)"
+fi
+
+# ============================================================================
+# Setup XFCE autostart (first boot only)
+# ============================================================================
+# Create autostart directory and desktop entries for apps that should start on login
+
+AUTOSTART_DIR="/home/kasm-user/.config/autostart"
+if [ ! -d "$AUTOSTART_DIR" ]; then
+  log "Setting up XFCE autostart..."
+  mkdir -p "$AUTOSTART_DIR"
+
+  # Autostart terminal
+  cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << 'AUTOSTART_EOF'
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Exec=xfce4-terminal
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+AUTOSTART_EOF
+
+  log "✓ XFCE autostart configured"
+else
+  log "✓ XFCE autostart already configured (skipping)"
 fi
 
 # ============================================================================
