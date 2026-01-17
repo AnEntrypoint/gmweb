@@ -223,35 +223,6 @@ find ~/{webssh2,node-file-manager-esm} -type d 2>/dev/null -exec chmod 755 {} \;
 log "✓ Permissions normalized"
 
 # ============================================================================
-# 12. .bashrc ENVIRONMENT SETUP
-# ============================================================================
-
-log "Adding environment variables to .bashrc..."
-
-if ! grep -q "GMWeb Environment Setup" ~/.bashrc 2>/dev/null; then
-  cat >> ~/.bashrc <<'BASHRC_EOF'
-
-# GMWeb Environment Setup
-export NVM_DIR="/usr/local/local/nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
-
-export NODE_PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin"
-export PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$PATH"
-export PATH="$HOME/.local/bin:$PATH"
-
-export WEBSSH2_LISTEN_PORT=9999
-export PORT=9998
-
-# Auto-attach to tmux
-if [ -z "$TMUX" ] && [ -z "$SSH_CONNECTION" ]; then
-  exec tmux attach-session -t main 2>/dev/null || exec tmux new-session -s main
-fi
-BASHRC_EOF
-  log "✓ Environment variables added to .bashrc"
-fi
-
-# ============================================================================
 # COMPLETION
 # ============================================================================
 

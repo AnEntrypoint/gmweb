@@ -17,6 +17,40 @@ log() {
 log "===== CUSTOM STARTUP $(date) ====="
 
 # ============================================================================
+# .bashrc Environment Setup (first boot only)
+# ============================================================================
+
+BASHRC_MARKER="/home/kasm-user/.gmweb-bashrc-setup"
+if [ ! -f "$BASHRC_MARKER" ]; then
+  log "Setting up .bashrc environment variables (first boot)..."
+
+  cat >> /home/kasm-user/.bashrc <<'BASHRC_EOF'
+
+# GMWeb Environment Setup
+export NVM_DIR="/usr/local/local/nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+
+export NODE_PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin"
+export PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+
+export WEBSSH2_LISTEN_PORT=9999
+export PORT=9998
+
+# Auto-attach to tmux
+if [ -z "$TMUX" ] && [ -z "$SSH_CONNECTION" ]; then
+  exec tmux attach-session -t main 2>/dev/null || exec tmux new-session -s main
+fi
+BASHRC_EOF
+
+  touch "$BASHRC_MARKER"
+  log "✓ .bashrc environment variables set (first boot only)"
+else
+  log "Skipping .bashrc setup (already configured)"
+fi
+
+# ============================================================================
 # Fix runtime permissions (volume-mounted directories)
 # ============================================================================
 
