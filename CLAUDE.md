@@ -192,3 +192,36 @@ Routes through kasmproxy on port 80:
 - `/` → port 6901 (KasmVNC)
 
 **HTML Rewriting:** For `/ui` only, absolute paths like `/assets/` are rewritten to `/ui/assets/` so browser requests route correctly through proxy. This does NOT apply to `/files` or `/ssh`.
+
+## Terminal and Shell Configuration
+
+### ttyd Color Terminal Support
+For ttyd web terminal to display colors properly, both terminal type AND login shell are required:
+
+```javascript
+spawn(ttydPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-l'], {
+  env: { ...env, TERM: 'xterm-256color' }
+});
+```
+
+**Why both are needed:**
+- `-T xterm-256color` tells ttyd to report this terminal type to the shell
+- `TERM=xterm-256color` in environment ensures child processes inherit it
+- `bash -l` (login shell) loads `.bashrc` which contains color prompt settings
+
+Without all three, terminal will not show colors.
+
+### Shell Functions vs Aliases for Argument Passing
+When creating command shortcuts that need to pass arguments, use shell functions instead of aliases:
+
+**Correct (function):**
+```bash
+ccode() { claude --dangerously-skip-permissions "$@"; }
+```
+
+**Wrong (alias):**
+```bash
+alias ccode='claude --dangerously-skip-permissions'
+```
+
+While aliases can technically pass trailing arguments, functions with `"$@"` are more reliable across different shell contexts and scripts.
