@@ -252,3 +252,45 @@ alias ccode='claude --dangerously-skip-permissions'
 ```
 
 While aliases can technically pass trailing arguments, functions with `"$@"` are more reliable across different shell contexts and scripts.
+
+## Claude Code Data Persistence
+
+### Storage Locations for Volume Mounts
+Claude Code stores user data across multiple directories. To preserve settings across container restarts, these paths need volume mounts:
+
+| Path | Size | Content | Priority |
+|------|------|---------|----------|
+| `/home/kasm-user/.claude` | ~19M | Sessions, projects, plugins, credentials, history, todos, settings | **CRITICAL** |
+| `/home/kasm-user/.claude.json` | ~12K | User preferences, startup count, auto-update settings | **CRITICAL** |
+| `/home/kasm-user/.local/share/claude` | ~405M | CLI versions (e.g., 2.1.11, 2.1.12) | MEDIUM |
+| `/home/kasm-user/.local/state/claude` | ~12K | Lock files | LOW |
+| `/home/kasm-user/.cache/claude*` | ~544K | Runtime caches (regeneratable) | LOW |
+
+### Contents of /home/kasm-user/.claude
+- `credentials.json` - Authentication credentials
+- `history.jsonl` - Command history
+- `settings.json` - User settings
+- `projects/` - Project-specific session data
+- `plugins/` - Plugin cache and marketplace data
+- `session-env/` - Session environment directories
+- `todos/` - Todo tracking data
+- `file-history/` - File operation history
+
+### Recommended Volume Configuration
+```yaml
+volumes:
+  # Critical - user settings and session data
+  - claude-config:/home/kasm-user/.claude
+  # Critical - user preferences file
+  - ./claude.json:/home/kasm-user/.claude.json
+  # Optional - preserves CLI versions (saves ~405M download)
+  - claude-share:/home/kasm-user/.local/share/claude
+```
+
+### Single Volume Alternative
+For simplicity, mount the main config directory:
+```yaml
+volumes:
+  - claude-data:/home/kasm-user/.claude
+```
+Note: This doesn't preserve `.claude.json` (sibling file) or CLI versions in `.local/share/claude`.
