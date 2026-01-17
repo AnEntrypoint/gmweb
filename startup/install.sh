@@ -128,6 +128,14 @@ else
   log "WARNING: ProxyPilot download failed - service will be unavailable"
 fi
 
+# Download ProxyPilot config.yaml
+log "Downloading ProxyPilot config..."
+if curl -fL -o /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml 2>/dev/null; then
+  log "✓ ProxyPilot config.yaml downloaded"
+else
+  log "WARNING: ProxyPilot config.yaml download failed"
+fi
+
 # ============================================================================
 # 10b. CHROMIUM EXTENSION POLICIES
 # ============================================================================
