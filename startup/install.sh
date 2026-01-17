@@ -159,8 +159,9 @@ else
   git clone https://github.com/siteboon/claudecodeui /opt/claudecodeui
   cd /opt/claudecodeui
   npm install
+  npm run build
   cd -
-  log "✓ Claude Code UI installed"
+  log "✓ Claude Code UI installed and built"
 fi
 
 # ============================================================================

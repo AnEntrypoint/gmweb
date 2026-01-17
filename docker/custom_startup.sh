@@ -47,6 +47,18 @@ if [ ! -d /home/kasm-user/.npm ]; then
 fi
 
 # ============================================================================
+# Fix Claude Code UI permissions (root-owned from build time)
+# ============================================================================
+# The claudecodeui directory is created as root during docker build
+# Need to fix ownership so the server can write to database and temp files
+
+if [ -d /opt/claudecodeui ]; then
+  log "Fixing Claude Code UI permissions..."
+  sudo chown -R kasm-user:kasm-user /opt/claudecodeui
+  log "✓ Claude Code UI permissions fixed"
+fi
+
+# ============================================================================
 # Setup .bashrc PATH (first boot only)
 # ============================================================================
 # Add NVM and local bin paths to .bashrc for interactive shells

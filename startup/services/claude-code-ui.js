@@ -24,10 +24,10 @@ export default {
       };
     }
 
-    // Start Claude Code UI on port 9997
-    const ps = spawn('npm', ['run', 'dev', '--', '-p', '9997'], {
+    // Start Claude Code UI server in production mode (dist already built)
+    const ps = spawn('node', ['server/index.js'], {
       cwd: appPath,
-      env: { ...env, PORT: '9997' },
+      env: { ...env, PORT: '9997', NODE_ENV: 'production' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
