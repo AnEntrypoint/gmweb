@@ -207,34 +207,18 @@ fi
 
 log "Setting comprehensive permissions..."
 
-# Ensure all home directories are properly owned and readable
+# Ensure all home directories properly owned
 sudo chown -R kasm-user:kasm-user /home/kasm-user
 
-# Set directory permissions (755 = rwxr-xr-x)
-chmod 755 /home/kasm-user
-chmod 755 /home/kasm-user/.config
-chmod 755 /home/kasm-user/.config/autostart
-chmod 755 /home/kasm-user/.config/xfce4
-chmod 755 /home/kasm-user/.config/xfce4/xfconf
-chmod 755 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml
-chmod 755 /home/kasm-user/Desktop
-chmod 755 /home/kasm-user/Desktop/Uploads
-chmod 755 /home/kasm-user/Downloads
-chmod 755 /home/kasm-user/logs
-
-# Ensure web server directories have proper ownership
-[ -d ~/webssh2 ] && chmod 755 ~/webssh2 && find ~/webssh2 -type d -exec chmod 755 {} \;
-[ -d ~/node-file-manager-esm ] && chmod 755 ~/node-file-manager-esm && find ~/node-file-manager-esm -type d -exec chmod 755 {} \;
-
-# Cache and temp
+# Set directory permissions (755 = rwxr-xr-x, 600 = rw-------)
+chmod 755 /home/kasm-user{,/.config,/.config/{autostart,xfce4,xfce4/xfconf,xfce4/xfconf/xfce-perchannel-xml},/Desktop,/Desktop/Uploads,/Downloads,/logs}
 mkdir -p ~/.cache ~/.tmp
 chmod 755 ~/.cache ~/.tmp
-
-# .bashrc should be readable and writable by owner only
 chmod 600 ~/.bashrc 2>/dev/null || true
-
-# Desktop entries readable
 chmod 644 ~/.config/autostart/*.desktop 2>/dev/null || true
+
+# Fix permissions recursively on service directories
+find ~/{webssh2,node-file-manager-esm} -type d 2>/dev/null -exec chmod 755 {} \;
 
 log "✓ Permissions normalized"
 

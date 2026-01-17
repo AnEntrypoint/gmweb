@@ -20,29 +20,12 @@ log "===== CUSTOM STARTUP $(date) ====="
 # Fix runtime permissions (volume-mounted directories)
 # ============================================================================
 
-log "Fixing runtime permissions on mounted volumes..."
+# Fix permissions on mounted volumes (runs as root at startup)
+chmod 755 /home/kasm-user/{Desktop,Downloads,Desktop/Uploads} 2>/dev/null || true
 
-# Fix Desktop and Downloads permissions (happens AFTER volume mount)
-chmod 755 /home/kasm-user/Desktop 2>/dev/null || true
-chmod 755 /home/kasm-user/Downloads 2>/dev/null || true
-
-# Ensure Desktop/Uploads directory exists and is writable
-mkdir -p /home/kasm-user/Desktop/Uploads
-chmod 755 /home/kasm-user/Desktop/Uploads
-
-# Remove Desktop/Downloads if it's a directory (conflicts with symlink)
-if [ -d /home/kasm-user/Desktop/Downloads ] && [ ! -L /home/kasm-user/Desktop/Downloads ]; then
-  rm -rf /home/kasm-user/Desktop/Downloads
-  log "✓ Removed conflicting Downloads directory"
-fi
-
-# Create Downloads symlink for KasmWeb
-if [ ! -L /home/kasm-user/Desktop/Downloads ]; then
-  ln -sf /home/kasm-user/Downloads /home/kasm-user/Desktop/Downloads
-  log "✓ Downloads symlink created"
-fi
-
-log "✓ Runtime permissions fixed"
+# Create symlink for KasmWeb Downloads directory
+rm -rf /home/kasm-user/Desktop/Downloads
+ln -sf /home/kasm-user/Downloads /home/kasm-user/Desktop/Downloads
 
 # ============================================================================
 # Start supervisor
