@@ -85,14 +85,9 @@ RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-termi
     chmod 644 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
 
 # Setup startup scripts (stable - service configuration)
-RUN cat > $STARTUPDIR/custom_startup.sh << 'STARTUP_SCRIPT'
-# Setup environment once on first boot (idempotent check)
-if ! grep -q 'GMWeb Environment Setup' /home/kasm-user/.bashrc 2>/dev/null; then
-  sudo -u kasm-user bash -c 'printf "\n# GMWeb Environment Setup\nexport PATH=\"/usr/local/local/nvm/versions/node/v23.11.1/bin:\$PATH\"\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n" >> /home/kasm-user/.bashrc'
-fi
-
-echo '===== STARTUP '"$(date)"' =====' | tee -a /home/kasm-user/logs/startup.log
-STARTUP_SCRIPT
+# Use printf with && chaining to avoid Dockerfile parsing issues with heredoc
+RUN printf '#!/bin/bash\n# Setup environment once on first boot (idempotent check)\nif ! grep -q '"'"'GMWeb Environment Setup'"'"' /home/kasm-user/.bashrc 2>/dev/null; then\n  sudo -u kasm-user bash -c '"'"'printf "\\n# GMWeb Environment Setup\\nexport PATH=\\"/usr/local/local/nvm/versions/node/v23.11.1/bin:\\$PATH\\"\\nexport PATH=\\"\\$HOME/.local/bin:\\$PATH\\"\\n" >> /home/kasm-user/.bashrc'"'"'\nfi\n\necho '"'"'===== STARTUP '"'"'$(date)'"'"' ====='"'"' | tee -a /home/kasm-user/logs/startup.log\n' > $STARTUPDIR/custom_startup.sh && \
+    chmod +x $STARTUPDIR/custom_startup.sh
 RUN echo "/usr/bin/desktop_ready && nohup sudo -u kasm-user bash -c 'export VNC_PW=\"\$(strings /proc/1/environ | grep \"^VNC_PW=\" | cut -d= -f2-)\" && export PATH=\"/usr/local/local/nvm/versions/node/v23.11.1/bin:\$PATH\" && npx -y gxe@latest AnEntrypoint/kasmproxy start' > /home/kasm-user/logs/kasmproxy.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "/usr/bin/desktop_ready && nohup sudo -u kasm-user /usr/bin/proxypilot > /home/kasm-user/logs/proxypilot.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup sudo -u kasm-user npm install -g @google/gemini-cli > /home/kasm-user/logs/gemini-cli.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
@@ -108,7 +103,6 @@ RUN echo "nohup sudo -u kasm-user bash -c 'export PATH=\"/usr/local/local/nvm/ve
 RUN echo "mkdir -p /run/sshd && nohup bash -c 'if [ -n \"\$VNC_PW\" ]; then echo \"kasm-user:\$VNC_PW\" | chpasswd; fi && /usr/sbin/sshd' > /home/kasm-user/logs/sshd.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "nohup bash -c 'sudo -u kasm-user tmux new-session -d -s main -x 120 -y 30; sleep 1; sudo -u kasm-user tmux new-window -t main -n sshd' > /home/kasm-user/logs/tmux.log 2>&1 &" >> $STARTUPDIR/custom_startup.sh
 RUN echo "echo '===== STARTUP COMPLETE =====' | tee -a /home/kasm-user/logs/startup.log" >> $STARTUPDIR/custom_startup.sh
-RUN chmod +x $STARTUPDIR/custom_startup.sh
 
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
 RUN chmod +x /sbin/cc
