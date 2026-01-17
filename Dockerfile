@@ -18,7 +18,8 @@ RUN rm -rf /var/lib/apt/lists/*
 ENV NVM_DIR=/usr/local/local/nvm
 RUN mkdir -p /usr/local/local/nvm
 RUN echo 'export PATH="/usr/local/local/nvm:$PATH"' >> ~/.profile
-RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+RUN echo 'chmod +x ~./.profile'
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 RUN bash -c ". $NVM_DIR/nvm.sh && nvm install 23.11.1 && nvm use 23.11.1 && nvm alias default 23.11.1"
 
