@@ -110,6 +110,30 @@ else
 fi
 
 # ============================================================================
+# Setup Claude MCP and plugins (first boot only)
+# ============================================================================
+
+CLAUDE_MARKER="/home/kasm-user/.gmweb-claude-setup"
+if [ ! -f "$CLAUDE_MARKER" ]; then
+  log "Setting up Claude MCP and plugins..."
+
+  # Add playwriter MCP server
+  /home/kasm-user/.local/bin/claude mcp add playwriter npx -- -y playwriter@latest || true
+
+  # Add gm plugin from marketplace
+  /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true
+  /home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true
+
+  # Enable Chromium extension
+  python3 /usr/local/bin/enable_chromium_extension.py || true
+
+  touch "$CLAUDE_MARKER"
+  log "✓ Claude MCP and plugins configured"
+else
+  log "✓ Claude already configured (skipping)"
+fi
+
+# ============================================================================
 # Setup XFCE autostart (first boot only)
 # ============================================================================
 # Create autostart directory and desktop entries for apps that should start on login
