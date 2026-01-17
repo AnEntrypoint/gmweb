@@ -93,10 +93,11 @@ sudo printf 'set -g history-limit 2000\nset -g terminal-overrides "xterm*:smcup@
 log "✓ Global tmux configured (user config at boot time)"
 
 # ============================================================================
-# 5. USER HOME SETUP (moved to custom_startup.sh - DO NOT create here)
+# NOTE: USER HOME SETUP REMOVED
 # ============================================================================
-
-log "Skipping user home setup - handled by custom_startup.sh at boot"
+# No user home files created at build time
+# All setup deferred to allow KasmWeb profile initialization
+# User-specific files should be created by supervisor on second boot
 
 # ============================================================================
 # 10. PROXYPILOT DOWNLOAD
