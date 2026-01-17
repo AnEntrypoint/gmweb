@@ -84,11 +84,12 @@ RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-termi
     chown -R kasm-user:kasm-user /home/kasm-user/.config/xfce4 && \
     chmod 644 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
 
-# Copy modular startup system
+# Copy modular startup system (from project root startup/ directory)
 COPY startup/ /home/kasm-user/gmweb-startup/
 RUN cd /home/kasm-user/gmweb-startup && npm install --production && \
     chmod +x /home/kasm-user/gmweb-startup/index.js && \
-    chown -R kasm-user:kasm-user /home/kasm-user/gmweb-startup
+    chown -R kasm-user:kasm-user /home/kasm-user/gmweb-startup && \
+    ls -la /home/kasm-user/gmweb-startup/
 
 # Copy KasmWeb startup hook
 COPY docker/custom_startup.sh /dockerstartup/custom_startup.sh
