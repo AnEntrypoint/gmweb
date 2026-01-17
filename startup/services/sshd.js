@@ -18,11 +18,11 @@ export default {
     };
 
     const ps = spawn('bash', ['-c', `
-      mkdir -p /run/sshd
+      sudo mkdir -p /run/sshd
       if [ -n "$VNC_PW" ]; then
-        echo "kasm-user:$VNC_PW" | chpasswd
+        echo "kasm-user:$VNC_PW" | sudo chpasswd
       fi
-      /usr/sbin/sshd
+      sudo /usr/sbin/sshd
     `], {
       env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],

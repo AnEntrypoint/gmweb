@@ -1,33 +1,26 @@
 // Chromium Extension enablement service
+// Note: Extension enablement script not yet implemented
 import { spawn } from 'child_process';
 
 export default {
   name: 'chromium-ext',
-  type: 'install',
+  type: 'system',
   requiresDesktop: false,
   dependencies: [],
 
   async start(env) {
-    const ps = spawn('sudo', ['-u', 'kasm-user', 'python3', '/usr/local/bin/enable_chromium_extension.py'], {
-      env: { ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true
-    });
-
-    ps.unref();
+    // Extension enablement script not yet implemented
+    // Return immediately as healthy
+    console.log('[chromium-ext] Extension enablement not yet implemented');
     return {
-      pid: ps.pid,
-      process: ps,
-      cleanup: async () => {
-        try {
-          process.kill(-ps.pid, 'SIGKILL');
-        } catch (e) {}
-      }
+      pid: process.pid,
+      process: null,
+      cleanup: async () => {}
     };
   },
 
   async health() {
-    // Health check for extension
+    // Always healthy since this is a stub
     return true;
   }
 };

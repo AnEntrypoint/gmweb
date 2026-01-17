@@ -26,11 +26,11 @@
     },
     "scrot": {
       "enabled": true,
-      "type": "install"
+      "type": "system"
     },
     "chromium-ext": {
       "enabled": true,
-      "type": "install"
+      "type": "system"
     },
     "claude-cli": {
       "enabled": true,

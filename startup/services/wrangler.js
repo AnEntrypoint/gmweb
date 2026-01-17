@@ -11,7 +11,9 @@ export default {
   dependencies: [],
 
   async start(env) {
-    const ps = spawn('sudo', ['-u', 'kasm-user', 'npm', 'install', '-g', 'wrangler'], {
+    // Use full path to npm since sudo doesn't inherit NVM PATH
+    const npmPath = '/usr/local/local/nvm/versions/node/v23.11.1/bin/npm';
+    const ps = spawn('bash', ['-c', `${npmPath} install -g wrangler`], {
       env: { ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true

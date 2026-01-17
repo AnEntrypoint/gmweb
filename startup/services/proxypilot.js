@@ -1,5 +1,6 @@
 // ProxyPilot service - network daemon
 import { spawn } from 'child_process';
+import { existsSync } from 'fs';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
@@ -11,7 +12,19 @@ export default {
   dependencies: [],
 
   async start(env) {
-    const ps = spawn('/usr/bin/proxypilot', [], {
+    const binaryPath = '/usr/bin/proxypilot';
+
+    // Check if binary exists before attempting to spawn
+    if (!existsSync(binaryPath)) {
+      console.log('[proxypilot] Binary not found at ' + binaryPath + ' - service unavailable');
+      return {
+        pid: null,
+        process: null,
+        cleanup: async () => {}
+      };
+    }
+
+    const ps = spawn(binaryPath, [], {
       env: { ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true

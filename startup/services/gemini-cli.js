@@ -11,8 +11,10 @@ export default {
   dependencies: [],
 
   async start(env) {
+    // Use full path to npm since sudo doesn't inherit NVM PATH
+    const npmPath = '/usr/local/local/nvm/versions/node/v23.11.1/bin/npm';
     const ps = spawn('bash', ['-c', `
-      sudo -u kasm-user npm install -g @google/gemini-cli
+      ${npmPath} install -g @google/gemini-cli
     `], {
       env: { ...env },
       stdio: ['ignore', 'pipe', 'pipe'],

@@ -29,6 +29,24 @@ if [ -d /home/kasm-user/Desktop/Downloads ] && [ ! -L /home/kasm-user/Desktop/Do
 fi
 
 # ============================================================================
+# Fix npm permissions (root-owned files from build time)
+# ============================================================================
+# npm cache may have been created as root during docker build
+# This blocks npx and npm commands for kasm-user
+
+if [ -d /home/kasm-user/.npm ]; then
+  log "Fixing npm cache permissions..."
+  sudo chown -R kasm-user:kasm-user /home/kasm-user/.npm
+  log "✓ npm permissions fixed"
+fi
+
+# Create npm cache dir with correct ownership if missing
+if [ ! -d /home/kasm-user/.npm ]; then
+  mkdir -p /home/kasm-user/.npm
+  log "✓ npm cache directory created"
+fi
+
+# ============================================================================
 # Start supervisor
 # ============================================================================
 

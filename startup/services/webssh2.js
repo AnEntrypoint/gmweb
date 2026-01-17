@@ -12,18 +12,15 @@ export default {
 
   async start(env) {
     // Create combined environment for webssh2
+    // Use npx to run webssh2-server package directly (no clone needed)
     const processEnv = {
       ...env,
       PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      WEBSSH2_SSH_HOST: 'localhost',
-      WEBSSH2_SSH_PORT: '22',
-      WEBSSH2_USER_NAME: 'kasm-user',
-      WEBSSH2_USER_PASSWORD: 'kasm'
+      LISTEN: '0.0.0.0:9999'
     };
 
     const ps = spawn('bash', ['-c', `
-      cd /home/kasm-user/webssh2
-      npm start
+      npx -y webssh2-server
     `], {
       env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],

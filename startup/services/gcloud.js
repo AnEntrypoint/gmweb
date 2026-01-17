@@ -11,7 +11,12 @@ export default {
   dependencies: [],
 
   async start(env) {
-    const ps = spawn('sudo', ['-u', 'kasm-user', 'bash', '-c', 'curl https://sdk.cloud.google.com | bash'], {
+    // Install gcloud SDK non-interactively
+    const ps = spawn('bash', ['-c', `
+      curl -sSL https://sdk.cloud.google.com > /tmp/install_gcloud.sh
+      bash /tmp/install_gcloud.sh --disable-prompts --install-dir=/home/kasm-user
+      rm -f /tmp/install_gcloud.sh
+    `], {
       env: { ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
@@ -32,7 +37,8 @@ export default {
   async health() {
     try {
       const { execSync } = await import('child_process');
-      execSync('which gcloud', { stdio: 'pipe' });
+      // Check both PATH and direct install location
+      execSync('which gcloud || test -f /home/kasm-user/google-cloud-sdk/bin/gcloud', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;

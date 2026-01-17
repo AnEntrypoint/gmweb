@@ -1,32 +1,24 @@
-// Scrot installation service
+// Scrot service - screenshot utility (installed at build time via install.sh)
 import { spawn } from 'child_process';
 
 export default {
   name: 'scrot',
-  type: 'install',
+  type: 'system',
   requiresDesktop: false,
   dependencies: [],
 
   async start(env) {
-    const ps = spawn('bash', ['-c', 'apt-get update && apt-get install -y scrot'], {
-      env: { ...env },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true
-    });
-
-    ps.unref();
+    // scrot is installed at build time, no runtime action needed
+    // Just return a dummy handle
     return {
-      pid: ps.pid,
-      process: ps,
-      cleanup: async () => {
-        try {
-          process.kill(-ps.pid, 'SIGKILL');
-        } catch (e) {}
-      }
+      pid: process.pid,
+      process: null,
+      cleanup: async () => {}
     };
   },
 
   async health() {
+    // Check if scrot binary exists
     try {
       const { execSync } = await import('child_process');
       execSync('which scrot', { stdio: 'pipe' });

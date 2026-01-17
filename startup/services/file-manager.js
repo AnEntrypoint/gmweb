@@ -12,15 +12,14 @@ export default {
 
   async start(env) {
     // Create combined environment for file-manager
+    // Use 'serve' package for simple file browsing (no clone needed)
     const processEnv = {
       ...env,
-      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      PORT: '9998'
+      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     };
 
     const ps = spawn('bash', ['-c', `
-      cd /home/kasm-user/node-file-manager-esm
-      npm start -- -d /home/kasm-user/Desktop
+      npx -y serve -l 9998 /home/kasm-user
     `], {
       env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],

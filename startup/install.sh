@@ -25,11 +25,12 @@ sudo apt --fix-broken install -y 2>/dev/null || true
 sudo dpkg --configure -a 2>/dev/null || true
 sudo apt update
 
-# Install packages
+# Install packages (including scrot for screenshots)
 sudo apt-get install -y --no-install-recommends \
   curl bash git build-essential ca-certificates jq wget \
   software-properties-common apt-transport-https gnupg openssh-server \
-  openssh-client tmux lsof chromium xfce4-terminal xfce4 dbus-x11
+  openssh-client tmux lsof chromium xfce4-terminal xfce4 dbus-x11 \
+  scrot
 
 sudo rm -rf /var/lib/apt/lists/*
 log "✓ System packages installed"
@@ -108,18 +109,23 @@ log "Downloading ProxyPilot..."
 ARCH=$(uname -m)
 TARGETARCH=$([ "$ARCH" = "x86_64" ] && echo "amd64" || echo "arm64")
 
+# Try to get download URL from GitHub API
 DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Finesssee/ProxyPilot/releases/latest | \
-  grep "proxypilot-linux-${TARGETARCH}" | \
-  grep -o '"browser_download_url": "[^"]*"' | \
-  cut -d'"' -f4 | head -1)
+  jq -r ".assets[] | select(.name | contains(\"linux-${TARGETARCH}\")) | .browser_download_url" | head -1)
 
-if [ -z "$DOWNLOAD_URL" ]; then
-  log "WARNING: Could not determine ProxyPilot download URL"
-else
-  curl -L -o /tmp/proxypilot "$DOWNLOAD_URL"
+# Fallback to direct URL pattern if API fails
+if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
+  log "GitHub API failed, trying direct download..."
+  DOWNLOAD_URL="https://github.com/Finesssee/ProxyPilot/releases/latest/download/proxypilot-linux-${TARGETARCH}"
+fi
+
+log "Downloading from: $DOWNLOAD_URL"
+if curl -fL -o /tmp/proxypilot "$DOWNLOAD_URL" 2>/dev/null; then
   sudo mv /tmp/proxypilot /usr/bin/proxypilot
   sudo chmod +x /usr/bin/proxypilot
   log "✓ ProxyPilot installed"
+else
+  log "WARNING: ProxyPilot download failed - service will be unavailable"
 fi
 
 # ============================================================================
