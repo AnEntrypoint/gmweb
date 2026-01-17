@@ -43,7 +43,7 @@ export default {
   async health() {
     try {
       const { execSync } = await import('child_process');
-      execSync('lsof -i :9998 | grep -q node', { stdio: 'pipe' });
+      execSync('lsof -i :9998 | grep -q LISTEN', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;
