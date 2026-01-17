@@ -103,16 +103,14 @@ log "✓ tmux configured"
 
 log "Setting up home directory structure..."
 
-# Create directories (do NOT create Desktop/Downloads - KasmWeb creates it as symlink)
+# Create directories (do NOT create Desktop/Downloads/Downloads - KasmWeb manages these)
 mkdir -p ~/Desktop/Uploads
-mkdir -p ~/Downloads
 mkdir -p ~/.config/autostart
 mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml
 mkdir -p ~/logs
 
-# Ensure proper permissions for KasmWeb to create symlinks
+# Ensure proper permissions for KasmWeb to manage Desktop and Downloads
 chmod 755 ~/Desktop
-chmod 755 ~/Downloads
 
 log "✓ Home directories created"
 

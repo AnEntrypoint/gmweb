@@ -55,11 +55,8 @@ fi
 # ============================================================================
 
 # Fix permissions on mounted volumes (runs as root at startup)
-chmod 755 /home/kasm-user/{Desktop,Downloads,Desktop/Uploads} 2>/dev/null || true
-
-# Create symlink for KasmWeb Downloads directory
-rm -rf /home/kasm-user/Desktop/Downloads
-ln -sf /home/kasm-user/Downloads /home/kasm-user/Desktop/Downloads
+# Note: Desktop/Downloads symlink is created by KasmWeb, do not interfere
+chmod 755 /home/kasm-user/{Desktop,Desktop/Uploads} 2>/dev/null || true
 
 # ============================================================================
 # Start supervisor
