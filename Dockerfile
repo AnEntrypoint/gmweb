@@ -84,18 +84,17 @@ RUN printf '<?xml version="1.0" encoding="UTF-8"?>\n\n<channel name="xfce4-termi
     chown -R kasm-user:kasm-user /home/kasm-user/.config/xfce4 && \
     chmod 644 /home/kasm-user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
 
-# Setup startup system with modular JS supervisor
-# Single startup command: launches immortal supervisor that manages all services
-# Services are enabled/disabled via config.json without rebuild
-RUN mkdir -p /home/kasm-user/gmweb-startup && \
-    printf '#!/bin/bash\necho "===== STARTUP $(date) =====" | tee -a /home/kasm-user/logs/startup.log\ncd /home/kasm-user/gmweb-startup && node index.js &\n' > $STARTUPDIR/custom_startup.sh && \
-    chmod +x $STARTUPDIR/custom_startup.sh
-
 # Copy startup system files from build context
 COPY startup/ /home/kasm-user/gmweb-startup/
 RUN cd /home/kasm-user/gmweb-startup && npm install --production && \
     chmod +x /home/kasm-user/gmweb-startup/index.js && \
     chown -R kasm-user:kasm-user /home/kasm-user/gmweb-startup
+
+# Setup startup system with modular JS supervisor
+# Create startup script that launches supervisor in background then exits
+RUN printf '#!/bin/bash\necho "===== STARTUP $(date) =====" | tee -a /home/kasm-user/logs/startup.log\ncd /home/kasm-user/gmweb-startup && /usr/local/local/nvm/versions/node/v23.11.1/bin/node index.js > /home/kasm-user/logs/supervisor.log 2>&1 &\necho "gmweb supervisor started (PID: $!)"\nexit 0\n' > $STARTUPDIR/custom_startup.sh && \
+    chmod +x $STARTUPDIR/custom_startup.sh && \
+    chown kasm-user:kasm-user $STARTUPDIR/custom_startup.sh
 
 RUN echo "claude --dangerously-skip-permissions \$@" > /sbin/cc
 RUN chmod +x /sbin/cc
