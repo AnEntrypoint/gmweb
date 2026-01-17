@@ -57,10 +57,9 @@ if [ -d /opt/claudecodeui ]; then
   sudo chown -R kasm-user:kasm-user /opt/claudecodeui
   log "✓ Claude Code UI permissions fixed"
 
-  # Create kasm_user in Claude Code UI database with VNC_PW
-  log "Setting up Claude Code UI user..."
-  cd /opt/claudecodeui
-  node -e "
+  # Create kasm_user in Claude Code UI database with VNC_PW (backgrounded to not block kasmproxy)
+  log "Setting up Claude Code UI user (background)..."
+  nohup bash -c "cd /opt/claudecodeui && node -e \"
     const Database = require('better-sqlite3');
     const bcrypt = require('bcrypt');
     const vncPw = process.env.VNC_PW || '';
@@ -77,9 +76,8 @@ if [ -d /opt/claudecodeui ]; then
       console.log('Created kasm_user');
     }
     db.close();
-  " 2>&1 | tee -a "$LOG_DIR/startup.log"
-  cd - > /dev/null
-  log "✓ Claude Code UI user configured"
+  \"" > "$LOG_DIR/claudeui-user.log" 2>&1 &
+  log "✓ Claude Code UI user setup started (background)"
 fi
 
 # ============================================================================
@@ -115,20 +113,24 @@ fi
 
 CLAUDE_MARKER="/home/kasm-user/.gmweb-claude-setup"
 if [ ! -f "$CLAUDE_MARKER" ]; then
-  log "Setting up Claude MCP and plugins..."
+  log "Setting up Claude MCP and plugins (background)..."
 
-  # Add playwriter MCP server
-  /home/kasm-user/.local/bin/claude mcp add playwriter npx -- -y playwriter@latest || true
+  # Background all Claude setup to not block kasmproxy
+  nohup bash -c "
+    # Add playwriter MCP server
+    /home/kasm-user/.local/bin/claude mcp add playwriter npx -- -y playwriter@latest || true
 
-  # Add gm plugin from marketplace
-  /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true
-  /home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true
+    # Add gm plugin from marketplace
+    /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true
+    /home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true
 
-  # Enable Chromium extension
-  python3 /usr/local/bin/enable_chromium_extension.py || true
+    # Enable Chromium extension
+    python3 /usr/local/bin/enable_chromium_extension.py || true
 
-  touch "$CLAUDE_MARKER"
-  log "✓ Claude MCP and plugins configured"
+    # Mark as complete
+    touch /home/kasm-user/.gmweb-claude-setup
+  " > "$LOG_DIR/claude-setup.log" 2>&1 &
+  log "✓ Claude MCP and plugins setup started (background)"
 else
   log "✓ Claude already configured (skipping)"
 fi
