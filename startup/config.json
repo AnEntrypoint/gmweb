@@ -1,0 +1,64 @@
+{
+  "healthCheckInterval": 30000,
+  "logDirectory": "/home/kasm-user/logs",
+  "services": {
+    "kasmproxy": {
+      "enabled": true,
+      "type": "critical",
+      "requiresDesktop": true
+    },
+    "proxypilot": {
+      "enabled": true,
+      "type": "critical",
+      "requiresDesktop": true
+    },
+    "gemini-cli": {
+      "enabled": true,
+      "type": "install"
+    },
+    "wrangler": {
+      "enabled": true,
+      "type": "install"
+    },
+    "gcloud": {
+      "enabled": true,
+      "type": "install"
+    },
+    "scrot": {
+      "enabled": true,
+      "type": "install"
+    },
+    "chromium-ext": {
+      "enabled": true,
+      "type": "install"
+    },
+    "claude-cli": {
+      "enabled": true,
+      "type": "install"
+    },
+    "claude-marketplace": {
+      "enabled": true,
+      "type": "install"
+    },
+    "claude-plugin-gm": {
+      "enabled": true,
+      "type": "install"
+    },
+    "webssh2": {
+      "enabled": true,
+      "type": "web"
+    },
+    "file-manager": {
+      "enabled": true,
+      "type": "web"
+    },
+    "sshd": {
+      "enabled": true,
+      "type": "system"
+    },
+    "tmux": {
+      "enabled": true,
+      "type": "system"
+    }
+  }
+}
