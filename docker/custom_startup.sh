@@ -56,6 +56,30 @@ if [ -d /opt/claudecodeui ]; then
   log "Fixing Claude Code UI permissions..."
   sudo chown -R kasm-user:kasm-user /opt/claudecodeui
   log "✓ Claude Code UI permissions fixed"
+
+  # Create kasm_user in Claude Code UI database with VNC_PW
+  log "Setting up Claude Code UI user..."
+  cd /opt/claudecodeui
+  node -e "
+    const Database = require('better-sqlite3');
+    const bcrypt = require('bcrypt');
+    const vncPw = process.env.VNC_PW || '';
+    if (!vncPw) { console.log('No VNC_PW, skipping'); process.exit(0); }
+    const db = new Database('/opt/claudecodeui/server/database/auth.db');
+    const user = db.prepare('SELECT id FROM users WHERE username = ?').get('kasm_user');
+    if (user) {
+      const hash = bcrypt.hashSync(vncPw, 10);
+      db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(hash, 'kasm_user');
+      console.log('Updated kasm_user password');
+    } else {
+      const hash = bcrypt.hashSync(vncPw, 10);
+      db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('kasm_user', hash);
+      console.log('Created kasm_user');
+    }
+    db.close();
+  " 2>&1 | tee -a "$LOG_DIR/startup.log"
+  cd - > /dev/null
+  log "✓ Claude Code UI user configured"
 fi
 
 # ============================================================================
