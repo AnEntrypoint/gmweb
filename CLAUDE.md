@@ -469,3 +469,188 @@ docker buildx create --name multiarch
 docker buildx create --append --name multiarch
 docker buildx use multiarch
 ```
+
+## Coolify Deployment (Complete Setup)
+
+### How Coolify Builds This Project
+
+Coolify discovers and builds `docker-compose.yaml` applications via:
+1. Clones your Git repo
+2. Reads docker-compose.yaml
+3. Executes `docker-compose build` (respects build variables)
+4. Runs `docker-compose up -d` with your configured domain
+
+**Important:** Coolify does NOT use `docker buildx` by default. Multi-arch support is via the x-bake section for local development.
+
+### Pre-Deployment Checklist
+
+**1. Create .env file from example:**
+```bash
+cp .env.example .env
+# Edit .env and set VNC_PW to a strong password
+```
+
+**2. Set environment variables in Coolify UI:**
+- Application → Settings → Environment
+- Required:
+  - `VNC_PW`: Password for desktop access
+  - `CUSTOM_PORT=6901` (already in docker-compose)
+  - `CUSTOM_HTTPS_PORT=6902` (already in docker-compose)
+  - `FILE_MANAGER_PATH=/config/Desktop` (already in docker-compose)
+  - `SUBFOLDER=/desk/` (already in docker-compose)
+
+**3. Configure Docker Hub push:**
+- Application → Settings → General
+- Docker Image: `almagest/gmweb`
+- Docker Image Tag: `latest`
+- Requires: `docker login` on Coolify server
+
+**4. Verify build won't fail:**
+```bash
+# Test locally first
+docker-compose build
+docker-compose up -d
+# Check it starts without errors
+docker-compose logs -f
+```
+
+### Deployment via Coolify CLI
+
+**1. List and get application UUID:**
+```bash
+coolify app list
+```
+
+**2. Set environment variables:**
+```bash
+coolify app env create <uuid> VNC_PW "strong-password"
+```
+
+**3. Configure Docker Hub:**
+```bash
+coolify app update <uuid> \
+  --docker-image almagest/gmweb \
+  --docker-tag latest
+```
+
+**4. Deploy (builds and pushes):**
+```bash
+coolify app start <uuid>
+```
+
+**5. Monitor build:**
+```bash
+# Watch deployment logs in real-time
+coolify app deployments logs <uuid> -f
+```
+
+### Verifying Build Success
+
+After deployment completes:
+
+**Check container is running:**
+```bash
+docker ps | grep gmweb
+```
+
+**Verify ports are listening:**
+```bash
+# On Coolify server:
+lsof -i :6901   # Webtop HTTP
+lsof -i :6902   # Webtop HTTPS
+lsof -i :80     # kasmproxy-wrapper (internal)
+```
+
+**Test Docker Hub image:**
+```bash
+docker pull almagest/gmweb:latest
+docker image inspect almagest/gmweb:latest | grep -E "Architecture|RepoTags"
+```
+
+### Common Coolify Build Issues
+
+**Issue: "Cannot connect to Docker daemon"**
+- Coolify server requires Docker to be running
+- SSH to server and verify: `docker ps`
+
+**Issue: "Port 80 already in use"**
+- This was fixed by NOT exposing port 80 to host
+- Port 80 is internal only (kasmproxy-wrapper)
+- If error persists, verify docker-compose.yaml has no `"80:80"` mapping
+
+**Issue: "Build context too large"**
+- Coolify has a .dockerignore file
+- Ensure large files/directories are excluded
+
+**Issue: Docker Hub push fails**
+- Verify `docker login` was run on Coolify server
+- Credentials stored in `~/.docker/config.json`
+- Run again: `docker login` with credentials
+
+### Troubleshooting: Enable Debug Logs
+
+Coolify CLI debug mode:
+```bash
+coolify --debug app start <uuid>
+```
+
+Check Coolify server logs:
+```bash
+docker logs -f $(docker ps | grep coolify | head -1 | awk '{print $1}')
+```
+
+### Docker Hub Credentials Setup (Critical for Auto-Push)
+
+**On Coolify Server - SSH and authenticate with Docker Hub:**
+
+```bash
+# Login to Docker Hub
+docker login
+
+# When prompted, enter:
+# Username: almagest
+# Password: (use Personal Access Token, NOT password)
+# Login Succeeded ✓
+
+# Verify credentials are saved
+cat ~/.docker/config.json
+# Should show: "auths": { "https://index.docker.io/v1/": { "auth": "..." } }
+```
+
+**Important:** Use a **Personal Access Token** (not your Docker Hub password):
+1. Go to Docker Hub → Account Settings → Security
+2. Create new Personal Access Token
+3. Copy the token and use it as password for `docker login`
+4. Token is stored securely in `~/.docker/config.json`
+
+**In Coolify UI - Set Docker Hub credentials:**
+1. Application → Settings → General
+2. Docker Image: `almagest/gmweb`
+3. Docker Image Tag: `latest`
+4. (Optional) Docker Registry: `docker.io` (default for Docker Hub)
+5. Save
+
+**Verify Coolify has credentials:**
+```bash
+# SSH to Coolify server
+docker login --check
+# Or list what's stored:
+docker info | grep -A5 "Registries:"
+```
+
+**Test push capability:**
+```bash
+# SSH to Coolify server
+docker pull hello-world
+docker tag hello-world:latest almagest/test:latest
+docker push almagest/test:latest
+# Should succeed without auth errors
+```
+
+If push succeeds, Coolify can push to Docker Hub after builds.
+
+**On Next Deployment:**
+1. Push code: `git push origin main`
+2. Trigger Coolify deploy: `coolify app start <uuid>`
+3. Coolify will build and automatically push `almagest/gmweb:latest` + commit SHA
+4. Verify on Docker Hub: https://hub.docker.com/r/almagest/gmweb
