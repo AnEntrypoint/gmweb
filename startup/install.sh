@@ -1,11 +1,14 @@
 #!/bin/bash
 # gmweb Installation Script - SYSTEM PACKAGES ONLY
 # Runs ONCE during docker build time (RUN bash install.sh in Dockerfile)
-# DO NOT create anything in /home/kasm-user - KasmWeb manages that at startup
+# DO NOT create anything in /config - LinuxServer webtop manages that at startup
 # Idempotent checks NOT needed (runs only once)
 # All output captured by docker build
 
 set -e
+
+# LinuxServer webtop uses 'abc' as the default user
+WEBTOP_USER="abc"
 
 log() {
   echo "[gmweb-install] $@"
@@ -20,7 +23,7 @@ log "===== GMWEB INSTALL START $(date) ====="
 log "Installing system packages..."
 
 # Ensure apt is functional
-echo "kasm-user ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null
+echo "${WEBTOP_USER} ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null
 sudo apt --fix-broken install -y 2>/dev/null || true
 sudo dpkg --configure -a 2>/dev/null || true
 sudo apt update
@@ -62,8 +65,8 @@ fi
 # Generate host keys
 sudo /usr/bin/ssh-keygen -A
 
-# Set default password for kasm-user
-echo 'kasm-user:kasm' | sudo chpasswd
+# Set default password for webtop user
+echo "${WEBTOP_USER}:abc" | sudo chpasswd
 
 log "✓ SSH configured"
 
@@ -128,10 +131,10 @@ else
   log "WARNING: ProxyPilot download failed - service will be unavailable"
 fi
 
-# Download ProxyPilot config.yaml
+# Download ProxyPilot config.yaml to /opt (user home not available at build time)
 log "Downloading ProxyPilot config..."
-if curl -fL -o /home/kasm-user/config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml 2>/dev/null; then
-  log "✓ ProxyPilot config.yaml downloaded"
+if curl -fL -o /opt/proxypilot-config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml 2>/dev/null; then
+  log "✓ ProxyPilot config.yaml downloaded to /opt (copied to user home at boot)"
 else
   log "WARNING: ProxyPilot config.yaml download failed"
 fi

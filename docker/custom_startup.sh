@@ -32,6 +32,16 @@ if [ ! -d "$HOME_DIR/.npm" ]; then
 fi
 
 # ============================================================================
+# Copy ProxyPilot config (from build-time download)
+# ============================================================================
+if [ -f /opt/proxypilot-config.yaml ] && [ ! -f "$HOME_DIR/config.yaml" ]; then
+  log "Copying ProxyPilot config..."
+  cp /opt/proxypilot-config.yaml "$HOME_DIR/config.yaml"
+  chown abc:abc "$HOME_DIR/config.yaml"
+  log "✓ ProxyPilot config copied"
+fi
+
+# ============================================================================
 # Fix NVM directory permissions
 # ============================================================================
 if [ -d /usr/local/local/nvm ]; then
