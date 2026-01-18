@@ -321,33 +321,18 @@ export class Supervisor {
     env.PATH = `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH}`;
     env.PATH = `${process.env.HOME}/.local/bin:${env.PATH}`;
 
-    // Extract or set VNC_PW from container environment
-    if (!env.VNC_PW) {
-      try {
-        // Read /proc/1/environ and parse environment variables
-        const { readFileSync } = await import('fs');
-        const environBuffer = readFileSync('/proc/1/environ');
-        const environStr = environBuffer.toString();
-        const envVars = environStr.split('\0').filter(x => x);
-        const vncPwVar = envVars.find(v => v.startsWith('VNC_PW='));
+    // Get VNC_PW from environment (docker-compose sets both VNC_PW and PASSWORD)
+    // Priority: VNC_PW > PASSWORD > 'password' (default)
+    if (!env.VNC_PW && env.PASSWORD) {
+      env.VNC_PW = env.PASSWORD;
+      this.log('INFO', `Using PASSWORD as VNC_PW: ${env.VNC_PW.substring(0, 3)}***`);
+    }
 
-        if (vncPwVar) {
-          env.VNC_PW = vncPwVar.substring(7); // Remove 'VNC_PW=' prefix
-          this.log('INFO', `Extracted VNC_PW from /proc/1/environ: ${env.VNC_PW.substring(0, 3)}***`);
-        } else {
-          // Also try PASSWORD variable (Webtop uses PASSWORD for VNC password)
-          const passVar = envVars.find(v => v.startsWith('PASSWORD='));
-          if (passVar) {
-            env.VNC_PW = passVar.substring(9); // Remove 'PASSWORD=' prefix
-            this.log('INFO', `Extracted PASSWORD from /proc/1/environ and using as VNC_PW: ${env.VNC_PW.substring(0, 3)}***`);
-          } else {
-            throw new Error('Neither VNC_PW nor PASSWORD found');
-          }
-        }
-      } catch (err) {
-        this.log('WARN', `Could not extract VNC_PW from environment: ${err.message}, using default`);
-        env.VNC_PW = 'password';
-      }
+    if (!env.VNC_PW) {
+      env.VNC_PW = 'password';
+      this.log('WARN', 'No VNC_PW or PASSWORD set, using default');
+    } else {
+      this.log('INFO', `VNC_PW configured: ${env.VNC_PW.substring(0, 3)}***`);
     }
 
     return env;

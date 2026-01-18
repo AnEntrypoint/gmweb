@@ -85,16 +85,33 @@ function shouldBypassAuth(path) {
  * Check if authorization header is valid
  */
 function checkAuth(authHeader) {
-  if (!authHeader) return false;
+  if (!authHeader) {
+    console.log('[kasmproxy-wrapper] Auth check: no header provided');
+    return false;
+  }
   const [scheme, credentials] = authHeader.split(' ');
-  if (scheme !== 'Basic') return false;
+  if (scheme !== 'Basic') {
+    console.log('[kasmproxy-wrapper] Auth check: invalid scheme', scheme);
+    return false;
+  }
 
   try {
     const decoded = Buffer.from(credentials, 'base64').toString();
-    // Expected format: kasm_user:VNC_PW
-    if (decoded !== 'kasm_user:' + VNC_PW) return false;
+    const expected = 'kasm_user:' + VNC_PW;
+
+    // Log for debugging (mask passwords)
+    const decodedMask = decoded.includes(':') ? decoded.split(':')[0] + ':' + '***' : '***';
+    const expectedMask = expected.split(':')[0] + ':' + '***';
+    console.log('[kasmproxy-wrapper] Auth check: decoded=' + decodedMask + ', expected=' + expectedMask);
+
+    if (decoded !== expected) {
+      console.log('[kasmproxy-wrapper] Auth FAILED: password mismatch');
+      return false;
+    }
+    console.log('[kasmproxy-wrapper] Auth SUCCESS');
     return true;
-  } catch {
+  } catch (err) {
+    console.log('[kasmproxy-wrapper] Auth check error:', err.message);
     return false;
   }
 }
