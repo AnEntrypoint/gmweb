@@ -25,9 +25,6 @@ services:
       - SUBFOLDER=/desk/
     volumes:
       - gmweb-config:/config
-    ports:
-      - "6901:6901"  # Webtop HTTP
-      - "6902:6902"  # Webtop HTTPS
     shm_size: "1gb"
     restart: unless-stopped
 
