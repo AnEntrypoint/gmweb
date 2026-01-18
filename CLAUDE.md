@@ -150,47 +150,59 @@ Applications installed to `/opt/` during docker build are owned by root. Service
 
 **Pattern:** Add `chown -R abc:abc /opt/<app>` to `custom_startup.sh`
 
-### Port Architecture
+### kasmproxy-wrapper Architecture (CRITICAL)
 
-**Exposed to host (docker-compose port mappings):**
-- 6901 → 6901: Webtop HTTP (CUSTOM_PORT, for direct desktop access)
-- 6902 → 6902: Webtop HTTPS (CUSTOM_HTTPS_PORT, for direct desktop access)
+**Function:** HTTP Basic Auth reverse proxy on port 80 that routes requests to backend services.
+
+**CRITICAL: Service Dependencies**
+- kasmproxy-wrapper should **NOT depend on the old kasmproxy service** in Webtop architecture
+- The old `kasmproxy` service (AnEntrypoint/kasmproxy on port 8080) should be **disabled in config.json** for Webtop deployments
+- kasmproxy-wrapper can start immediately on port 80 without waiting for kasmproxy
+- If kasmproxy-wrapper depends on kasmproxy, it will block and never start (causing auth failures)
+
+**Port Forwarding (Webtop + Selkies architecture):**
+- Port 80: kasmproxy-wrapper listens here
+- Port 3000: Webtop web UI (internal, not exposed)
+- Port 8082: Selkies WebSocket streaming (internal, not exposed)
+
+**kasmproxy-wrapper routing logic:**
+```javascript
+// Routes /data/* and /ws/* to Selkies WebSocket on port 8082
+if (path.startsWith('/data') || path.startsWith('/ws')) {
+  return 8082;  // Selkies
+}
+// All other routes go to Webtop web UI on port 3000
+return 3000;  // Webtop UI
+```
+
+**Authentication Bypass:**
+- `/data/*` and `/ws/*` routes bypass auth (Selkies handles its own authentication)
+- All other routes require HTTP Basic Auth with username: `kasm_user`, password: `VNC_PW`
+
+### Port Architecture (Webtop + Selkies)
+
+**Exposed to host (docker-compose port mappings - via Traefik/Coolify):**
+- Port 80: kasmproxy-wrapper (reverse proxy on port 80, routed to external domain via Traefik)
+- Port 3000: Webtop web UI (internal only, not directly exposed)
+- Port 8082: Selkies WebSocket (internal only, not directly exposed)
 
 **IMPORTANT: Port 80 stays INTERNAL to container - DO NOT expose it in docker-compose**
-Port 80 is where kasmproxy-wrapper listens. Exposing it causes "Bind for 0.0.0.0:80 failed" errors in environments where port 80 is already in use (Coolify, Traefik, etc). The internal routing still works without external exposure.
+Port 80 is where kasmproxy-wrapper listens. Traefik/Coolify handles the external routing via domain assignment. Exposing port 80 directly causes conflicts in containerized environments.
 
 **Internal service ports (container only, never expose externally):**
-- 80: kasmproxy-wrapper (reverse proxy, routing, auth bypass, SUBFOLDER prefix stripping)
-  - Handles `/ui`, `/api`, `/ws` → 9997 (Claude Code UI)
-  - Handles `/files` → 9998 (file-manager, public)
-  - Handles `/ssh`, `/ssh/ws` → 9999 (webssh2/ttyd)
-  - Handles `/websockify` → 6901 (Webtop VNC, public)
-  - Handles `/` → 6901 (Webtop web UI) or kasmproxy on 8080
-- 8080: kasmproxy (authentication middleware from AnEntrypoint/kasmproxy)
-- 6901: Webtop HTTP (set via CUSTOM_PORT environment variable)
-- 6902: Webtop HTTPS (set via CUSTOM_HTTPS_PORT environment variable)
-- 9997: Claude Code UI
-- 9998: file-manager (standalone server)
-- 9999: webssh2/ttyd (terminal)
+- 80: kasmproxy-wrapper (HTTP Basic Auth, reverse proxy, SUBFOLDER prefix stripping)
+  - Routes to port 3000 (Webtop web UI) for most requests
+  - Routes to port 8082 (Selkies WebSocket) for `/data/*` and `/ws/*` requests
+- 3000: Webtop web UI (LinuxServer Webtop, HTML interface)
+- 8082: Selkies WebSocket (desktop streaming, VNC replacement)
 
 **kasmproxy-wrapper routing (on port 80):**
-- `/ui` → port 9997 (Claude Code UI) - path stripped to `/`
-- `/api` → port 9997 (Claude Code UI API) - path kept as-is
-- `/ws` → port 9997 (Claude Code UI WebSocket) - path kept as-is
-- `/files` → port 9998 (standalone file-manager) - path stripped to `/`, **public (no auth)**
-- `/ssh` → port 9999 (ttyd terminal) - path stripped to `/`
-- `/websockify` → port 6901 (Webtop VNC WebSocket) - direct proxy
-- `/` → port 6901 (Webtop web UI)
+- `/data/*` → port 8082 (Selkies WebSocket) - bypasses auth
+- `/ws/*` → port 8082 (Selkies WebSocket) - bypasses auth
+- `/` (all other routes) → port 3000 (Webtop web UI) - requires HTTP Basic Auth
 
 **WebSocket Upgrade Handling:**
-The kasmproxy-wrapper handles WebSocket upgrades for `/websockify` and `/ssh/ws` by forwarding the 101 Switching Protocols response and establishing bidirectional piping.
-
-**HTML Rewriting:** For `/ui` only, absolute paths like `/assets/`, `/icons/`, and `/favicon` are rewritten to `/ui/assets/`, `/ui/icons/`, etc.
-
-**Authentication:**
-- Claude Code UI (port 9997) has its own authentication - kasmproxy skips basic auth for `/ui`, `/api`, `/ws`
-- File manager (`/files`) is public - no authentication required
-- All other routes require HTTP Basic Auth with `VNC_PW`/`PASSWORD`
+kasmproxy-wrapper handles WebSocket upgrades for `/ws/*` and `/data/*` by forwarding the 101 Switching Protocols response and establishing bidirectional piping to the Selkies server on port 8082.
 
 ### Claude Code UI Basename Fix (Critical)
 When Claude Code UI is accessed via `/ui` prefix, React Router needs a `basename` prop.
