@@ -1,4 +1,4 @@
-// Node File Manager service
+// File Manager service using serve
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -11,19 +11,22 @@ export default {
   dependencies: [],
 
   async start(env) {
-    // Create combined environment for file-manager
-    // Use 'serve' package for simple file browsing (no clone needed)
     const processEnv = {
       ...env,
       PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     };
 
-    const ps = spawn('bash', ['-c', `
-      npx -y serve -l 9998 /home/kasm-user
-    `], {
+    const ps = spawn('npx', ['-y', 'serve', '-l', '9998', '/home/kasm-user'], {
       env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
+    });
+
+    ps.stdout?.on('data', (data) => {
+      console.log(`[file-manager] ${data.toString().trim()}`);
+    });
+    ps.stderr?.on('data', (data) => {
+      console.log(`[file-manager:err] ${data.toString().trim()}`);
     });
 
     ps.unref();
