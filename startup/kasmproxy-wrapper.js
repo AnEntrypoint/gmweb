@@ -16,7 +16,7 @@
 import http from 'http';
 import net from 'net';
 
-const WEBTOP_UI_PORT = 3000;  // LinuxServer webtop web UI port (HTML interface)
+const WEBTOP_UI_PORT = parseInt(process.env.CUSTOM_PORT || '3000', 10);  // LinuxServer webtop web UI port (configurable via CUSTOM_PORT env var)
 const SELKIES_WS_PORT = 8082;  // Selkies WebSocket for desktop streaming
 const LISTEN_PORT = 80;
 const VNC_PW = process.env.VNC_PW || '';
