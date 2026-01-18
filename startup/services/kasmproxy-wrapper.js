@@ -1,6 +1,8 @@
 // KasmProxy Authentication Wrapper service
-// Runs on port 80, forwards to kasmproxy on port 8080
-// Selectively bypasses authentication for /files route
+// Runs on port 80, forwards to:
+// - Webtop web UI on port 3000
+// - Selkies WebSocket on port 8082
+// HTTP Basic Auth for all routes except /data/* and /ws/*
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
