@@ -21,7 +21,6 @@ services:
     ports:
       - "6901:6901"  # Webtop HTTP
       - "6902:6902"  # Webtop HTTPS
-      - "80:80"      # kasmproxy-wrapper
     shm_size: "1gb"
     restart: unless-stopped
 

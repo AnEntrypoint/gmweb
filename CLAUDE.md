@@ -151,13 +151,18 @@ Applications installed to `/opt/` during docker build are owned by root. Service
 **Pattern:** Add `chown -R abc:abc /opt/<app>` to `custom_startup.sh`
 
 ### Port Architecture
-**Port 80 (EXCLUSIVE to kasmproxy-wrapper - no other service must use it):**
-- `kasmproxy-wrapper.js`: Sits on port 80, handles routing, auth bypass, and SUBFOLDER prefix stripping
-- Forwards authenticated requests to backend services
-- Bypasses auth for /files and /websockify routes
-- Enforces SUBFOLDER prefix (if configured)
 
-**Internal service ports (never expose externally):**
+**Exposed to host (docker-compose port mappings):**
+- 6901 → 6901: Webtop HTTP (CUSTOM_PORT, for direct desktop access)
+- 6902 → 6902: Webtop HTTPS (CUSTOM_HTTPS_PORT, for direct desktop access)
+
+**Internal service ports (container only, never expose externally):**
+- 80: kasmproxy-wrapper (reverse proxy, routing, auth bypass, SUBFOLDER prefix stripping)
+  - Handles `/ui`, `/api`, `/ws` → 9997 (Claude Code UI)
+  - Handles `/files` → 9998 (file-manager, public)
+  - Handles `/ssh`, `/ssh/ws` → 9999 (webssh2/ttyd)
+  - Handles `/websockify` → 6901 (Webtop VNC, public)
+  - Handles `/` → 6901 (Webtop web UI) or kasmproxy on 8080
 - 8080: kasmproxy (authentication middleware from AnEntrypoint/kasmproxy)
 - 6901: Webtop HTTP (set via CUSTOM_PORT environment variable)
 - 6902: Webtop HTTPS (set via CUSTOM_HTTPS_PORT environment variable)

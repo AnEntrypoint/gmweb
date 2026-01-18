@@ -52,14 +52,5 @@ RUN mkdir -p /custom-cont-init.d && \
 COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
 RUN chmod +x /opt/gmweb-startup/custom_startup.sh
 
-# Disable webtop's default port 80 binding - kasmproxy-wrapper needs it
-# Create a script to kill any process on port 80 before kasmproxy-wrapper starts
-RUN mkdir -p /custom-cont-init.d && \
-    echo '#!/bin/bash' > /custom-cont-init.d/00-disable-port-80 && \
-    echo '# Kill any existing process on port 80' >> /custom-cont-init.d/00-disable-port-80 && \
-    echo 'lsof -ti :80 | xargs -r kill -9 2>/dev/null || true' >> /custom-cont-init.d/00-disable-port-80 && \
-    echo 'sleep 1' >> /custom-cont-init.d/00-disable-port-80 && \
-    chmod +x /custom-cont-init.d/00-disable-port-80
-
-# Webtop ports: 6901 (HTTP), 6902 (HTTPS), 80 (kasmproxy-wrapper)
+# Webtop ports: 6901 (HTTP), 6902 (HTTPS), 80 (kasmproxy-wrapper, internal only)
 EXPOSE 6901 6902 80
