@@ -38,7 +38,8 @@ async function main() {
       'file-manager',
       'claude-code-ui',
       'sshd',
-      'tmux'
+      'tmux',
+      'opencode'
     ];
 
     console.log('[startup] Loading services...');

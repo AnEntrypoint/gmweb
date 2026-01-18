@@ -63,6 +63,10 @@
     "tmux": {
       "enabled": true,
       "type": "system"
+    },
+    "opencode": {
+      "enabled": true,
+      "type": "install"
     }
   }
 }
