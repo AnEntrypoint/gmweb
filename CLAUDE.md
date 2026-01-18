@@ -208,15 +208,7 @@ const processEnv = {
 5. Endpoint available within 30-60 seconds
 ```
 
-**Verification:** Test in environment shows correct startup sequence - kasmproxy-wrapper prioritized, kasmproxy skipped.
-
-### Issue: kasmproxy Service Not Disabled
-
-**Symptom:** Port 80 doesn't listen, HTTP 502 on all requests
-
-**Cause:** Both kasmproxy and kasmproxy-wrapper try to start, conflict occurs
-
-**Solution:** Ensure config.json has `"kasmproxy": { "enabled": false }` (already correct)
+**Verification:** Code verified correct. Startup sequence will work after container rebuild with new supervisor code.
 
 ### Issue: Wrong Environment Variable Name
 
