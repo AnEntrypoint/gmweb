@@ -30,12 +30,6 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.services.gmweb.loadbalancer.server.port=80
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
 volumes:
   gmweb-config:
