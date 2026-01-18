@@ -141,7 +141,7 @@ const server = http.createServer((req, res) => {
   const options = {
     hostname: 'localhost',
     port: upstreamPort,
-    path: req.url,
+    path: path,
     method: req.method,
     headers
   };
@@ -170,7 +170,8 @@ const server = http.createServer((req, res) => {
  * WebSockets require special handling via the 'upgrade' event, not regular HTTP
  */
 server.on('upgrade', (req, socket, head) => {
-  const path = req.url.split('?')[0];
+  // Strip SUBFOLDER prefix from request path (keep query string for upstream)
+  const path = stripSubfolder(req.url);
 
   // Check if this route should bypass auth
   const bypassAuth = shouldBypassAuth(path);
@@ -197,7 +198,7 @@ server.on('upgrade', (req, socket, head) => {
   const options = {
     hostname: 'localhost',
     port: upstreamPort,
-    path: req.url,
+    path: path,
     method: req.method,
     headers
   };
