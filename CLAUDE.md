@@ -406,3 +406,66 @@ docker pull almagest/gmweb:latest
 3. Set **Docker Image** field: `almagest/gmweb`
 4. Set **Docker Image Tag** field: `latest`
 5. Save and deploy
+
+## Multi-Architecture Builds (amd64 & arm64)
+
+### Why Multi-Arch?
+
+The LinuxServer webtop base image (`lscr.io/linuxserver/webtop:ubuntu-xfce`) is already published for multiple architectures. We automatically build for both to support deployment on x86_64 and ARM64 servers.
+
+### Build Configuration
+
+**x-bake section in docker-compose.yaml** (already configured):
+```yaml
+x-bake:
+  targets:
+    gmweb:
+      platforms:
+        - linux/amd64
+        - linux/arm64
+```
+
+This tells buildx to create multi-arch images automatically.
+
+### Building Locally
+
+**Prerequisites:**
+- Docker Desktop (includes buildx), OR
+- Linux: `docker buildx create --use` to enable buildx
+
+**Build and push to Docker Hub (creates manifest list):**
+```bash
+docker buildx bake --push
+```
+
+This will:
+1. Build for both amd64 and arm64
+2. Push both variants to Docker Hub
+3. Create and push a manifest list (so Docker auto-selects correct variant)
+
+**Result on Docker Hub:**
+- `almagest/gmweb:latest` → manifest list pointing to both architectures
+- `almagest/gmweb:amd64` → x86_64 specific image
+- `almagest/gmweb:arm64` → ARM64 specific image
+- `almagest/gmweb:<commit-sha>` → multi-arch for current commit
+
+### Building via Coolify
+
+Coolify doesn't natively support buildx bake yet. Workaround:
+1. Build locally with buildx bake and push to Docker Hub
+2. Configure Coolify to pull from `almagest/gmweb:latest`
+3. Coolify will automatically use the correct architecture variant
+
+**Future:** When Coolify supports buildx, multi-arch builds will happen automatically on deployment.
+
+### Performance Note
+
+- **Native builds** (matching server CPU): Fast
+- **QEMU emulation** (cross-arch on one server): ~4-5x slower
+
+For production multi-arch builds, use multiple native builder nodes (one amd64, one arm64) via:
+```bash
+docker buildx create --name multiarch
+docker buildx create --append --name multiarch
+docker buildx use multiarch
+```

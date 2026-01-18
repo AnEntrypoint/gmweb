@@ -1,5 +1,12 @@
 version: '3.8'
 
+x-bake:
+  targets:
+    gmweb:
+      platforms:
+        - linux/amd64
+        - linux/arm64
+
 services:
   gmweb:
     build:
