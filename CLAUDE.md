@@ -721,3 +721,68 @@ docker image inspect almagest/gmweb:latest | grep Architecture
 - After GitHub Actions pushes image, Coolify can pull `almagest/gmweb:latest`
 - No manual intervention needed - Coolify automatically uses the pre-built image
 - Deployment becomes: Pull built image → Run container (minutes instead of build+run hours)
+
+## Coolify & Traefik Service Routing
+
+### Critical: EXPOSE vs Port Mapping
+
+**DO NOT** use explicit port mappings in docker-compose.yaml when deploying to Coolify:
+```yaml
+# WRONG - will conflict with Traefik and other services:
+ports:
+  - "8080:80"
+  - "8443:443"
+```
+
+**Instead:**
+1. Add EXPOSE statements to Dockerfile for port discovery
+2. Add Traefik labels to docker-compose.yaml for routing configuration
+3. Let Traefik/Coolify handle all reverse proxy routing
+
+**Why:** Coolify is a multi-application platform where Traefik already manages port 80 and 443. Explicit host port mappings cause "port already allocated" errors when multiple services compete.
+
+### Traefik Label Configuration
+
+Minimal required labels for Coolify service discovery:
+```yaml
+labels:
+  - traefik.enable=true
+  - traefik.http.services.gmweb.loadbalancer.server.port=80
+```
+
+- `traefik.enable=true` - Enables Traefik service discovery
+- `traefik.http.services.gmweb.loadbalancer.server.port=80` - Routes traffic to internal port 80 (where kasmproxy-wrapper listens)
+
+### Health Checks in Coolify
+
+**Avoid curl-based health checks** in docker-compose when deploying to Coolify:
+```yaml
+# Problematic - may cause container to exit prematurely:
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost/"]
+```
+
+**Why:** Health check failures during startup (before services fully initialize) can cause Coolify to mark the container unhealthy and exit it. For this project, services take ~60 seconds to fully start, and curl may timeout during that window.
+
+**Solution:** Omit health checks in Coolify deployments, or use very lenient timing (high retry count, long timeout).
+
+### EXPOSE Statements
+
+Always include EXPOSE in Dockerfile for port discovery:
+```dockerfile
+EXPOSE 80 3000 6901
+```
+
+- Port 80: kasmproxy-wrapper (main entry point)
+- Port 3000: LinuxServer webtop web UI (fallback)
+- Port 6901: VNC websocket (backup)
+
+Traefik uses EXPOSE to discover available ports even without port mappings.
+
+### Coolify Port Conflict Resolution
+
+If you see: `Bind for 0.0.0.0:8080 failed: port is already allocated`
+- Remove explicit `ports:` section from docker-compose.yaml
+- Ensure Traefik labels are present
+- Restart deployment via Coolify UI
+- Traefik will automatically route to the exposed ports internally
