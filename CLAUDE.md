@@ -11,7 +11,7 @@ Uses `lscr.io/linuxserver/webtop:ubuntu-xfce` instead of KasmWeb.
 - Web UI port: 6901 (set via `CUSTOM_PORT=6901` environment variable)
 - HTTPS port: 6902 (set via `CUSTOM_HTTPS_PORT=6902`)
 - Init mechanism: `/custom-cont-init.d/` scripts
-- Environment: `PASSWORD` (also accepts `VNC_PW` for compatibility)
+- Environment: `PASSWORD` (set by Coolify/Webtop)
 
 ### Environment Variables (LinuxServer Webtop)
 **Critical for port configuration:**
@@ -19,7 +19,7 @@ Uses `lscr.io/linuxserver/webtop:ubuntu-xfce` instead of KasmWeb.
 - `CUSTOM_HTTPS_PORT=6902` - Internal HTTPS port (automatically CUSTOM_PORT+1)
 - `FILE_MANAGER_PATH=/config/Desktop` - Where webtop file uploads/downloads go
 - `SUBFOLDER=/desk/` - Optional: run webtop under /desk/ prefix instead of root (requires kasmproxy-wrapper support)
-- `PASSWORD` or `VNC_PW` - HTTP Basic auth password
+- `PASSWORD` - HTTP Basic auth password (set in Coolify environment)
 - `CUSTOM_USER` - HTTP Basic auth username (default: abc)
 
 **Important**: LinuxServer webtop does NOT listen on port 80. Only ports 3000 (HTTP) and 3001 (HTTPS) are used internally. We override this with CUSTOM_PORT.
@@ -64,7 +64,7 @@ const WEBTOP_USER = process.env.SUDO_USER || 'abc';
 - Timeout: 2 minutes max wait, then continues anyway
 
 ### Environment Variable Passing
-- Supervisor extracts PASSWORD/VNC_PW from container environment via `/proc/1/environ`
+- Supervisor reads PASSWORD from container environment
 - All services receive environment through `process.env` in node child_process spawn
 - **Critical:** Do NOT use template string injection - use explicit env object:
   ```javascript
@@ -177,7 +177,7 @@ return 3000;  // Webtop UI
 
 **Authentication Bypass:**
 - `/data/*` and `/ws/*` routes bypass auth (Selkies handles its own authentication)
-- All other routes require HTTP Basic Auth with username: `kasm_user`, password: `VNC_PW`
+- All other routes require HTTP Basic Auth with username: `kasm_user`, password: `PASSWORD`
 
 ### kasmproxy Configuration (Critical)
 
@@ -202,33 +202,20 @@ kasmproxy-wrapper enforces HTTP Basic Auth for all non-Selkies routes.
 
 **Credentials for accessing the endpoint:**
 - Username: `kasm_user` (hardcoded)
-- Password: Value from `VNC_PW` environment variable
+- Password: Value from `PASSWORD` environment variable
 
 **In Coolify:**
-1. Set environment variable: `VNC_PW=your-password`
+1. Set environment variable: `PASSWORD=your-password`
 2. Container needs to be redeployed (docker-compose rebuild)
 3. Test with: `curl -u kasm_user:your-password https://desk.acc.l-inc.co.za/desk`
 
-**Debugging VNC_PW issues:**
+**Debugging PASSWORD issues:**
 If auth keeps failing even with correct credentials:
 - Check supervisor logs: `docker exec gmweb tail /config/logs/supervisor.log`
-- Look for line: `✓ VNC_PW configured from environment:`
-- If you see `⚠⚠ NO VNC_PW or PASSWORD found` - Coolify environment variable not passed to container
-- Verify in Coolify UI: Settings → Environment variables → `VNC_PW` is set
-
-**How supervisor extracts VNC_PW:**
-```javascript
-// Supervisor reads directly from Node.js process.env
-if (process.env.VNC_PW) {
-  env.VNC_PW = process.env.VNC_PW;  // Use VNC_PW
-} else if (process.env.PASSWORD) {
-  env.VNC_PW = process.env.PASSWORD;  // Fallback to PASSWORD
-} else {
-  env.VNC_PW = 'password';  // Default (WARNS in logs)
-}
-```
-
-If neither VNC_PW nor PASSWORD is in container environment, supervisor uses hardcoded default and logs a warning.
+- Look for line: `✓ PASSWORD configured:`
+- If you see `⚠ No PASSWORD set` - Coolify environment variable not passed
+- Verify in Coolify UI: Settings → Environment variables → `PASSWORD` is set
+- PASSWORD must match what you're sending in basic auth header
 
 ### kasmproxy-wrapper Service Configuration (Deprecated)
 **Service name mismatch prevents startup.** The supervisor loads services by name from `config.json`. The service file is `kasmproxy-wrapper.js`, so `config.json` must reference it as `"kasmproxy-wrapper"` (not `"kasmproxy"`).
@@ -605,13 +592,13 @@ Coolify discovers and builds `docker-compose.yaml` applications via:
 **1. Create .env file from example:**
 ```bash
 cp .env.example .env
-# Edit .env and set VNC_PW to a strong password
+# Edit .env and set PASSWORD to a strong password
 ```
 
 **2. Set environment variables in Coolify UI:**
 - Application → Settings → Environment
 - Required:
-  - `VNC_PW`: Password for desktop access
+  - `PASSWORD`: Password for desktop access
   - `CUSTOM_PORT=6901` (already in docker-compose)
   - `CUSTOM_HTTPS_PORT=6902` (already in docker-compose)
   - `FILE_MANAGER_PATH=/config/Desktop` (already in docker-compose)
@@ -641,7 +628,7 @@ coolify app list
 
 **2. Set environment variables:**
 ```bash
-coolify app env create <uuid> VNC_PW "strong-password"
+coolify app env create <uuid> PASSWORD "strong-password"
 ```
 
 **3. Configure Docker Hub:**
