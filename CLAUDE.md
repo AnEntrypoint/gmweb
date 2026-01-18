@@ -318,6 +318,31 @@ Supervisor creates separate log files for each service:
 
 ## Discovered Gotchas & Migration Fixes
 
+### Port Mapping Removal (Coolify Optimization)
+
+**Discovery:** Explicit port mappings and EXPOSE statements are unnecessary in Coolify-based deployments.
+
+**Rationale:**
+- Coolify manages all port exposure through domain assignment in the UI
+- When you assign a domain to a service in Coolify, Traefik automatically creates routing rules
+- EXPOSE statements in Dockerfile are informational only and don't affect Coolify
+- Docker-compose port mappings (`"6901:6901"`) are not used in Coolify environments
+
+**Changes Made:**
+- Removed `ports:` section from docker-compose.yaml
+- Removed `EXPOSE 6901 6902 80` from Dockerfile
+- Internal port configuration remains (CUSTOM_PORT=6901, etc.)
+- Webtop still listens on port 6901 internally; Coolify handles external routing
+
+**Effect:**
+- Cleaner, simpler configuration
+- No conflicts with host port availability
+- Coolify assigns domain → Traefik creates routing → Service accessible via domain
+- To access: Assign domain in Coolify UI (e.g., `desk.acc.l-inc.co.za`), then use that domain
+
+**Deployment Note:**
+After removing ports from docker-compose, domain assignment in Coolify is REQUIRED for external access. Without domain assignment, Coolify returns 502 Bad Gateway.
+
 ### KasmWeb → LinuxServer Webtop Migration Issues
 
 **Issue 1: Old KasmWeb paths in startup system**
