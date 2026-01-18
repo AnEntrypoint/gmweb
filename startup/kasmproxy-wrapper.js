@@ -151,9 +151,8 @@ const server = http.createServer((req, res) => {
   // Forward request to appropriate upstream
   const headers = { ...req.headers };
   delete headers.host;
+  delete headers.authorization;
   headers.host = `localhost:${upstreamPort}`;
-
-  // Don't send auth headers to upstream services - they handle auth independently
 
   const options = {
     hostname: 'localhost',
@@ -208,9 +207,8 @@ server.on('upgrade', (req, socket, head) => {
   // Forward request to appropriate upstream
   const headers = { ...req.headers };
   delete headers.host;
+  delete headers.authorization;
   headers.host = `localhost:${upstreamPort}`;
-
-  // Don't send auth headers to upstream services - they handle auth independently
 
   const options = {
     hostname: 'localhost',
