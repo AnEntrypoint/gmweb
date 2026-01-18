@@ -679,3 +679,45 @@ If push succeeds, Coolify can push to Docker Hub after builds.
 2. Trigger Coolify deploy: `coolify app start <uuid>`
 3. Coolify will build and automatically push `almagest/gmweb:latest` + commit SHA
 4. Verify on Docker Hub: https://hub.docker.com/r/almagest/gmweb
+
+## GitHub Actions CI/CD for Multi-Arch Docker Builds
+
+### Automated Build & Push to Docker Hub
+
+Created `.github/workflows/docker-build-push.yml` to automate multi-architecture image builds and Docker Hub pushes.
+
+**How it works:**
+1. Every commit to `main` branch triggers the workflow
+2. GitHub Actions builds for `linux/amd64` and `linux/arm64` simultaneously
+3. Upon success, pushes to Docker Hub as:
+   - `almagest/gmweb:latest` (stable tag)
+   - `almagest/gmweb:<commit-sha>` (versioned tag)
+
+**Required Setup:**
+
+Add GitHub secrets (run via CLI):
+```bash
+gh secret set DOCKER_HUB_USERNAME --body "almagest"
+gh secret set DOCKER_HUB_TOKEN --body "<personal-access-token>"
+```
+
+**Important:** Use Docker Hub **Personal Access Token**, not password:
+- Docker Hub → Account Settings → Security → Create New Access Token
+- Copy token, paste into `gh secret set DOCKER_HUB_TOKEN`
+
+**Multi-arch build time:**
+- First build: ~15-20 minutes (both platforms)
+- Cached builds: ~5-10 minutes (BuildKit layer caching)
+
+**Verification:**
+After workflow completes, verify on Docker Hub:
+```bash
+docker pull almagest/gmweb:latest
+docker image inspect almagest/gmweb:latest | grep Architecture
+# Shows: "linux/amd64", "linux/arm64"
+```
+
+**Coolify Integration:**
+- After GitHub Actions pushes image, Coolify can pull `almagest/gmweb:latest`
+- No manual intervention needed - Coolify automatically uses the pre-built image
+- Deployment becomes: Pull built image → Run container (minutes instead of build+run hours)
