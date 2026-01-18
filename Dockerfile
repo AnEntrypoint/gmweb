@@ -52,5 +52,5 @@ RUN mkdir -p /custom-cont-init.d && \
 COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
 RUN chmod +x /opt/gmweb-startup/custom_startup.sh
 
-# Webtop default ports: 3000 (HTTP), 3001 (HTTPS)
-EXPOSE 3000 3001 80
+# Webtop ports: 6901 (HTTP), 6902 (HTTPS), 80 (kasmproxy-wrapper)
+EXPOSE 6901 6902 80
