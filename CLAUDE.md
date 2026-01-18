@@ -8,10 +8,18 @@ Uses `lscr.io/linuxserver/webtop:ubuntu-xfce` instead of KasmWeb.
 **Key differences from KasmWeb:**
 - Home directory: `/config` (not `/home/kasm-user`)
 - Default user: `abc` (not `kasm-user`)
-- Web UI port: 6901 (set via `PORT=6901` environment variable)
-- HTTPS port: 6902 (automatically PORT+1)
+- Web UI port: 6901 (set via `CUSTOM_PORT=6901` environment variable)
+- HTTPS port: 6902 (set via `CUSTOM_HTTPS_PORT=6902`)
 - Init mechanism: `/custom-cont-init.d/` scripts
 - Environment: `PASSWORD` (also accepts `VNC_PW` for compatibility)
+
+### Environment Variables (LinuxServer Webtop)
+**Critical for port configuration:**
+- `CUSTOM_PORT=6901` - Internal HTTP port (DO NOT use 80, reserved for kasmproxy-wrapper)
+- `CUSTOM_HTTPS_PORT=6902` - Internal HTTPS port (automatically CUSTOM_PORT+1)
+- `FILE_MANAGER_PATH=/config/Desktop` - Where webtop file uploads/downloads go
+- `PASSWORD` or `VNC_PW` - HTTP Basic auth password
+- `CUSTOM_USER` - HTTP Basic auth username (default: abc)
 
 ### Dynamic Path Resolution
 All services use dynamic paths to support both webtop and legacy configurations:
@@ -139,8 +147,17 @@ Applications installed to `/opt/` during docker build are owned by root. Service
 
 **Pattern:** Add `chown -R abc:abc /opt/<app>` to `custom_startup.sh`
 
-### Kasmproxy Path Routing
-Routes through kasmproxy-wrapper on port 80:
+### Port Architecture
+**Internal service ports (never expose externally):**
+- 80: kasmproxy-wrapper (reverse proxy, forwards to below services)
+- 8080: kasmproxy (authentication middleware)
+- 6901: Webtop HTTP (CUSTOM_PORT)
+- 6902: Webtop HTTPS (CUSTOM_HTTPS_PORT)
+- 9997: Claude Code UI
+- 9998: file-manager (standalone)
+- 9999: webssh2/ttyd (terminal)
+
+**kasmproxy-wrapper routing (on port 80):**
 - `/ui` → port 9997 (Claude Code UI) - path stripped to `/`
 - `/api` → port 9997 (Claude Code UI API) - path kept as-is
 - `/ws` → port 9997 (Claude Code UI WebSocket) - path kept as-is
