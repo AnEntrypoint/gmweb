@@ -17,7 +17,9 @@ services:
     ports:
       - "3000:3000"  # Webtop HTTP
       - "3001:3001"  # Webtop HTTPS
-      - "80:80"      # kasmproxy-wrapper
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.gmweb.loadbalancer.server.port=80
     shm_size: "1gb"
     restart: unless-stopped
 
