@@ -1,40 +1,24 @@
 # Technical Caveats & Gotchas
 
-## KasmWeb Integration - Critical Principles
+## LinuxServer Webtop Integration
 
-### DO NOT interfere with KasmWeb initialization
-KasmWeb's profile setup is flawless and self-contained. Any attempt to pre-create directories, set permissions, or create symlinks in `/home/kasm-user` or `/home/kasm-default-profile` during build time will interfere with profile verification and cause startup failures.
+### Base Image
+Uses `lscr.io/linuxserver/webtop:ubuntu-xfce` instead of KasmWeb.
 
-**Rule: Let KasmWeb do its job unchanged.**
+**Key differences from KasmWeb:**
+- Home directory: `/config` (not `/home/kasm-user`)
+- Default user: `abc` (not `kasm-user`)
+- Web UI port: 3000 (not 6901)
+- HTTPS port: 3001
+- Init mechanism: `/custom-cont-init.d/` scripts
+- Environment: `PASSWORD` (also accepts `VNC_PW` for compatibility)
 
-### .bashrc File Existence Matters (KasmWeb Profile Marker)
-- KasmWeb checks if `.bashrc` exists to determine if user profile has been initialized
-- If `.bashrc` exists at startup, KasmWeb skips default profile setup
-- **NEVER create or modify `.bashrc` during build time**
-- Only modify `.bashrc` at BOOT time in `custom_startup.sh` with first-boot detection
-
-### Directory Structure: Build vs Boot Split
-- **Build time (`install.sh`):** System packages ONLY (`/usr`, `/etc`, `/opt`)
-  - Do NOT create anything in `/home/kasm-user`
-  - Do NOT create anything in `/home/kasm-default-profile`
-  - Do NOT modify `.bashrc`
-  - Let Dockerfile ONLY handle system-level setup
-
-- **Boot time (`custom_startup.sh`):** User-specific setup ONLY
-  - Runs after KasmWeb completes profile initialization
-  - Create config files, directories, application setup
-  - Use first-boot marker files to prevent duplicate setup on restarts
-  - Example marker: `/home/kasm-user/.gmweb-bashrc-setup` for .bashrc setup
-
-### KasmWeb Manages These Automatically
-KasmWeb will create these directories with correct permissions and symlinks:
-- `/home/kasm-user/Desktop`
-- `/home/kasm-user/Downloads`
-- `/home/kasm-user/Uploads`
-- `/home/kasm-user/Desktop/Downloads` (symlink → ../Downloads)
-- `/home/kasm-user/Desktop/Uploads` (symlink → ../Uploads)
-
-**Do NOT pre-create these. Do NOT create symlinks for these. Let KasmWeb handle it.**
+### Dynamic Path Resolution
+All services use dynamic paths to support both webtop and legacy configurations:
+```javascript
+const HOME_DIR = process.env.HOME || '/config';
+const WEBTOP_USER = process.env.SUDO_USER || 'abc';
+```
 
 ## Runtime-Driven Startup Architecture
 
@@ -42,40 +26,34 @@ KasmWeb will create these directories with correct permissions and symlinks:
 - **install.sh** runs at `docker-compose build` time (one-time setup)
   - All system packages, software installation
   - Runs as ROOT during Dockerfile RUN command
-  - Must NOT create anything in `/home/kasm-user`
-  - Must NOT modify `.bashrc`
+  - Must NOT create anything in `/config`
   - Output captured by docker build
 
-- **Startup system location: `/opt/gmweb-startup`** (NOT `/home/kasm-user`)
+- **Startup system location: `/opt/gmweb-startup`**
   - Supervisor (index.js), start.sh, service modules
-  - Located in system-level directory (safe from KasmWeb overwrites)
-  - All references point to `/opt/gmweb-startup` in Dockerfile and custom_startup.sh
+  - Located in system-level directory
+  - All references point to `/opt/gmweb-startup` in Dockerfile
 
 ### Boot-Time Runtime Startup
-- **start.sh** runs at container BOOT time (every restart)
-  - Minimal launcher script (16 lines)
-  - Nohups supervisor from `/opt/gmweb-startup/index.js` in background
-  - Exits immediately to unblock KasmWeb initialization
-  - Must NOT block or wait for anything
+- **LinuxServer init mechanism:** `/custom-cont-init.d/01-gmweb-init`
+  - Runs automatically at container boot
+  - Calls `/opt/gmweb-startup/custom_startup.sh`
+  - Sets up user-specific configuration
+  - Launches supervisor in background
 
-- **custom_startup.sh** orchestrator in `/dockerstartup/`
-  - KasmWeb native hook that runs at boot (after profile verification)
+- **custom_startup.sh** orchestrator
   - Sets up user-specific configuration (first boot only)
   - Calls start.sh (supervisor launcher)
-  - Optionally calls user's `/home/kasm-user/startup.sh` hook if present
-  - Exits to allow KasmWeb desktop to continue initializing
-
-**Critical:** custom_startup.sh must exit immediately. If it stays open, KasmWeb desktop initialization is blocked and container becomes unhealthy.
+  - Optionally calls user's `/config/startup.sh` hook if present
 
 ### Supervisor Kasmproxy Prioritization
-- Kasmproxy (KasmWeb proxy) **MUST** start FIRST (critical path)
+- Kasmproxy **MUST** start FIRST (critical path)
 - Supervisor blocks all other services until kasmproxy is healthy
 - Health check: verifies port 80 is listening via `lsof -i :80`
 - Timeout: 2 minutes max wait, then continues anyway
-- This ensures service becomes available ASAP (5-10 seconds from boot)
 
 ### Environment Variable Passing
-- Supervisor extracts VNC_PW from container environment via `/proc/1/environ`
+- Supervisor extracts PASSWORD/VNC_PW from container environment via `/proc/1/environ`
 - All services receive environment through `process.env` in node child_process spawn
 - **Critical:** Do NOT use template string injection - use explicit env object:
   ```javascript
@@ -83,16 +61,14 @@ KasmWeb will create these directories with correct permissions and symlinks:
     env: { ...process.env, CUSTOM_VAR: value }
   });
   ```
-- Services inherit both parent environment AND explicitly set variables
 
 ### User Startup Hook Support
-- If `/home/kasm-user/startup.sh` exists, custom_startup.sh will execute it
-- Called with `bash /home/kasm-user/startup.sh` (no executable bit needed)
+- If `/config/startup.sh` exists, custom_startup.sh will execute it
+- Called with `bash /config/startup.sh` (no executable bit needed)
 - Allows users to add custom boot-time logic without code changes
-- Example: Start additional background services, configure dynamic settings
 
 ### Service Module Interface
-Each of 14 services exports standard interface:
+Each service exports standard interface:
 ```javascript
 {
   name: 'service-name',
@@ -105,14 +81,13 @@ Each of 14 services exports standard interface:
 }
 ```
 
-- Services with `requiresDesktop: true` wait for `/usr/bin/desktop_ready`
 - Dependency resolution via topological sort (prevents circular deps)
 - Health checks every 30 seconds
 
 ### Health Check Pattern (Critical)
 **Always use `grep LISTEN` not process name in health checks.**
 
-Node processes spawned via `npx` show as `MainThrea` in `lsof`, not `node`. Health checks like `lsof -i :PORT | grep node` will always fail.
+Node processes spawned via `npx` show as `MainThrea` in `lsof`, not `node`.
 
 **Correct pattern:**
 ```bash
@@ -131,58 +106,38 @@ lsof -i :9998 | grep -q node  # FAILS - process shows as MainThrea
 - **Self-healing**: Continuous monitoring loop with recovery on failure
 - **Graceful degradation**: Service max restart attempts = 5, then marked unhealthy but supervisor continues
 
-### Dockerfile Minimal Build
-- ~51 lines total
+### Dockerfile Build Process
 - Clones gmweb repo from GitHub during build
-- Installs only: git, NVM, Node.js 23.11.1
+- Installs: git, NVM, Node.js 23.11.1
 - Runs `bash install.sh` at build time for system packages
-- Copies startup system to `/opt/gmweb-startup` (NOT `/home/kasm-user`)
-- BuildKit syntax enabled (`# syntax=docker/dockerfile:1.4`)
-- Layer caching optimized for fast rebuilds (subsequent builds 2-3 minutes)
+- Copies startup system to `/opt/gmweb-startup`
+- Creates `/custom-cont-init.d/01-gmweb-init` for LinuxServer init
 
 ### Dockerfile Clones From GitHub (Critical)
 **Important:** Dockerfile clones the repo instead of copying build context:
 ```dockerfile
 RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
     cp -r /tmp/gmweb/startup /opt/gmweb-startup && \
-    cp /tmp/gmweb/docker/custom_startup.sh /dockerstartup/custom_startup.sh && \
     rm -rf /tmp/gmweb
 ```
 
-**Why:** Startup files (install.sh, start.sh, supervisor, 14 services) are only available if cloned from GitHub. Without this, container has no startup system.
-
-**Benefits:**
-- Startup files always available regardless of build context
-- Works reliably in Coolify and other CI/CD systems
-- Gets latest code from GitHub repo
-- No dependency on local COPY commands
+**Why:** Startup files are only available if cloned from GitHub. Works reliably in Coolify and other CI/CD systems.
 
 ### Deployment Infrastructure (Coolify)
 **Important:** Code is production-ready but deployment requires Coolify domain assignment:
 1. Code: All tests pass, all commits pushed, Docker builds cleanly
 2. Infrastructure: Requires manual Coolify UI action to assign domain
-3. Traefik routing: Auto-generated by Coolify when domain assigned to gmweb service
+3. Traefik routing: Auto-generated by Coolify when domain assigned
 4. HTTPS: Auto-provisioned by Let's Encrypt (via Coolify)
 
-Without domain assignment in Coolify UI, service returns 502 (no routing rule exists).
+Without domain assignment in Coolify UI, service returns 502.
 
 ## /opt Directory Ownership Pattern
 
 ### Root-Owned at Build, User-Owned at Boot
-Applications installed to `/opt/` during docker build are owned by root. Services running as kasm-user need write access for:
-- Database files (SQLite)
-- Temp files (Vite compilation)
-- Log files
-- Cache directories
+Applications installed to `/opt/` during docker build are owned by root. Services running as abc need write access.
 
-**Pattern:** Add `chown -R kasm-user:kasm-user /opt/<app>` to `custom_startup.sh`
-
-### Claude Code UI Specific Requirements
-- **Location:** `/opt/claudecodeui`
-- **Must run production mode:** `node server/index.js` (NOT `npm run dev`)
-- **Requires pre-built dist:** `npm run build` must run at install time
-- **Vite temp files:** If directory is root-owned, Vite fails with EACCES on `.timestamp-*.mjs` files
-- **Fix:** `custom_startup.sh` runs `chown -R kasm-user:kasm-user /opt/claudecodeui` at boot
+**Pattern:** Add `chown -R abc:abc /opt/<app>` to `custom_startup.sh`
 
 ### Kasmproxy Path Routing
 Routes through kasmproxy-wrapper on port 80:
@@ -191,19 +146,21 @@ Routes through kasmproxy-wrapper on port 80:
 - `/ws` → port 9997 (Claude Code UI WebSocket) - path kept as-is
 - `/files` → port 9998 (standalone file-manager) - path stripped to `/`, **public (no auth)**
 - `/ssh` → port 9999 (ttyd terminal) - path stripped to `/`
-- `/` → port 6901 (KasmVNC)
+- `/websockify` → port 3000 (Webtop VNC WebSocket) - direct proxy
+- `/` → port 3000 (Webtop web UI)
 
-**HTML Rewriting:** For `/ui` only, absolute paths like `/assets/`, `/icons/`, and `/favicon` are rewritten to `/ui/assets/`, `/ui/icons/`, etc. so browser requests route correctly through proxy. This does NOT apply to `/files` or `/ssh`.
+**WebSocket Upgrade Handling:**
+The kasmproxy-wrapper handles WebSocket upgrades for `/websockify` and `/ssh/ws` by forwarding the 101 Switching Protocols response and establishing bidirectional piping.
+
+**HTML Rewriting:** For `/ui` only, absolute paths like `/assets/`, `/icons/`, and `/favicon` are rewritten to `/ui/assets/`, `/ui/icons/`, etc.
 
 **Authentication:**
-- Claude Code UI (port 9997) has its own authentication system - kasmproxy skips basic auth for `/ui`, `/api`, `/ws`
-- File manager (`/files`) is public - no authentication required (handled by kasmproxy-wrapper)
-- All other routes require HTTP Basic Auth with `VNC_PW`
+- Claude Code UI (port 9997) has its own authentication - kasmproxy skips basic auth for `/ui`, `/api`, `/ws`
+- File manager (`/files`) is public - no authentication required
+- All other routes require HTTP Basic Auth with `VNC_PW`/`PASSWORD`
 
 ### Claude Code UI Basename Fix (Critical)
-When Claude Code UI is accessed via `/ui` prefix, React Router needs a `basename` prop to match routes correctly. Without this fix, login succeeds but the app crashes because routes don't match.
-
-**Symptom:** Login works, token is stored, but page goes blank with empty `#root` div.
+When Claude Code UI is accessed via `/ui` prefix, React Router needs a `basename` prop.
 
 **Fix:** `install.sh` patches `App.jsx` after cloning to add:
 ```javascript
@@ -215,177 +172,96 @@ function getBasename() {
 // Then: <Router basename={basename}>
 ```
 
-This fix is applied via `sed` in `install.sh` to survive rebuilds.
-
 ## Terminal and Shell Configuration
 
 ### ttyd Color Terminal Support
-For ttyd web terminal to display colors properly, both terminal type AND tmux are required:
-
+For ttyd web terminal to display colors properly:
 ```javascript
 spawn(ttydPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'tmux', 'new-session', '-A', '-s', 'main', 'bash'], {
   env: { ...env, TERM: 'xterm-256color' }
 });
 ```
 
-**Why this configuration:**
-- `-T xterm-256color` tells ttyd to report this terminal type to the shell
-- `TERM=xterm-256color` in environment ensures child processes inherit it
-- `tmux new-session -A -s main bash` attaches to existing session or creates new one with bash
-
 ### Shared tmux Session (/ssh and GUI Terminal)
 Both the `/ssh` web terminal and the XFCE GUI terminal share the same tmux session named "main":
-
 - **ttyd (webssh2.js):** `tmux new-session -A -s main bash`
 - **XFCE autostart:** `xfce4-terminal -e "tmux new-session -A -s main bash"`
 
-This allows users to seamlessly switch between web and GUI terminals while maintaining the same session state. The `-A` flag attaches to existing session if it exists.
-
 ### tmux Must Start bash Explicitly
-The tmux command must explicitly specify `bash` as the shell to run:
+The tmux command must explicitly specify `bash` as the shell to run.
 
-**Why:** Without explicit `bash`, tmux uses the default shell which may not source `.bashrc`, resulting in missing PATH entries (NVM, gemini, etc.).
-
-**Symptom:** User has to type `bash` manually after opening terminal to get proper PATH.
-
-**Fix:** Always append `bash` to the tmux command: `tmux new-session -A -s main bash`
+**Why:** Without explicit `bash`, tmux uses the default shell which may not source `.bashrc`.
 
 ### Shell Functions vs Aliases for Argument Passing
-When creating command shortcuts that need to pass arguments, use shell functions instead of aliases:
+When creating command shortcuts that need to pass arguments, use shell functions:
 
 **Correct (function):**
 ```bash
 ccode() { claude --dangerously-skip-permissions "$@"; }
 ```
 
-**Wrong (alias):**
-```bash
-alias ccode='claude --dangerously-skip-permissions'
-```
-
-While aliases can technically pass trailing arguments, functions with `"$@"` are more reliable across different shell contexts and scripts.
-
 ## Claude Code Data Persistence
 
 ### Storage Locations for Volume Mounts
-Claude Code stores user data across multiple directories. To preserve settings across container restarts, these paths need volume mounts:
+Claude Code stores user data across multiple directories:
 
 | Path | Size | Content | Priority |
 |------|------|---------|----------|
-| `/home/kasm-user/.claude` | ~19M | Sessions, projects, plugins, credentials, history, todos, settings | **CRITICAL** |
-| `/home/kasm-user/.claude.json` | ~12K | User preferences, startup count, auto-update settings | **CRITICAL** |
-| `/home/kasm-user/.local/share/claude` | ~405M | CLI versions (e.g., 2.1.11, 2.1.12) | MEDIUM |
-| `/home/kasm-user/.local/state/claude` | ~12K | Lock files | LOW |
-| `/home/kasm-user/.cache/claude*` | ~544K | Runtime caches (regeneratable) | LOW |
-
-### Contents of /home/kasm-user/.claude
-- `credentials.json` - Authentication credentials
-- `history.jsonl` - Command history
-- `settings.json` - User settings
-- `projects/` - Project-specific session data
-- `plugins/` - Plugin cache and marketplace data
-- `session-env/` - Session environment directories
-- `todos/` - Todo tracking data
-- `file-history/` - File operation history
+| `/config/.claude` | ~19M | Sessions, projects, plugins, credentials, history, todos, settings | **CRITICAL** |
+| `/config/.claude.json` | ~12K | User preferences, startup count, auto-update settings | **CRITICAL** |
+| `/config/.local/share/claude` | ~405M | CLI versions (e.g., 2.1.11, 2.1.12) | MEDIUM |
 
 ### Recommended Volume Configuration
 ```yaml
 volumes:
-  # Critical - user settings and session data
-  - claude-config:/home/kasm-user/.claude
-  # Critical - user preferences file
-  - ./claude.json:/home/kasm-user/.claude.json
-  # Optional - preserves CLI versions (saves ~405M download)
-  - claude-share:/home/kasm-user/.local/share/claude
+  # Critical - entire config directory
+  - gmweb-config:/config
 ```
-
-### Single Volume Alternative
-For simplicity, mount the main config directory:
-```yaml
-volumes:
-  - claude-data:/home/kasm-user/.claude
-```
-Note: This doesn't preserve `.claude.json` (sibling file) or CLI versions in `.local/share/claude`.
 
 ## NVM Directory Ownership
 
 ### Build vs Boot Ownership Issue
-NVM is installed during docker build as root/kasm-recorder. Services running as kasm-user cannot write to NVM directories for global npm installs.
+NVM is installed during docker build as root. Services running as abc cannot write to NVM directories.
 
-**Symptom:** `EACCES: permission denied, mkdir '/usr/local/local/nvm/versions/node/v23.11.1/lib/node_modules/@google'`
-
-**Fix:** `custom_startup.sh` runs `sudo chown -R kasm-user:kasm-user /usr/local/local/nvm` at boot.
+**Fix:** `custom_startup.sh` runs `sudo chown -R abc:abc /usr/local/local/nvm` at boot.
 
 ## Gemini CLI Installation
 
 ### Use npx Wrapper Instead of Global Install
-Global `npm install -g @google/gemini-cli` is unreliable due to:
-- Parallel install attempts from supervisor restarts corrupt npm state
-- Large dependency tree (~400 packages) prone to extraction failures
-- Interrupted installs leave partial state that breaks subsequent attempts
-
-**Solution:** Create a wrapper script that uses npx:
+Global npm install is unreliable. Use wrapper script:
 ```bash
 #!/bin/bash
 exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y @google/gemini-cli "$@"
 ```
 
-**Benefits:**
-- npx caches the package after first run (~/.npm/_npx/)
-- No corruption from parallel installs
-- Always gets working version
-- Wrapper at `/usr/local/local/nvm/versions/node/v23.11.1/bin/gemini` is in PATH
-
 ## OpenCode-AI Installation
 
 ### Same npx Wrapper Pattern as Gemini
-OpenCode-AI uses the same wrapper pattern to avoid npm global install issues:
-
 ```bash
 #!/bin/bash
 exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y opencode-ai "$@"
 ```
 
-- Wrapper at `/usr/local/local/nvm/versions/node/v23.11.1/bin/opencode`
-- Service: `startup/services/opencode.js` (type: 'install')
-- Verified working: `opencode --version` returns version
-
 ## File Manager (Standalone Server)
 
 ### Lightweight HTTP File Server
-The file manager uses a custom standalone Node.js HTTP server (`standalone-server.mjs`) instead of external packages like NHFS or serve.
+Custom standalone Node.js HTTP server (`standalone-server.mjs`).
 
-**Why standalone:** External packages like NHFS (Next.js) bundle configuration at build time, making runtime configuration impossible. The standalone server reads `BASE_DIR` at startup.
-
-**Location:** `/opt/gmweb-startup/standalone-server.mjs` (copied from `startup/standalone-server.mjs`)
+**Location:** `/opt/gmweb-startup/standalone-server.mjs`
 
 **Features:**
 - Zero external dependencies (pure Node.js)
 - Directory listing with file/folder icons
 - File downloads with proper MIME types
 - Path traversal protection
-- Breadcrumb navigation
 - `/files` prefix support for kasmproxy routing
 
 **Service startup:**
 ```javascript
 spawn('node', ['/opt/gmweb-startup/standalone-server.mjs'], {
-  env: { ...env, BASE_DIR: '/home/kasm-user', PORT: '9998', HOSTNAME: '0.0.0.0' }
+  env: { ...env, BASE_DIR: '/config', PORT: '9998', HOSTNAME: '0.0.0.0' }
 });
 ```
-
-### Path Handling for Kasmproxy
-The standalone server handles the `/files` prefix from kasmproxy:
-- Strips `/files` prefix from incoming paths for file resolution
-- Adds `/files` prefix to generated links for correct routing
-- Normalizes multiple slashes (`//`) that result from path stripping
-
-### IPv6 Dual-Stack Binding
-The server binds to `::` (IPv6 any) which enables dual-stack support:
-```javascript
-server.listen(PORT, '::', callback);
-```
-This ensures the server accepts connections on both IPv4 and IPv6 interfaces.
 
 ## Supervisor Logging
 
@@ -393,7 +269,7 @@ This ensures the server accepts connections on both IPv4 and IPv6 interfaces.
 Supervisor creates separate log files for each service:
 
 ```
-/home/kasm-user/logs/
+/config/logs/
 ├── supervisor.log           # Main orchestration log
 ├── startup.log              # Boot-time custom_startup.sh log
 ├── LOG_INDEX.txt            # Reference guide for log files
@@ -406,4 +282,3 @@ Supervisor creates separate log files for each service:
 - `tail -f supervisor.log` - Watch supervisor activity
 - `tail -f services/*.log` - Watch all service output
 - `grep ERROR *.log` - Find errors across all logs
-- Check `services/<name>.err` for service-specific errors
