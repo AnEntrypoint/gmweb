@@ -241,23 +241,30 @@ const processEnv = {
 
 **Solution:** Use `lsof -i :PORT | grep LISTEN` instead of process name matching.
 
-### Issue: Traefik Auth Middleware Intercepting Requests
+### Issue: kasmproxy-wrapper Forwarding to Wrong Port (FIXED)
 
-**Symptom:** Endpoint returns 401 with realm="Login" when credentials sent, but realm="kasmproxy" without credentials
+**Symptom:** Even with correct auth, upstream returns 401 (in-container)
 
-**Cause:** Traefik/Coolify has auth middleware that intercepts requests BEFORE they reach the container. When Authorization header is sent, Traefik validates credentials and rejects before forwarding.
+**Root Cause:** kasmproxy-wrapper was using CUSTOM_PORT (6901) to forward requests to Webtop, but Webtop's web UI listens on port 3000 internally. CUSTOM_PORT is for external configuration only.
 
-**Evidence:**
-- Without auth: `www-authenticate: Basic realm="kasmproxy"` (our proxy responding)
-- With auth: `www-authenticate: Basic realm="Login"` (Traefik middleware intercepting)
+**Fix applied (commit 05e09ed):**
+- Changed kasmproxy-wrapper to hardcode port 3000 for Webtop UI forwarding
+- Before: `const WEBTOP_UI_PORT = parseInt(process.env.CUSTOM_PORT || '3000', 10);`
+- After: `const WEBTOP_UI_PORT = 3000;`
 
-**Solution:**
-- Check Coolify application settings for "Basic Auth" or auth middleware
-- If enabled, disable it to allow container to handle auth
-- OR ensure Traefik passes through Authorization headers to container
-- May require infrastructure-level configuration beyond code changes
+**Why this fixes it:**
+- Auth passes at kasmproxy-wrapper
+- Request forwarded to correct port (3000)
+- Webtop receives request and responds with HTML
+- Endpoint returns 200
 
-**Note:** This is NOT a code issue. kasmproxy-wrapper IS running correctly (proven by realm change). This is a Traefik/Coolify configuration issue.
+**Verification:** After rebuild, endpoint should return HTTP 200 with Webtop login page.
+
+### Issue: Traefik Auth Middleware Intercepting Requests (No Longer Applicable)
+
+**Previous issue:** Was seeing realm="Login" when auth sent, but this was misdiagnosed.
+The actual issue was the wrong upstream port - Webtop at port 6901 was unreachable.
+Fixed by forwarding to correct port 3000.
 
 ## Deployment Prerequisites
 
