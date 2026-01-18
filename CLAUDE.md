@@ -15,11 +15,14 @@ Uses `lscr.io/linuxserver/webtop:ubuntu-xfce` instead of KasmWeb.
 
 ### Environment Variables (LinuxServer Webtop)
 **Critical for port configuration:**
-- `CUSTOM_PORT=6901` - Internal HTTP port (DO NOT use 80, reserved for kasmproxy-wrapper)
+- `CUSTOM_PORT=6901` - Internal HTTP port (webtop does NOT use 80 - port 80 is for kasmproxy-wrapper only)
 - `CUSTOM_HTTPS_PORT=6902` - Internal HTTPS port (automatically CUSTOM_PORT+1)
 - `FILE_MANAGER_PATH=/config/Desktop` - Where webtop file uploads/downloads go
+- `SUBFOLDER=/desk/` - Optional: run webtop under /desk/ prefix instead of root (requires kasmproxy-wrapper support)
 - `PASSWORD` or `VNC_PW` - HTTP Basic auth password
 - `CUSTOM_USER` - HTTP Basic auth username (default: abc)
+
+**Important**: LinuxServer webtop does NOT listen on port 80. Only ports 3000 (HTTP) and 3001 (HTTPS) are used internally. We override this with CUSTOM_PORT.
 
 ### Dynamic Path Resolution
 All services use dynamic paths to support both webtop and legacy configurations:
@@ -148,13 +151,18 @@ Applications installed to `/opt/` during docker build are owned by root. Service
 **Pattern:** Add `chown -R abc:abc /opt/<app>` to `custom_startup.sh`
 
 ### Port Architecture
+**Port 80 (EXCLUSIVE to kasmproxy-wrapper - no other service must use it):**
+- `kasmproxy-wrapper.js`: Sits on port 80, handles routing, auth bypass, and SUBFOLDER prefix stripping
+- Forwards authenticated requests to backend services
+- Bypasses auth for /files and /websockify routes
+- Enforces SUBFOLDER prefix (if configured)
+
 **Internal service ports (never expose externally):**
-- 80: kasmproxy-wrapper (reverse proxy, forwards to below services)
-- 8080: kasmproxy (authentication middleware)
-- 6901: Webtop HTTP (CUSTOM_PORT)
-- 6902: Webtop HTTPS (CUSTOM_HTTPS_PORT)
+- 8080: kasmproxy (authentication middleware from AnEntrypoint/kasmproxy)
+- 6901: Webtop HTTP (set via CUSTOM_PORT environment variable)
+- 6902: Webtop HTTPS (set via CUSTOM_HTTPS_PORT environment variable)
 - 9997: Claude Code UI
-- 9998: file-manager (standalone)
+- 9998: file-manager (standalone server)
 - 9999: webssh2/ttyd (terminal)
 
 **kasmproxy-wrapper routing (on port 80):**
