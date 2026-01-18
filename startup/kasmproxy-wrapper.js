@@ -14,8 +14,21 @@ import http from 'http';
 import net from 'net';
 
 const KASMPROXY_PORT = 8080;
+const KASMVNC_PORT = 6901;
 const LISTEN_PORT = 80;
 const VNC_PW = process.env.VNC_PW || '';
+
+/**
+ * Determine which upstream port to use for a given path
+ */
+function getUpstreamPort(path) {
+  // /websockify routes go directly to KasmVNC (port 6901)
+  if (path === '/websockify' || path.startsWith('/websockify/') || path.startsWith('/websockify?')) {
+    return KASMVNC_PORT;
+  }
+  // All other routes go through kasmproxy (port 8080)
+  return KASMPROXY_PORT;
+}
 
 /**
  * Routes that should bypass authentication
@@ -23,6 +36,10 @@ const VNC_PW = process.env.VNC_PW || '';
 function shouldBypassAuth(path) {
   // /files routes are public (file manager UI doesn't require auth)
   if (path === '/files' || path.startsWith('/files/') || path.startsWith('/files?')) {
+    return true;
+  }
+  // /websockify routes are public (VNC WebSocket doesn't require auth)
+  if (path === '/websockify' || path.startsWith('/websockify/') || path.startsWith('/websockify?')) {
     return true;
   }
   return false;
@@ -75,20 +92,23 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // Forward request to kasmproxy on 8080
+  // Determine which upstream port to use
+  const upstreamPort = getUpstreamPort(path);
+
+  // Forward request to appropriate upstream
   const headers = { ...req.headers };
   delete headers.host;
-  headers.host = `localhost:${KASMPROXY_PORT}`;
+  headers.host = `localhost:${upstreamPort}`;
 
   // Always send auth to kasmproxy (it expects it)
   const basicAuth = getBasicAuth();
-  if (basicAuth && !headers.authorization) {
+  if (basicAuth && !headers.authorization && upstreamPort === KASMPROXY_PORT) {
     headers.authorization = basicAuth;
   }
 
   const options = {
     hostname: 'localhost',
-    port: KASMPROXY_PORT,
+    port: upstreamPort,
     path: req.url,
     method: req.method,
     headers
@@ -132,20 +152,23 @@ server.on('upgrade', (req, socket, head) => {
     }
   }
 
-  // Forward request to kasmproxy on 8080
+  // Determine which upstream port to use
+  const upstreamPort = getUpstreamPort(path);
+
+  // Forward request to appropriate upstream
   const headers = { ...req.headers };
   delete headers.host;
-  headers.host = `localhost:${KASMPROXY_PORT}`;
+  headers.host = `localhost:${upstreamPort}`;
 
   // Always send auth to kasmproxy (it expects it)
   const basicAuth = getBasicAuth();
-  if (basicAuth && !headers.authorization) {
+  if (basicAuth && !headers.authorization && upstreamPort === KASMPROXY_PORT) {
     headers.authorization = basicAuth;
   }
 
   const options = {
     hostname: 'localhost',
-    port: KASMPROXY_PORT,
+    port: upstreamPort,
     path: req.url,
     method: req.method,
     headers
@@ -153,7 +176,7 @@ server.on('upgrade', (req, socket, head) => {
 
   const proxyReq = http.request(options);
 
-  // Handle upgrade response from kasmproxy
+  // Handle upgrade response from upstream
   proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
     // Send upgrade response back to client
     socket.write('HTTP/1.1 101 Switching Protocols\r\n');
@@ -203,7 +226,8 @@ server.on('upgrade', (req, socket, head) => {
 server.listen(LISTEN_PORT, '0.0.0.0', () => {
   console.log(`[kasmproxy-wrapper] Listening on port ${LISTEN_PORT}`);
   console.log(`[kasmproxy-wrapper] Forwarding to kasmproxy on port ${KASMPROXY_PORT}`);
-  console.log(`[kasmproxy-wrapper] Public routes: /files`);
+  console.log(`[kasmproxy-wrapper] Forwarding /websockify to KasmVNC on port ${KASMVNC_PORT}`);
+  console.log(`[kasmproxy-wrapper] Public routes: /files, /websockify`);
 });
 
 server.on('error', (err) => {
