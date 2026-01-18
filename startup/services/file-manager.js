@@ -16,7 +16,7 @@ export default {
       PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     };
 
-    const ps = spawn('npx', ['-y', 'serve', '-l', '9998', '/home/kasm-user'], {
+    const ps = spawn('npx', ['-y', 'serve', '-l', 'tcp://0.0.0.0:9998', '/home/kasm-user'], {
       env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
