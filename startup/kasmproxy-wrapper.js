@@ -16,7 +16,7 @@
 import http from 'http';
 import net from 'net';
 
-const WEBTOP_UI_PORT = parseInt(process.env.CUSTOM_PORT || '3000', 10);
+const WEBTOP_UI_PORT = 3000;
 const SELKIES_WS_PORT = 8082;
 const LISTEN_PORT = 80;
 const PASSWORD = process.env.PASSWORD || '';
