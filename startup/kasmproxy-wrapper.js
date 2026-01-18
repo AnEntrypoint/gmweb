@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 /**
- * KasmProxy Authentication Wrapper with SUBFOLDER Support
+ * LinuxServer Webtop Authentication Wrapper with SUBFOLDER Support
  *
- * Sits on port 80 and forwards to kasmproxy on port 8080
- * Selectively bypasses authentication for /files route while maintaining
- * HTTP Basic Auth for all other routes.
+ * Sits on port 80 and forwards to:
+ * - Webtop web UI on port 3000 (main desktop interface)
+ * - Selkies WebSocket on port 8082 (VNC/desktop streaming)
+ *
+ * Selectively bypasses authentication for public routes while maintaining
+ * HTTP Basic Auth for protected routes.
  *
  * Supports SUBFOLDER environment variable for running under a prefix path.
  * Example: SUBFOLDER=/desk/ routes /desk/* to internal services as /*
- *
- * This is necessary because AnEntrypoint/kasmproxy doesn't support
- * per-route auth bypass configuration.
  */
 
 import http from 'http';
 import net from 'net';
 
-const KASMPROXY_PORT = 8080;
-const WEBTOP_PORT = 6901;  // LinuxServer webtop web UI port (VNC WebSocket)
+const WEBTOP_UI_PORT = 3000;  // LinuxServer webtop web UI port (HTML interface)
+const SELKIES_WS_PORT = 8082;  // Selkies WebSocket for desktop streaming
 const LISTEN_PORT = 80;
 const VNC_PW = process.env.VNC_PW || '';
 const SUBFOLDER = (process.env.SUBFOLDER || '/').replace(/\/+$/, '') || '/';  // Normalized path without trailing slash
@@ -48,26 +48,28 @@ function stripSubfolder(fullPath) {
  * Determine which upstream port to use for a given path (after SUBFOLDER stripping)
  */
 function getUpstreamPort(path) {
-  // /websockify routes go directly to KasmVNC (port 6901)
-  if (path === '/websockify' || path.startsWith('/websockify/') || path.startsWith('/websockify?')) {
-    return WEBTOP_PORT;
+  // /data and /ws routes go to Selkies WebSocket (port 8082)
+  if (path.startsWith('/data') || path.startsWith('/ws')) {
+    return SELKIES_WS_PORT;
   }
-  // All other routes go through kasmproxy (port 8080)
-  return KASMPROXY_PORT;
+  // All other routes go to webtop web UI (port 3000)
+  return WEBTOP_UI_PORT;
 }
 
 /**
  * Routes that should bypass authentication (after SUBFOLDER stripping)
+ * Selkies WebSocket and streaming endpoints require no auth - VNC password in URL
  */
 function shouldBypassAuth(path) {
-  // /files routes are public (file manager UI doesn't require auth)
-  if (path === '/files' || path.startsWith('/files/') || path.startsWith('/files?')) {
+  // /data/* routes are Selkies WebSocket (handles own auth)
+  if (path === '/data' || path.startsWith('/data/') || path.startsWith('/data?')) {
     return true;
   }
-  // /websockify routes are public (VNC WebSocket doesn't require auth)
-  if (path === '/websockify' || path.startsWith('/websockify/') || path.startsWith('/websockify?')) {
+  // /ws/* routes are WebSocket upgrade endpoints (handles own auth)
+  if (path === '/ws' || path.startsWith('/ws/') || path.startsWith('/ws?')) {
     return true;
   }
+  // All other routes require authentication
   return false;
 }
 
@@ -134,11 +136,7 @@ const server = http.createServer((req, res) => {
   delete headers.host;
   headers.host = `localhost:${upstreamPort}`;
 
-  // Always send auth to kasmproxy (it expects it)
-  const basicAuth = getBasicAuth();
-  if (basicAuth && !headers.authorization && upstreamPort === KASMPROXY_PORT) {
-    headers.authorization = basicAuth;
-  }
+  // Don't send auth headers to upstream services - they handle auth independently
 
   const options = {
     hostname: 'localhost',
@@ -194,11 +192,7 @@ server.on('upgrade', (req, socket, head) => {
   delete headers.host;
   headers.host = `localhost:${upstreamPort}`;
 
-  // Always send auth to kasmproxy (it expects it)
-  const basicAuth = getBasicAuth();
-  if (basicAuth && !headers.authorization && upstreamPort === KASMPROXY_PORT) {
-    headers.authorization = basicAuth;
-  }
+  // Don't send auth headers to upstream services - they handle auth independently
 
   const options = {
     hostname: 'localhost',
@@ -259,9 +253,9 @@ server.on('upgrade', (req, socket, head) => {
 
 server.listen(LISTEN_PORT, '0.0.0.0', () => {
   console.log(`[kasmproxy-wrapper] Listening on port ${LISTEN_PORT}`);
-  console.log(`[kasmproxy-wrapper] Forwarding to kasmproxy on port ${KASMPROXY_PORT}`);
-  console.log(`[kasmproxy-wrapper] Forwarding /websockify to webtop on port ${WEBTOP_PORT}`);
-  console.log(`[kasmproxy-wrapper] Public routes: /files, /websockify`);
+  console.log(`[kasmproxy-wrapper] Forwarding to Webtop UI on port ${WEBTOP_UI_PORT}`);
+  console.log(`[kasmproxy-wrapper] Forwarding /data and /ws to Selkies on port ${SELKIES_WS_PORT}`);
+  console.log(`[kasmproxy-wrapper] Public routes: /data/*, /ws/*`);
 });
 
 server.on('error', (err) => {
