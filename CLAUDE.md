@@ -197,6 +197,39 @@ kasmproxy now supports:
 5. Auth check skipped for Selkies routes
 6. WebSocket upgraded to Selkies on port 8082
 
+### HTTP Basic Authentication (kasm_user)
+kasmproxy-wrapper enforces HTTP Basic Auth for all non-Selkies routes.
+
+**Credentials for accessing the endpoint:**
+- Username: `kasm_user` (hardcoded)
+- Password: Value from `VNC_PW` environment variable
+
+**In Coolify:**
+1. Set environment variable: `VNC_PW=your-password`
+2. Container needs to be redeployed (docker-compose rebuild)
+3. Test with: `curl -u kasm_user:your-password https://desk.acc.l-inc.co.za/desk`
+
+**Debugging VNC_PW issues:**
+If auth keeps failing even with correct credentials:
+- Check supervisor logs: `docker exec gmweb tail /config/logs/supervisor.log`
+- Look for line: `✓ VNC_PW configured from environment:`
+- If you see `⚠⚠ NO VNC_PW or PASSWORD found` - Coolify environment variable not passed to container
+- Verify in Coolify UI: Settings → Environment variables → `VNC_PW` is set
+
+**How supervisor extracts VNC_PW:**
+```javascript
+// Supervisor reads directly from Node.js process.env
+if (process.env.VNC_PW) {
+  env.VNC_PW = process.env.VNC_PW;  // Use VNC_PW
+} else if (process.env.PASSWORD) {
+  env.VNC_PW = process.env.PASSWORD;  // Fallback to PASSWORD
+} else {
+  env.VNC_PW = 'password';  // Default (WARNS in logs)
+}
+```
+
+If neither VNC_PW nor PASSWORD is in container environment, supervisor uses hardcoded default and logs a warning.
+
 ### kasmproxy-wrapper Service Configuration (Deprecated)
 **Service name mismatch prevents startup.** The supervisor loads services by name from `config.json`. The service file is `kasmproxy-wrapper.js`, so `config.json` must reference it as `"kasmproxy-wrapper"` (not `"kasmproxy"`).
 
