@@ -317,6 +317,14 @@ export class Supervisor {
   async getEnvironment() {
     const env = { ...process.env };
 
+    // DEBUG: Log all relevant container environment variables
+    this.log('DEBUG', '=== CONTAINER ENVIRONMENT ===');
+    this.log('DEBUG', `process.env.VNC_PW: ${env.VNC_PW ? env.VNC_PW.substring(0, 3) + '***' : '(not set)'}`);
+    this.log('DEBUG', `process.env.PASSWORD: ${env.PASSWORD ? env.PASSWORD.substring(0, 3) + '***' : '(not set)'}`);
+    this.log('DEBUG', `process.env.CUSTOM_PORT: ${env.CUSTOM_PORT}`);
+    this.log('DEBUG', `process.env.SUBFOLDER: ${env.SUBFOLDER}`);
+    this.log('DEBUG', '=== END ENVIRONMENT ===');
+
     // Setup Node.js PATH
     env.PATH = `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH}`;
     env.PATH = `${process.env.HOME}/.local/bin:${env.PATH}`;
@@ -325,14 +333,20 @@ export class Supervisor {
     // Priority: VNC_PW > PASSWORD > 'password' (default)
     if (!env.VNC_PW && env.PASSWORD) {
       env.VNC_PW = env.PASSWORD;
-      this.log('INFO', `Using PASSWORD as VNC_PW: ${env.VNC_PW.substring(0, 3)}***`);
+      this.log('INFO', `⚠ Using PASSWORD env var as VNC_PW: ${env.VNC_PW.substring(0, 3)}***`);
     }
 
     if (!env.VNC_PW) {
       env.VNC_PW = 'password';
-      this.log('WARN', 'No VNC_PW or PASSWORD set, using default');
+      this.log('WARN', '⚠⚠ NO VNC_PW or PASSWORD found in environment! Using hardcoded default "password"');
+      this.log('WARN', 'This means either:');
+      this.log('WARN', '  1. VNC_PW is not set in Coolify environment variables');
+      this.log('WARN', '  2. docker-compose is not reading it correctly');
+      this.log('WARN', 'Solution: Check Coolify resource settings and ensure VNC_PW is configured');
     } else {
-      this.log('INFO', `VNC_PW configured: ${env.VNC_PW.substring(0, 3)}***`);
+      this.log('INFO', `✓ VNC_PW configured from environment: ${env.VNC_PW.substring(0, 3)}***`);
+      this.log('INFO', `✓ Use username: kasm_user`);
+      this.log('INFO', `✓ Use password: ${env.VNC_PW}`);
     }
 
     return env;
