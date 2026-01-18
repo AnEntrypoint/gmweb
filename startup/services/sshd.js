@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
+const WEBTOP_USER = process.env.SUDO_USER || 'abc';
 
 export default {
   name: 'sshd',
@@ -14,13 +15,13 @@ export default {
     // Create combined environment with VNC_PW
     const processEnv = {
       ...env,
-      VNC_PW: env.VNC_PW || 'password'
+      VNC_PW: env.VNC_PW || env.PASSWORD || 'password'
     };
 
     const ps = spawn('bash', ['-c', `
       sudo mkdir -p /run/sshd
       if [ -n "$VNC_PW" ]; then
-        echo "kasm-user:$VNC_PW" | sudo chpasswd
+        echo "${WEBTOP_USER}:$VNC_PW" | sudo chpasswd
       fi
       sudo /usr/sbin/sshd
     `], {

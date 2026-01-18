@@ -1,90 +1,70 @@
 #!/bin/bash
-# KasmWeb Custom Startup Script - Minimal Orchestrator
-# Purpose: Clean up stale state, start gmweb supervisor, exit
-# Does NOT interfere with KasmWeb profile initialization
-# Cleans only stale entries from previous failed deployments
+# LinuxServer Webtop Custom Startup Script
+# Purpose: Setup gmweb services on top of webtop base
+# Runs via /custom-cont-init.d/ mechanism
 
 set -e
 
-LOG_DIR="/home/kasm-user/logs"
+# Webtop uses /config as home directory
+HOME_DIR="/config"
+LOG_DIR="$HOME_DIR/logs"
 mkdir -p "$LOG_DIR"
 
 log() {
-  echo "[custom_startup] $@" | tee -a "$LOG_DIR/startup.log"
+  echo "[gmweb-startup] $@" | tee -a "$LOG_DIR/startup.log"
 }
 
-log "===== CUSTOM STARTUP $(date) ====="
+log "===== GMWEB STARTUP $(date) ====="
 
 # ============================================================================
-# Clean up stale state from previous failed deployments
+# Fix npm permissions
 # ============================================================================
-# If Desktop/Downloads exists as a DIRECTORY (not symlink), remove it
-# This prevents KasmWeb profile verification from getting stuck
-# We ONLY remove the specific conflict, not interfering with KasmWeb setup
-
-if [ -d /home/kasm-user/Desktop/Downloads ] && [ ! -L /home/kasm-user/Desktop/Downloads ]; then
-  log "Cleaning stale Desktop/Downloads directory from previous deployment..."
-  rm -rf /home/kasm-user/Desktop/Downloads
-  log "✓ Stale directory removed, KasmWeb can now create symlink"
-fi
-
-# ============================================================================
-# Fix npm permissions (root-owned files from build time)
-# ============================================================================
-# npm cache may have been created as root during docker build
-# This blocks npx and npm commands for kasm-user
-
-if [ -d /home/kasm-user/.npm ]; then
+if [ -d "$HOME_DIR/.npm" ]; then
   log "Fixing npm cache permissions..."
-  sudo chown -R kasm-user:kasm-user /home/kasm-user/.npm
+  chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || true
   log "✓ npm permissions fixed"
 fi
 
-# Create npm cache dir with correct ownership if missing
-if [ ! -d /home/kasm-user/.npm ]; then
-  mkdir -p /home/kasm-user/.npm
+if [ ! -d "$HOME_DIR/.npm" ]; then
+  mkdir -p "$HOME_DIR/.npm"
+  chown -R abc:abc "$HOME_DIR/.npm"
   log "✓ npm cache directory created"
 fi
 
 # ============================================================================
-# Fix NVM directory permissions (may be owned by kasm-recorder from build)
+# Fix NVM directory permissions
 # ============================================================================
-# Required for npm global installs (gemini-cli, wrangler, etc.)
-
 if [ -d /usr/local/local/nvm ]; then
   log "Fixing NVM directory permissions..."
-  sudo chown -R kasm-user:kasm-user /usr/local/local/nvm
+  chown -R abc:abc /usr/local/local/nvm 2>/dev/null || true
   log "✓ NVM permissions fixed"
 fi
 
 # ============================================================================
-# Fix Claude Code UI permissions (root-owned from build time)
+# Fix Claude Code UI permissions
 # ============================================================================
-# The claudecodeui directory is created as root during docker build
-# Need to fix ownership so the server can write to database and temp files
-
 if [ -d /opt/claudecodeui ]; then
   log "Fixing Claude Code UI permissions..."
-  sudo chown -R kasm-user:kasm-user /opt/claudecodeui
+  chown -R abc:abc /opt/claudecodeui 2>/dev/null || true
   log "✓ Claude Code UI permissions fixed"
 
-  # Create kasm_user in Claude Code UI database with VNC_PW (backgrounded to not block kasmproxy)
+  # Setup Claude Code UI user (background)
   log "Setting up Claude Code UI user (background)..."
   nohup bash -c "cd /opt/claudecodeui && node -e \"
     const Database = require('better-sqlite3');
     const bcrypt = require('bcrypt');
-    const vncPw = process.env.VNC_PW || '';
-    if (!vncPw) { console.log('No VNC_PW, skipping'); process.exit(0); }
+    const vncPw = process.env.PASSWORD || process.env.VNC_PW || '';
+    if (!vncPw) { console.log('No PASSWORD/VNC_PW, skipping'); process.exit(0); }
     const db = new Database('/opt/claudecodeui/server/database/auth.db');
-    const user = db.prepare('SELECT id FROM users WHERE username = ?').get('kasm_user');
+    const user = db.prepare('SELECT id FROM users WHERE username = ?').get('abc');
     if (user) {
       const hash = bcrypt.hashSync(vncPw, 10);
-      db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(hash, 'kasm_user');
-      console.log('Updated kasm_user password');
+      db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(hash, 'abc');
+      console.log('Updated abc user password');
     } else {
       const hash = bcrypt.hashSync(vncPw, 10);
-      db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('kasm_user', hash);
-      console.log('Created kasm_user');
+      db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('abc', hash);
+      console.log('Created abc user');
     }
     db.close();
   \"" > "$LOG_DIR/claudeui-user.log" 2>&1 &
@@ -94,25 +74,22 @@ fi
 # ============================================================================
 # Setup .bashrc PATH (first boot only)
 # ============================================================================
-# Add NVM and local bin paths to .bashrc for interactive shells
-# Uses marker file to prevent duplicate entries on container restarts
-
-BASHRC_MARKER="/home/kasm-user/.gmweb-bashrc-setup"
+BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
 if [ ! -f "$BASHRC_MARKER" ]; then
   log "Setting up .bashrc PATH configuration..."
 
-  # Add NVM and local paths to .bashrc
-  cat >> /home/kasm-user/.bashrc << 'BASHRC_EOF'
+  cat >> "$HOME_DIR/.bashrc" << 'BASHRC_EOF'
 
 # gmweb PATH setup
 export NVM_DIR="/usr/local/local/nvm"
 export PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$HOME/.local/bin:$PATH"
 
-# Claude Code function with --dangerously-skip-permissions (passes all args)
+# Claude Code function with --dangerously-skip-permissions
 ccode() { claude --dangerously-skip-permissions "$@"; }
 BASHRC_EOF
 
   touch "$BASHRC_MARKER"
+  chown abc:abc "$BASHRC_MARKER"
   log "✓ .bashrc PATH configured"
 else
   log "✓ .bashrc already configured (skipping)"
@@ -121,25 +98,21 @@ fi
 # ============================================================================
 # Setup Claude MCP and plugins (first boot only)
 # ============================================================================
-
-CLAUDE_MARKER="/home/kasm-user/.gmweb-claude-setup"
+CLAUDE_MARKER="$HOME_DIR/.gmweb-claude-setup"
 if [ ! -f "$CLAUDE_MARKER" ]; then
   log "Setting up Claude MCP and plugins (background)..."
 
-  # Background all Claude setup to not block kasmproxy
   nohup bash -c "
+    export HOME=$HOME_DIR
     # Add playwriter MCP server
-    /home/kasm-user/.local/bin/claude mcp add playwriter npx -- -y playwriter@latest || true
+    $HOME_DIR/.local/bin/claude mcp add playwriter npx -- -y playwriter@latest || true
 
     # Add gm plugin from marketplace
-    /home/kasm-user/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true
-    /home/kasm-user/.local/bin/claude plugin install -s user gm@gm || true
+    $HOME_DIR/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true
+    $HOME_DIR/.local/bin/claude plugin install -s user gm@gm || true
 
-    # Enable Chromium extension
-    python3 /usr/local/bin/enable_chromium_extension.py || true
-
-    # Mark as complete
-    touch /home/kasm-user/.gmweb-claude-setup
+    touch $HOME_DIR/.gmweb-claude-setup
+    chown abc:abc $HOME_DIR/.gmweb-claude-setup
   " > "$LOG_DIR/claude-setup.log" 2>&1 &
   log "✓ Claude MCP and plugins setup started (background)"
 else
@@ -149,15 +122,12 @@ fi
 # ============================================================================
 # Setup XFCE autostart (first boot only)
 # ============================================================================
-# Create autostart directory and desktop entries for apps that should start on login
-
-AUTOSTART_DIR="/home/kasm-user/.config/autostart"
+AUTOSTART_DIR="$HOME_DIR/.config/autostart"
 if [ ! -d "$AUTOSTART_DIR" ]; then
   log "Setting up XFCE autostart..."
   mkdir -p "$AUTOSTART_DIR"
 
-  # Autostart terminal with shared tmux session running bash
-  # Explicit bash ensures .bashrc is sourced and PATH is configured
+  # Autostart terminal with shared tmux session
   cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
@@ -192,40 +162,8 @@ X-GNOME-Autostart-enabled=true
 StartupDelay=5
 AUTOSTART_EOF
 
-  # Autostart Chromium browser
-  cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
-[Desktop Entry]
-Type=Application
-Name=Chromium
-Exec=/usr/bin/chromium
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-AUTOSTART_EOF
-
-  # Autostart Chrome Extension Installer (ProxyPilot extension)
-  cat > "$AUTOSTART_DIR/ext.desktop" << 'AUTOSTART_EOF'
-[Desktop Entry]
-Type=Application
-Name=Chrome Extension Installer
-Exec=/usr/local/nvm/versions/node/v23.11.1/bin/npx -y gxe@latest AnEntrypoint/chromeextensioninstaller chromeextensioninstaller jfeammnjpkecdekppnclgkkffahnhfhe
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-AUTOSTART_EOF
-
-  # Autostart ProxyPilot
-  cat > "$AUTOSTART_DIR/proxypilot.desktop" << 'AUTOSTART_EOF'
-[Desktop Entry]
-Type=Application
-Name=ProxyPilot
-Exec=/usr/bin/proxypilot
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-AUTOSTART_EOF
-
-  log "✓ XFCE autostart configured (7 apps)"
+  chown -R abc:abc "$AUTOSTART_DIR"
+  log "✓ XFCE autostart configured"
 else
   log "✓ XFCE autostart already configured (skipping)"
 fi
@@ -233,8 +171,10 @@ fi
 # ============================================================================
 # Start supervisor
 # ============================================================================
-
 log "Starting gmweb supervisor..."
+
+# Export HOME for supervisor
+export HOME="$HOME_DIR"
 
 if [ -f /opt/gmweb-startup/start.sh ]; then
   bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
@@ -244,11 +184,11 @@ else
 fi
 
 # Check for user startup hook
-if [ -f /home/kasm-user/startup.sh ]; then
+if [ -f "$HOME_DIR/startup.sh" ]; then
   log "Running user startup hook..."
-  bash /home/kasm-user/startup.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
+  bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
   log "User startup hook completed"
 fi
 
-log "===== CUSTOM STARTUP COMPLETE ====="
+log "===== GMWEB STARTUP COMPLETE ====="
 exit 0

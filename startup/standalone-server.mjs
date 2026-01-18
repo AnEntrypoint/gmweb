@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import url from 'url';
 
-const BASE_DIR = process.env.BASE_DIR || '/home/kasm-user';
+const BASE_DIR = process.env.BASE_DIR || process.env.HOME || '/config';
 const PORT = parseInt(process.env.PORT || 9998);
 const HOSTNAME = process.env.HOSTNAME || '0.0.0.0';
 const PREFIX = '/files'; // Add prefix for kasmproxy routing

@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
+const HOME_DIR = process.env.HOME || '/config';
 
 export default {
   name: 'gcloud',
@@ -14,10 +15,10 @@ export default {
     // Install gcloud SDK non-interactively
     const ps = spawn('bash', ['-c', `
       curl -sSL https://sdk.cloud.google.com > /tmp/install_gcloud.sh
-      bash /tmp/install_gcloud.sh --disable-prompts --install-dir=/home/kasm-user
+      bash /tmp/install_gcloud.sh --disable-prompts --install-dir=${HOME_DIR}
       rm -f /tmp/install_gcloud.sh
     `], {
-      env: { ...env },
+      env: { ...env, HOME: HOME_DIR },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
@@ -38,7 +39,7 @@ export default {
     try {
       const { execSync } = await import('child_process');
       // Check both PATH and direct install location
-      execSync('which gcloud || test -f /home/kasm-user/google-cloud-sdk/bin/gcloud', { stdio: 'pipe' });
+      execSync(`which gcloud || test -f ${HOME_DIR}/google-cloud-sdk/bin/gcloud`, { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;

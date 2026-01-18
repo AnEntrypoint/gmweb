@@ -13,7 +13,7 @@ export default {
   async start(env) {
     const processEnv = {
       ...env,
-      BASE_DIR: '/home/kasm-user',
+      BASE_DIR: '/config',  // LinuxServer webtop home directory
       PORT: '9998',
       HOSTNAME: '0.0.0.0'
     };

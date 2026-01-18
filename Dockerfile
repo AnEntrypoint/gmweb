@@ -1,17 +1,19 @@
 # syntax=docker/dockerfile:1.4
-# ULTRA-MINIMAL gmweb Dockerfile
-# Only: Base image, NVM, Node.js, startup scripts
-# All installation delegated to install.sh (called on first boot)
-# ALL SETUP now happens in custom_startup.sh -> install.sh
+# gmweb Dockerfile - LinuxServer Webtop base
+# Ubuntu XFCE4 desktop with gmweb startup system
 
-ARG ARCH=aarch64
-FROM kasmweb/ubuntu-noble-dind-rootless:${ARCH}-1.18.0
+FROM lscr.io/linuxserver/webtop:ubuntu-xfce
 
-USER root
-ENV DEBIAN_FRONTEND=noninteractive
+# LinuxServer init will run scripts in /custom-cont-init.d/ at container start
+# and services in /custom-services.d/ as supervised services
 
-# Minimal base: only git (needed for cloning gmweb repo)
-RUN apt update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+# Install minimal dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    lsof \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
 
 # Setup NVM and Node.js (stable, pinned version)
 ENV NVM_DIR=/usr/local/local/nvm
@@ -25,14 +27,12 @@ ENV PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$PATH"
 # Cache-bust to force fresh git clone (ensures latest code from GitHub)
 ARG BUILD_DATE=unknown
 
-# Clone gmweb repo to get startup system and custom startup hook
-# BuildKit cache-busting: Changes to BUILD_DATE force rebuild without layer cache
+# Clone gmweb repo to get startup system
 RUN git clone --depth 1 https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
     cp -r /tmp/gmweb/startup /opt/gmweb-startup && \
-    cp /tmp/gmweb/docker/custom_startup.sh /dockerstartup/custom_startup.sh && \
     rm -rf /tmp/gmweb
 
-# Setup startup system (in /opt, system-level, not user home)
+# Setup startup system
 RUN cd /opt/gmweb-startup && \
     npm install --production && \
     chmod +x /opt/gmweb-startup/install.sh && \
@@ -42,14 +42,15 @@ RUN cd /opt/gmweb-startup && \
 # RUN install.sh at BUILD TIME (installs all system packages and software)
 RUN bash /opt/gmweb-startup/install.sh
 
-# Setup custom startup hook permissions
-RUN chmod +x /dockerstartup/custom_startup.sh
+# Create LinuxServer custom init script (runs at container start)
+RUN mkdir -p /custom-cont-init.d && \
+    echo '#!/bin/bash' > /custom-cont-init.d/01-gmweb-init && \
+    echo 'bash /opt/gmweb-startup/custom_startup.sh' >> /custom-cont-init.d/01-gmweb-init && \
+    chmod +x /custom-cont-init.d/01-gmweb-init
 
-# NOTE: KasmWeb natively manages /home/kasm-user and /home/kasm-default-profile
-# Do NOT pre-create directories or modify these paths
-# KasmWeb profile initialization handles everything automatically
-# Our job: provide system-level software (/opt, /usr, /etc) only
-# User-specific setup: handled by custom_startup.sh after KasmWeb initializes
+# Copy our custom startup script
+COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
+RUN chmod +x /opt/gmweb-startup/custom_startup.sh
 
-# Switch to user (kasm-user = UID 1000)
-USER 1000
+# Webtop default ports: 3000 (HTTP), 3001 (HTTPS)
+EXPOSE 3000 3001 80

@@ -16,7 +16,7 @@ export class Supervisor {
       maxRestartAttempts: 5,
       baseBackoffDelay: 5000,
       maxBackoffDelay: 60000,
-      logDirectory: '/home/kasm-user/logs',
+      logDirectory: process.env.HOME ? `${process.env.HOME}/logs` : '/config/logs',
       kasmproxyStartupTimeout: 120000, // 2 minutes max to wait for kasmproxy
       ...config
     };

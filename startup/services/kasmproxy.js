@@ -1,4 +1,4 @@
-// KasmProxy service - web proxy for Kasm desktop
+// KasmProxy service - web proxy for webtop desktop
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -7,7 +7,7 @@ const sleep = promisify(setTimeout);
 export default {
   name: 'kasmproxy',
   type: 'critical',
-  requiresDesktop: true,
+  requiresDesktop: false,  // Webtop manages desktop via its own init
   dependencies: [],
 
   async start(env) {

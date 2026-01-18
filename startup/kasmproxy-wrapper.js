@@ -14,7 +14,7 @@ import http from 'http';
 import net from 'net';
 
 const KASMPROXY_PORT = 8080;
-const KASMVNC_PORT = 6901;
+const WEBTOP_PORT = 3000;  // LinuxServer webtop web UI port
 const LISTEN_PORT = 80;
 const VNC_PW = process.env.VNC_PW || '';
 
@@ -24,7 +24,7 @@ const VNC_PW = process.env.VNC_PW || '';
 function getUpstreamPort(path) {
   // /websockify routes go directly to KasmVNC (port 6901)
   if (path === '/websockify' || path.startsWith('/websockify/') || path.startsWith('/websockify?')) {
-    return KASMVNC_PORT;
+    return WEBTOP_PORT;
   }
   // All other routes go through kasmproxy (port 8080)
   return KASMPROXY_PORT;
@@ -226,7 +226,7 @@ server.on('upgrade', (req, socket, head) => {
 server.listen(LISTEN_PORT, '0.0.0.0', () => {
   console.log(`[kasmproxy-wrapper] Listening on port ${LISTEN_PORT}`);
   console.log(`[kasmproxy-wrapper] Forwarding to kasmproxy on port ${KASMPROXY_PORT}`);
-  console.log(`[kasmproxy-wrapper] Forwarding /websockify to KasmVNC on port ${KASMVNC_PORT}`);
+  console.log(`[kasmproxy-wrapper] Forwarding /websockify to webtop on port ${WEBTOP_PORT}`);
   console.log(`[kasmproxy-wrapper] Public routes: /files, /websockify`);
 });
 
