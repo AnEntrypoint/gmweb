@@ -189,7 +189,7 @@ Routes through kasmproxy on port 80:
 - `/ui` → port 9997 (Claude Code UI) - path stripped to `/`
 - `/api` → port 9997 (Claude Code UI API) - path kept as-is
 - `/ws` → port 9997 (Claude Code UI WebSocket) - path kept as-is
-- `/files` → port 9998 (file-manager) - path stripped to `/`
+- `/files` → port 9998 (NHFS file-manager) - path stripped to `/`
 - `/ssh` → port 9999 (ttyd terminal) - path stripped to `/`
 - `/` → port 6901 (KasmVNC)
 
@@ -346,6 +346,46 @@ exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y opencode-ai "$@"
 - Wrapper at `/usr/local/local/nvm/versions/node/v23.11.1/bin/opencode`
 - Service: `startup/services/opencode.js` (type: 'install')
 - Verified working: `opencode --version` returns version
+
+## NHFS File Manager
+
+### Pre-Built at Docker Build Time (Critical)
+NHFS (Next.js HTTP File Server) must be pre-built during docker build, not at runtime.
+
+**Why:** Next.js bundles environment variables at build time. Setting `NHFS_BASE_DIR` at runtime has no effect - the value is already compiled into the JavaScript bundle.
+
+**Location:** `/opt/nhfs` (cloned from `https://github.com/AliSananS/NHFS`)
+
+**Build steps in install.sh:**
+```bash
+git clone https://github.com/AliSananS/NHFS /opt/nhfs
+cd /opt/nhfs
+npm install
+npm run build
+npm run build:move
+```
+
+**Service startup:** The file-manager service runs the pre-built server directly:
+```javascript
+spawn('node', ['/opt/nhfs/bin.js', '--port', '9998', '--dir', '/home/kasm-user'], {
+  env: { ...env, NODE_ENV: 'production', NHFS_BASE_DIR: '/home/kasm-user' },
+  cwd: '/opt/nhfs'
+});
+```
+
+### NHFS bin.js CLI Wrapper
+The NHFS package includes a `bin.js` CLI wrapper that:
+- Parses `--port`, `--dir`, `--hostname` arguments
+- Sets environment variables (`PORT`, `HOSTNAME`)
+- Spawns `dist/server.js` with proper configuration
+
+**Do not call `dist/server.js` directly** - use `bin.js` to ensure proper environment setup.
+
+### Ownership at Boot
+NHFS is installed as root during build. Add to `custom_startup.sh`:
+```bash
+sudo chown -R kasm-user:kasm-user /opt/nhfs
+```
 
 ## Supervisor Logging
 
