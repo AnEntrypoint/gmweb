@@ -321,13 +321,31 @@ export class Supervisor {
     env.PATH = `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH}`;
     env.PATH = `${process.env.HOME}/.local/bin:${env.PATH}`;
 
-    // Extract or set VNC_PW
+    // Extract or set VNC_PW from container environment
     if (!env.VNC_PW) {
       try {
-        const vncPw = execSync("strings /proc/1/environ | grep '^VNC_PW=' | cut -d= -f2-", { encoding: 'utf8' }).trim();
-        if (vncPw) env.VNC_PW = vncPw;
+        // Read /proc/1/environ and parse environment variables
+        const { readFileSync } = await import('fs');
+        const environBuffer = readFileSync('/proc/1/environ');
+        const environStr = environBuffer.toString();
+        const envVars = environStr.split('\0').filter(x => x);
+        const vncPwVar = envVars.find(v => v.startsWith('VNC_PW='));
+
+        if (vncPwVar) {
+          env.VNC_PW = vncPwVar.substring(7); // Remove 'VNC_PW=' prefix
+          this.log('INFO', `Extracted VNC_PW from /proc/1/environ: ${env.VNC_PW.substring(0, 3)}***`);
+        } else {
+          // Also try PASSWORD variable (Webtop uses PASSWORD for VNC password)
+          const passVar = envVars.find(v => v.startsWith('PASSWORD='));
+          if (passVar) {
+            env.VNC_PW = passVar.substring(9); // Remove 'PASSWORD=' prefix
+            this.log('INFO', `Extracted PASSWORD from /proc/1/environ and using as VNC_PW: ${env.VNC_PW.substring(0, 3)}***`);
+          } else {
+            throw new Error('Neither VNC_PW nor PASSWORD found');
+          }
+        }
       } catch (err) {
-        this.log('WARN', 'Could not extract VNC_PW, using default');
+        this.log('WARN', `Could not extract VNC_PW from environment: ${err.message}, using default`);
         env.VNC_PW = 'password';
       }
     }

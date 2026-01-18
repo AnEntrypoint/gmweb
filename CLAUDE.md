@@ -179,7 +179,25 @@ return 3000;  // Webtop UI
 - `/data/*` and `/ws/*` routes bypass auth (Selkies handles its own authentication)
 - All other routes require HTTP Basic Auth with username: `kasm_user`, password: `VNC_PW`
 
-### kasmproxy-wrapper Service Configuration (Critical)
+### kasmproxy Configuration (Critical)
+
+**NOTE: Deprecated - See original kasmproxy repo (/home/user/kasmproxy) for current implementation.**
+
+kasmproxy now supports:
+- **CUSTOM_PORT environment variable**: Webtop UI port (defaults to 3000, set to 6901 in docker-compose for Webtop)
+- **SUBFOLDER environment variable**: URL prefix stripping (e.g., `/desk/` paths become `/` when forwarded to upstream)
+- **Selkies WebSocket routing**: `/data/*` and `/ws/*` routes forward to port 8082 without authentication
+- **Authentication bypass**: Selkies handles its own authentication via VNC password in URL
+
+**Path forwarding flow:**
+1. Client requests: `https://domain/desk/data/stream`
+2. kasmproxy receives: `/desk/data/stream`
+3. stripSubfolder() removes prefix: `/data/stream`
+4. Routes to port 8082 (Selkies) as: `/data/stream`
+5. Auth check skipped for Selkies routes
+6. WebSocket upgraded to Selkies on port 8082
+
+### kasmproxy-wrapper Service Configuration (Deprecated)
 **Service name mismatch prevents startup.** The supervisor loads services by name from `config.json`. The service file is `kasmproxy-wrapper.js`, so `config.json` must reference it as `"kasmproxy-wrapper"` (not `"kasmproxy"`).
 
 **Critical config settings:**
