@@ -1,4 +1,4 @@
-// File Manager service using pre-built NHFS
+// File Manager service using standalone HTTP server
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -13,16 +13,15 @@ export default {
   async start(env) {
     const processEnv = {
       ...env,
-      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      NODE_ENV: 'production',
-      NHFS_BASE_DIR: '/home/kasm-user'
+      BASE_DIR: '/home/kasm-user',
+      PORT: '9998',
+      HOSTNAME: '0.0.0.0'
     };
 
-    // Run pre-built NHFS using the bin.js CLI
-    // bin.js spawns dist/server.js with PORT and HOSTNAME set
-    const ps = spawn('node', ['/opt/nhfs/bin.js', '--port', '9998', '--dir', '/home/kasm-user'], {
+    // Run lightweight standalone file server
+    // Serves files from BASE_DIR with proper content types and no external dependencies
+    const ps = spawn('node', ['/opt/gmweb-startup/standalone-server.mjs'], {
       env: processEnv,
-      cwd: '/opt/nhfs',
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
