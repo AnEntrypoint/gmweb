@@ -71,7 +71,10 @@ export class Supervisor {
 
       // CRITICAL: Start kasmproxy FIRST and wait for it to be healthy
       const kasmproxy = this.services.get('kasmproxy');
-      if (kasmproxy) {
+      const kasmproxyConfig = this.config.services?.['kasmproxy'];
+      const kasmproxyEnabled = kasmproxyConfig?.enabled !== false;
+
+      if (kasmproxy && kasmproxyEnabled) {
         this.log('INFO', '=== CRITICAL: Starting kasmproxy first ===');
         try {
           await this.startService(kasmproxy);
@@ -86,6 +89,8 @@ export class Supervisor {
           await sleep(2000);
           await this.startService(kasmproxy);
         }
+      } else if (kasmproxy && !kasmproxyEnabled) {
+        this.log('INFO', 'kasmproxy is disabled in config - skipping');
       }
 
       // Resolve dependencies and sort remaining services
