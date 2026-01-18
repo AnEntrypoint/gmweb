@@ -17,8 +17,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-Etc/UTC}
-      - PASSWORD=${VNC_PW:-password}
-      - VNC_PW=${VNC_PW:-password}
+      - PASSWORD=${PASSWORD:-password}
       - CUSTOM_PORT=6901
       - CUSTOM_HTTPS_PORT=6902
       - FILE_MANAGER_PATH=/config/Desktop
