@@ -10,7 +10,7 @@ export default {
   name: 'kasmproxy-wrapper',
   type: 'web',
   requiresDesktop: false,
-  dependencies: ['kasmproxy'],
+  dependencies: [],
 
   async start(env) {
     const processEnv = {
