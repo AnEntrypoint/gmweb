@@ -1,6 +1,6 @@
 {
   "healthCheckInterval": 30000,
-  "logDirectory": "/home/kasm-user/logs",
+  "logDirectory": "/config/logs",
   "services": {
     "kasmproxy": {
       "enabled": true,
