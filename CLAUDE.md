@@ -94,8 +94,16 @@ lsof -i :9998 | grep -q node  # FAILS
 2. Decodes Base64: `kasm_user:PASSWORD`
 3. Compares expected: `kasm_user:` + PASSWORD
 4. 401 if mismatch, 200 if match
+5. **CRITICAL:** Deletes Authorization header before forwarding to upstream
+6. Upstream services never see auth credentials
 
-**Important:** Selkies routes (`,/data/*`, `/ws/*`) bypass kasmproxy-wrapper auth - Selkies handles its own authentication via VNC password in URL.
+**Important:** Selkies routes (`/data/*`, `/ws/*`) bypass kasmproxy-wrapper auth - Selkies handles its own authentication via VNC password in URL.
+
+**Auth Isolation (No Conflicts):**
+- Proxy enforces auth at port 80 boundary
+- Upstream services (Webtop port 3000, Selkies port 8082) receive requests WITHOUT auth headers
+- No double-auth or conflicting auth checks
+- Upstream services don't need to parse/validate auth headers
 
 ### SUBFOLDER Path Stripping
 
