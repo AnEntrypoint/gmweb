@@ -319,7 +319,6 @@ export class Supervisor {
 
     // DEBUG: Log all relevant container environment variables
     this.log('DEBUG', '=== CONTAINER ENVIRONMENT ===');
-    this.log('DEBUG', `process.env.VNC_PW: ${env.VNC_PW ? env.VNC_PW.substring(0, 3) + '***' : '(not set)'}`);
     this.log('DEBUG', `process.env.PASSWORD: ${env.PASSWORD ? env.PASSWORD.substring(0, 3) + '***' : '(not set)'}`);
     this.log('DEBUG', `process.env.CUSTOM_PORT: ${env.CUSTOM_PORT}`);
     this.log('DEBUG', `process.env.SUBFOLDER: ${env.SUBFOLDER}`);

@@ -2,6 +2,11 @@
   "healthCheckInterval": 30000,
   "logDirectory": "/config/logs",
   "services": {
+    "kasmproxy": {
+      "enabled": false,
+      "type": "critical",
+      "requiresDesktop": false
+    },
     "kasmproxy-wrapper": {
       "enabled": true,
       "type": "critical",

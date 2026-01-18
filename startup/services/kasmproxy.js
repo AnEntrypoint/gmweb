@@ -14,13 +14,13 @@ export default {
     // Create combined environment for kasmproxy
     const processEnv = {
       ...env,
-      VNC_PW: env.VNC_PW || 'password',
+      PASSWORD: env.PASSWORD || 'password',
       LISTEN_PORT: '8080',
       PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     };
 
     const ps = spawn('bash', ['-c', `
-      export VNC_PW="$VNC_PW"
+      export PASSWORD="$PASSWORD"
       export LISTEN_PORT="8080"
       export PATH="$PATH"
       npx -y gxe@latest AnEntrypoint/kasmproxy start
