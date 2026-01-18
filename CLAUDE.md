@@ -57,19 +57,22 @@ const WEBTOP_USER = process.env.SUDO_USER || 'abc';
   - Calls start.sh (supervisor launcher)
   - Optionally calls user's `/config/startup.sh` hook if present
 
-### Supervisor Kasmproxy Prioritization
-- Kasmproxy **MUST** start FIRST (critical path)
-- Supervisor blocks all other services until kasmproxy is healthy
-- Health check: verifies port 80 is listening via `lsof -i :80`
+### Supervisor kasmproxy-wrapper Prioritization
+- kasmproxy-wrapper **MUST** start FIRST (critical path) - it's the external entry point on port 80
+- Supervisor blocks all other services until kasmproxy-wrapper is healthy
+- Health check: verifies port 80 is listening via `lsof -i :80 | grep LISTEN`
 - Timeout: 2 minutes max wait, then continues anyway
+- **Why critical:** External clients can only reach the container through port 80. If kasmproxy-wrapper fails, nothing is accessible
 
 ### Environment Variable Passing
-- Supervisor reads PASSWORD from container environment
+- Supervisor reads PASSWORD from container environment (native to LinuxServer Webtop)
+- Supervisor passes PASSWORD to all services including kasmproxy-wrapper
 - All services receive environment through `process.env` in node child_process spawn
+- **Critical:** Use PASSWORD (not VNC_PW) for Webtop architecture - it's the native environment variable
 - **Critical:** Do NOT use template string injection - use explicit env object:
   ```javascript
   const child = spawn(cmd, args, {
-    env: { ...process.env, CUSTOM_VAR: value }
+    env: { ...process.env, PASSWORD: env.PASSWORD || 'password' }
   });
   ```
 
@@ -154,11 +157,12 @@ Applications installed to `/opt/` during docker build are owned by root. Service
 
 **Function:** HTTP Basic Auth reverse proxy on port 80 that routes requests to backend services.
 
-**CRITICAL: Service Dependencies**
-- kasmproxy-wrapper should **NOT depend on the old kasmproxy service** in Webtop architecture
-- The old `kasmproxy` service (AnEntrypoint/kasmproxy on port 8080) should be **disabled in config.json** for Webtop deployments
-- kasmproxy-wrapper can start immediately on port 80 without waiting for kasmproxy
-- If kasmproxy-wrapper depends on kasmproxy, it will block and never start (causing auth failures)
+**CRITICAL: Service Configuration (Webtop Architecture)**
+- The old `kasmproxy` service must be **explicitly disabled in config.json** with `"enabled": false`
+- Reason: In Webtop architecture, `kasmproxy-wrapper` on port 80 is the **ONLY** reverse proxy
+- If both kasmproxy and kasmproxy-wrapper try to start, kasmproxy will fail (port conflict or bad startup)
+- kasmproxy-wrapper starts immediately, doesn't depend on kasmproxy, and routes all traffic
+- **Fix applied:** Added `"kasmproxy": { "enabled": false }` to config.json
 
 **Port Forwarding (Webtop + Selkies architecture):**
 - Port 80: kasmproxy-wrapper listens here
