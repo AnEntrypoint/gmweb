@@ -69,28 +69,36 @@ export class Supervisor {
       // Setup environment once
       this.env = await this.getEnvironment();
 
-      // CRITICAL: Start kasmproxy FIRST and wait for it to be healthy
-      const kasmproxy = this.services.get('kasmproxy');
-      const kasmproxyConfig = this.config.services?.['kasmproxy'];
-      const kasmproxyEnabled = kasmproxyConfig?.enabled !== false;
+      // CRITICAL: Start proxy FIRST and wait for it to be healthy
+      // Check for kasmproxy-wrapper (Webtop architecture) or kasmproxy (legacy)
+      let proxyService = this.services.get('kasmproxy-wrapper');
+      let proxyName = 'kasmproxy-wrapper';
 
-      if (kasmproxy && kasmproxyEnabled) {
-        this.log('INFO', '=== CRITICAL: Starting kasmproxy first ===');
+      if (!proxyService) {
+        proxyService = this.services.get('kasmproxy');
+        proxyName = 'kasmproxy';
+      }
+
+      const proxyConfig = this.config.services?.[proxyName];
+      const proxyEnabled = proxyConfig?.enabled !== false;
+
+      if (proxyService && proxyEnabled) {
+        this.log('INFO', `=== CRITICAL: Starting ${proxyName} first ===`);
         try {
-          await this.startService(kasmproxy);
+          await this.startService(proxyService);
 
-          // Wait for kasmproxy to be healthy (blocks other services)
+          // Wait for proxy to be healthy (blocks other services)
           await this.waitForKasmproxyHealthy();
           this.kasmproxyHealthy = true;
-          this.log('INFO', 'kasmproxy is healthy - proceeding with other services');
+          this.log('INFO', `${proxyName} is healthy - proceeding with other services`);
         } catch (err) {
-          this.log('ERROR', 'Failed to start kasmproxy', err);
+          this.log('ERROR', `Failed to start ${proxyName}`, err);
           this.log('WARN', 'Attempting recovery...');
           await sleep(2000);
-          await this.startService(kasmproxy);
+          await this.startService(proxyService);
         }
-      } else if (kasmproxy && !kasmproxyEnabled) {
-        this.log('INFO', 'kasmproxy is disabled in config - skipping');
+      } else if (proxyService && !proxyEnabled) {
+        this.log('INFO', `${proxyName} is disabled in config - skipping`);
       }
 
       // Resolve dependencies and sort remaining services
@@ -100,10 +108,10 @@ export class Supervisor {
         return;
       }
 
-      // Start all other services (kasmproxy already started)
+      // Start all other services (proxy already started)
       for (const service of sorted) {
-        // Skip kasmproxy - already started
-        if (service.name === 'kasmproxy') continue;
+        // Skip proxy services - already started
+        if (service.name === 'kasmproxy' || service.name === 'kasmproxy-wrapper') continue;
 
         // Check if service is explicitly disabled (default is enabled)
         const serviceConfig = this.config.services?.[service.name];

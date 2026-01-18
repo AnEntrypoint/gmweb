@@ -10,7 +10,7 @@ const sleep = promisify(setTimeout);
 
 export default {
   name: 'kasmproxy-wrapper',
-  type: 'web',
+  type: 'critical',
   requiresDesktop: false,
   dependencies: [],
 
