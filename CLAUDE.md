@@ -177,13 +177,46 @@ const processEnv = {
 
 ## Known Technical Issues & Solutions
 
+### Issue: Supervisor Ignores Disabled kasmproxy (FIXED)
+
+**Symptom:** Port 80 doesn't listen, endpoint times out after 2 minutes even though kasmproxy is disabled
+
+**Root Cause:** Supervisor had special startup logic for kasmproxy that didn't check the `enabled` flag in config.json. It attempted to start the disabled service, waited up to 2 minutes for it to become healthy, while kasmproxy-wrapper sat idle in the startup queue.
+
+**Startup path before fix:**
+```
+1. Supervisor checks services.get('kasmproxy')
+2. If service exists, tries to start it (regardless of enabled status)
+3. Waits up to 2 minutes for kasmproxy health check
+4. After timeout, continues with remaining services
+5. kasmproxy-wrapper finally starts (2 minutes late)
+6. Requests timeout before proxy is ready
+```
+
+**Fix applied (commits 3c0cd78, 3eb5910):**
+- Supervisor now checks `config.services[name].enabled` before starting proxy
+- Prioritizes kasmproxy-wrapper (Webtop) over kasmproxy (legacy)
+- Falls back to kasmproxy only if wrapper not available or enabled
+- Both proxy services properly skipped in main startup loop
+
+**Startup path after fix:**
+```
+1. Supervisor checks for kasmproxy-wrapper AND enabled status
+2. If enabled, starts immediately (critical path)
+3. Waits for health check (port 80 listening)
+4. Other services start after proxy is healthy
+5. Endpoint available within 30-60 seconds
+```
+
+**Verification:** Test in environment shows correct startup sequence - kasmproxy-wrapper prioritized, kasmproxy skipped.
+
 ### Issue: kasmproxy Service Not Disabled
 
 **Symptom:** Port 80 doesn't listen, HTTP 502 on all requests
 
 **Cause:** Both kasmproxy and kasmproxy-wrapper try to start, conflict occurs
 
-**Solution:** Ensure config.json has `"kasmproxy": { "enabled": false }`
+**Solution:** Ensure config.json has `"kasmproxy": { "enabled": false }` (already correct)
 
 ### Issue: Wrong Environment Variable Name
 
