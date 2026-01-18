@@ -329,25 +329,12 @@ export class Supervisor {
     env.PATH = `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH}`;
     env.PATH = `${process.env.HOME}/.local/bin:${env.PATH}`;
 
-    // Get VNC_PW from environment
-    // Priority: PASSWORD (Webtop native) > VNC_PW (kasmproxy native) > 'password' (default)
-    // Coolify sets PASSWORD for Webtop, but kasmproxy-wrapper needs the same value as VNC_PW
-
-    if (env.PASSWORD && !env.VNC_PW) {
-      // Coolify/Webtop sets PASSWORD - use it as VNC_PW for kasmproxy-wrapper
-      env.VNC_PW = env.PASSWORD;
-      this.log('INFO', `✓ Using PASSWORD env var (Webtop) as VNC_PW for kasmproxy-wrapper: ${env.VNC_PW.substring(0, 3)}***`);
-    } else if (!env.VNC_PW) {
-      // Neither PASSWORD nor VNC_PW set - use default
-      env.VNC_PW = 'password';
-      this.log('WARN', '⚠⚠ NO PASSWORD or VNC_PW found! Using hardcoded default "password"');
-      this.log('WARN', 'Solution: In Coolify, set environment variable: PASSWORD or VNC_PW');
+    if (!env.PASSWORD) {
+      env.PASSWORD = 'password';
+      this.log('WARN', '⚠ No PASSWORD set, using default');
     } else {
-      this.log('INFO', `✓ VNC_PW configured from environment: ${env.VNC_PW.substring(0, 3)}***`);
+      this.log('INFO', `✓ PASSWORD configured: ${env.PASSWORD.substring(0, 3)}***`);
     }
-
-    this.log('INFO', `✓ Use username: kasm_user`);
-    this.log('INFO', `✓ Use password: ${env.VNC_PW}`);
 
     return env;
   }

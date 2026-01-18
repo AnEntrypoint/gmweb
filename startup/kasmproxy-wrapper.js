@@ -16,19 +16,11 @@
 import http from 'http';
 import net from 'net';
 
-const WEBTOP_UI_PORT = parseInt(process.env.CUSTOM_PORT || '3000', 10);  // LinuxServer webtop web UI port (configurable via CUSTOM_PORT env var)
-const SELKIES_WS_PORT = 8082;  // Selkies WebSocket for desktop streaming
+const WEBTOP_UI_PORT = parseInt(process.env.CUSTOM_PORT || '3000', 10);
+const SELKIES_WS_PORT = 8082;
 const LISTEN_PORT = 80;
-const VNC_PW = process.env.VNC_PW || '';
-const SUBFOLDER = (process.env.SUBFOLDER || '/').replace(/\/+$/, '') || '/';  // Normalized path without trailing slash
-
-// Debug logging
-console.log('[kasmproxy-wrapper] Starting with configuration:');
-console.log('[kasmproxy-wrapper]   WEBTOP_UI_PORT:', WEBTOP_UI_PORT);
-console.log('[kasmproxy-wrapper]   SELKIES_WS_PORT:', SELKIES_WS_PORT);
-console.log('[kasmproxy-wrapper]   LISTEN_PORT:', LISTEN_PORT);
-console.log('[kasmproxy-wrapper]   SUBFOLDER:', SUBFOLDER);
-console.log('[kasmproxy-wrapper]   VNC_PW: ' + (VNC_PW ? VNC_PW.substring(0, 3) + '***' : '(empty)'));
+const PASSWORD = process.env.PASSWORD || '';
+const SUBFOLDER = (process.env.SUBFOLDER || '/').replace(/\/+$/, '') || '/';
 
 /**
  * Strip SUBFOLDER prefix from request path
@@ -97,7 +89,7 @@ function checkAuth(authHeader) {
 
   try {
     const decoded = Buffer.from(credentials, 'base64').toString();
-    const expected = 'kasm_user:' + VNC_PW;
+    const expected = 'kasm_user:' + PASSWORD;
 
     // Log for debugging (mask passwords)
     const decodedMask = decoded.includes(':') ? decoded.split(':')[0] + ':' + '***' : '***';
@@ -120,8 +112,8 @@ function checkAuth(authHeader) {
  * Get basic auth header with VNC credentials
  */
 function getBasicAuth() {
-  if (!VNC_PW) return null;
-  const credentials = 'kasm_user:' + VNC_PW;
+  if (!PASSWORD) return null;
+  const credentials = 'kasm_user:' + PASSWORD;
   const encoded = Buffer.from(credentials).toString('base64');
   return 'Basic ' + encoded;
 }
@@ -142,7 +134,7 @@ const server = http.createServer((req, res) => {
   const bypassAuth = shouldBypassAuth(path);
 
   // Enforce auth for protected routes
-  if (VNC_PW && !bypassAuth) {
+  if (PASSWORD && !bypassAuth) {
     if (!checkAuth(req.headers.authorization)) {
       res.writeHead(401, {
         'WWW-Authenticate': 'Basic realm="kasmproxy"',
@@ -202,7 +194,7 @@ server.on('upgrade', (req, socket, head) => {
   const bypassAuth = shouldBypassAuth(path);
 
   // Enforce auth for protected routes
-  if (VNC_PW && !bypassAuth) {
+  if (PASSWORD && !bypassAuth) {
     if (!checkAuth(req.headers.authorization)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm="kasmproxy"\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nUnauthorized');
       socket.destroy();

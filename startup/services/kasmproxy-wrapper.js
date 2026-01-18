@@ -17,19 +17,11 @@ export default {
   async start(env) {
     const processEnv = {
       ...env,
-      // Ensure VNC_PW is set (supervisor should have extracted it)
-      VNC_PW: env.VNC_PW || 'password',
-      // Webtop configuration
+      PASSWORD: env.PASSWORD || 'password',
       CUSTOM_PORT: env.CUSTOM_PORT || '6901',
       SUBFOLDER: env.SUBFOLDER || '/desk/',
       PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     };
-
-    console.log(`[kasmproxy-wrapper:service] Starting with env:`, {
-      VNC_PW: processEnv.VNC_PW ? processEnv.VNC_PW.substring(0, 3) + '***' : '(empty)',
-      CUSTOM_PORT: processEnv.CUSTOM_PORT,
-      SUBFOLDER: processEnv.SUBFOLDER
-    });
 
     const ps = spawn('node', ['/opt/gmweb-startup/kasmproxy-wrapper.js'], {
       env: processEnv,
