@@ -179,6 +179,36 @@ return 3000;  // Webtop UI
 - `/data/*` and `/ws/*` routes bypass auth (Selkies handles its own authentication)
 - All other routes require HTTP Basic Auth with username: `kasm_user`, password: `VNC_PW`
 
+### kasmproxy-wrapper Service Configuration (Critical)
+**Service name mismatch prevents startup.** The supervisor loads services by name from `config.json`. The service file is `kasmproxy-wrapper.js`, so `config.json` must reference it as `"kasmproxy-wrapper"` (not `"kasmproxy"`).
+
+**Critical config settings:**
+- `enabled: true` - Must be enabled for supervisor to start the service
+- `requiresDesktop: false` - Network proxy, not a GUI application
+- `type: "critical"` - Blocks other services until healthy
+
+**Symptoms of misconfiguration:**
+- `enabled: false` → Nothing listens on port 80 → HTTP 502 errors
+- Service name mismatch (`"kasmproxy"` instead of `"kasmproxy-wrapper"`) → Supervisor can't find service → HTTP 502 errors
+- `requiresDesktop: true` → Waits for desktop init that may delay proxy startup
+
+### SUBFOLDER Path Stripping (Critical)
+When `SUBFOLDER=/desk/` is set, kasmproxy-wrapper must strip the prefix from requests before forwarding to upstream services (Webtop on 3000, Selkies on 8082).
+
+**Critical code path (both HTTP and WebSocket handlers):**
+1. Call `stripSubfolder(req.url)` early to remove `/desk` prefix
+2. Use the stripped `path` variable (not `req.url`) when forwarding to upstream
+3. WebSocket handler: Must call `stripSubfolder()` before auth checks to ensure correct route matching
+
+**Example:**
+- Client requests: `https://domain/desk/data`
+- kasmproxy-wrapper receives: `/desk/data`
+- After stripping: `/data`
+- Forwarded to Selkies on port 8082 as: `/data` (not `/desk/data`)
+
+**Symptom of path forwarding bug:**
+- Requests forwarded with raw `req.url` instead of stripped `path` → Upstream services receive `/desk/data` → Return 404/502
+
 ### Port Architecture (Webtop + Selkies)
 
 **Exposed to host (docker-compose port mappings - via Traefik/Coolify):**
