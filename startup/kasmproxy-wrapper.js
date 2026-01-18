@@ -22,6 +22,14 @@ const LISTEN_PORT = 80;
 const VNC_PW = process.env.VNC_PW || '';
 const SUBFOLDER = (process.env.SUBFOLDER || '/').replace(/\/+$/, '') || '/';  // Normalized path without trailing slash
 
+// Debug logging
+console.log('[kasmproxy-wrapper] Starting with configuration:');
+console.log('[kasmproxy-wrapper]   WEBTOP_UI_PORT:', WEBTOP_UI_PORT);
+console.log('[kasmproxy-wrapper]   SELKIES_WS_PORT:', SELKIES_WS_PORT);
+console.log('[kasmproxy-wrapper]   LISTEN_PORT:', LISTEN_PORT);
+console.log('[kasmproxy-wrapper]   SUBFOLDER:', SUBFOLDER);
+console.log('[kasmproxy-wrapper]   VNC_PW: ' + (VNC_PW ? VNC_PW.substring(0, 3) + '***' : '(empty)'));
+
 /**
  * Strip SUBFOLDER prefix from request path
  * Example: /desk/ui with SUBFOLDER=/desk/ becomes /ui
