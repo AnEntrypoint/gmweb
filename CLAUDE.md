@@ -156,6 +156,9 @@ Applications installed to `/opt/` during docker build are owned by root. Service
 - 6901 → 6901: Webtop HTTP (CUSTOM_PORT, for direct desktop access)
 - 6902 → 6902: Webtop HTTPS (CUSTOM_HTTPS_PORT, for direct desktop access)
 
+**IMPORTANT: Port 80 stays INTERNAL to container - DO NOT expose it in docker-compose**
+Port 80 is where kasmproxy-wrapper listens. Exposing it causes "Bind for 0.0.0.0:80 failed" errors in environments where port 80 is already in use (Coolify, Traefik, etc). The internal routing still works without external exposure.
+
 **Internal service ports (container only, never expose externally):**
 - 80: kasmproxy-wrapper (reverse proxy, routing, auth bypass, SUBFOLDER prefix stripping)
   - Handles `/ui`, `/api`, `/ws` → 9997 (Claude Code UI)
@@ -312,3 +315,52 @@ Supervisor creates separate log files for each service:
 - `tail -f supervisor.log` - Watch supervisor activity
 - `tail -f services/*.log` - Watch all service output
 - `grep ERROR *.log` - Find errors across all logs
+
+## Discovered Gotchas & Migration Fixes
+
+### KasmWeb → LinuxServer Webtop Migration Issues
+
+**Issue 1: Old KasmWeb paths in startup system**
+- **Problem**: Code referenced `/home/kasm-user/logs` which doesn't exist in webtop
+- **Impact**: Supervisor failed to create log directories, startup system crashed
+- **Fix**: Updated `startup/start.sh` to use `$HOME` env var (defaults to `/config`), updated `startup/config.json` logDirectory to `/config/logs`
+- **Files affected**: `startup/start.sh`, `startup/config.json`, `startup/lib/supervisor.js`
+
+**Issue 2: Port 80 binding conflict**
+- **Problem**: docker-compose exposed port 80 to host (`"80:80"`), but port 80 already allocated in deployment environments
+- **Error**: `Bind for 0.0.0.0:80 failed: port is already allocated`
+- **Impact**: Container failed to start on Coolify, any system where Traefik/reverse proxy uses port 80
+- **Fix**: Removed `"80:80"` port mapping from docker-compose.yaml
+- **Critical**: Port 80 stays INTERNAL to container for kasmproxy-wrapper. Do NOT expose it externally
+- **Files affected**: `docker-compose.yaml`
+
+**Issue 3: Incorrect webtop port configuration**
+- **Problem**: Initially tried `PORT=6901` instead of `CUSTOM_PORT=6901`
+- **Solution**: Use `CUSTOM_PORT` and `CUSTOM_HTTPS_PORT` environment variables (correct variable names for LinuxServer webtop)
+- **Files affected**: `docker-compose.yaml`, `startup/kasmproxy-wrapper.js`
+
+### Port Architecture (Finalized)
+
+**Why only expose 6901/6902 to host?**
+- Webtop web UI runs on CUSTOM_PORT (6901)
+- Port 80 runs kasmproxy-wrapper (internal reverse proxy) - DO NOT expose to host
+- All other services (9997, 9998, 9999, 8080) are internal only
+- External access goes through: Host:6901 → Container:6901 (webtop) or Host doesn't access port 80
+
+**SUBFOLDER Support Added**
+- Added `SUBFOLDER=/desk/` environment variable to docker-compose
+- kasmproxy-wrapper now strips prefix: `/desk/ui` → `/ui` before routing
+- Enables running entire webtop under a path prefix if needed
+
+### LinuxServer Webtop Specifics
+
+**Differences from KasmWeb:**
+| Aspect | KasmWeb | LinuxServer Webtop |
+|--------|---------|-------------------|
+| Home dir | `/home/kasm-user` | `/config` |
+| Default user | `kasm-user` | `abc` |
+| Port control | Built-in 3000/3001 | `CUSTOM_PORT` env var (defaults 3000/3001) |
+| Init system | Direct Dockerfile | s6-overlay + custom-cont-init.d |
+| Desktop type | KasmVNC | Selkies (nginx + streaming) |
+
+**Important**: LinuxServer webtop does NOT listen on port 80 by default. We use CUSTOM_PORT=6901 to avoid conflicts.
