@@ -220,7 +220,7 @@ This fix is applied via `sed` in `install.sh` to survive rebuilds.
 For ttyd web terminal to display colors properly, both terminal type AND tmux are required:
 
 ```javascript
-spawn(ttydPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'tmux', 'new-session', '-A', '-s', 'main'], {
+spawn(ttydPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'tmux', 'new-session', '-A', '-s', 'main', 'bash'], {
   env: { ...env, TERM: 'xterm-256color' }
 });
 ```
@@ -332,6 +332,20 @@ exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y @google/gemini-cli "
 - No corruption from parallel installs
 - Always gets working version
 - Wrapper at `/usr/local/local/nvm/versions/node/v23.11.1/bin/gemini` is in PATH
+
+## OpenCode-AI Installation
+
+### Same npx Wrapper Pattern as Gemini
+OpenCode-AI uses the same wrapper pattern to avoid npm global install issues:
+
+```bash
+#!/bin/bash
+exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y opencode-ai "$@"
+```
+
+- Wrapper at `/usr/local/local/nvm/versions/node/v23.11.1/bin/opencode`
+- Service: `startup/services/opencode.js` (type: 'install')
+- Verified working: `opencode --version` returns version
 
 ## Supervisor Logging
 
