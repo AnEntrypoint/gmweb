@@ -214,9 +214,16 @@ const processEnv = {
 
 **Symptom:** Auth fails even with correct password
 
-**Cause:** Code uses VNC_PW instead of PASSWORD (or vice versa)
+**Cause:**
+1. Code uses VNC_PW instead of PASSWORD (or vice versa)
+2. docker-compose.yaml uses VNC_PW instead of PASSWORD
+3. Inconsistent env vars between compose file and code
 
-**Solution:** Use PASSWORD only for Webtop. Supervisor passes PASSWORD to all services.
+**Solution:**
+- Use PASSWORD only for Webtop (matches LinuxServer Webtop standard)
+- Supervisor passes PASSWORD to all services
+- docker-compose.yaml should set: `PASSWORD=${PASSWORD:-password}` (NOT VNC_PW)
+- Coolify environment variable: set PASSWORD, not VNC_PW
 
 ### Issue: SUBFOLDER Path Not Stripped
 
@@ -234,6 +241,24 @@ const processEnv = {
 
 **Solution:** Use `lsof -i :PORT | grep LISTEN` instead of process name matching.
 
+### Issue: Traefik Auth Middleware Intercepting Requests
+
+**Symptom:** Endpoint returns 401 with realm="Login" when credentials sent, but realm="kasmproxy" without credentials
+
+**Cause:** Traefik/Coolify has auth middleware that intercepts requests BEFORE they reach the container. When Authorization header is sent, Traefik validates credentials and rejects before forwarding.
+
+**Evidence:**
+- Without auth: `www-authenticate: Basic realm="kasmproxy"` (our proxy responding)
+- With auth: `www-authenticate: Basic realm="Login"` (Traefik middleware intercepting)
+
+**Solution:**
+- Check Coolify application settings for "Basic Auth" or auth middleware
+- If enabled, disable it to allow container to handle auth
+- OR ensure Traefik passes through Authorization headers to container
+- May require infrastructure-level configuration beyond code changes
+
+**Note:** This is NOT a code issue. kasmproxy-wrapper IS running correctly (proven by realm change). This is a Traefik/Coolify configuration issue.
+
 ## Deployment Prerequisites
 
 **Before Coolify deployment:**
@@ -246,7 +271,13 @@ const processEnv = {
 1. Assign domain in Coolify UI (e.g., `desk.acc.l-inc.co.za`)
 2. Traefik automatically creates routing rules
 3. HTTPS auto-provisioned by Let's Encrypt
+4. Check Traefik auth middleware settings - may need to disable if blocking access
 
 **Access credentials:**
 - Username: `kasm_user`
-- Password: Value of PASSWORD environment variable
+- Password: Value of PASSWORD environment variable (not VNC_PW)
+
+**Troubleshooting Coolify deployments:**
+- Container boot logs show supervisor complete: `[gmweb-startup] ===== GMWEB STARTUP COMPLETE =====`
+- kasmproxy-wrapper running: Test with `curl -k https://domain/desk` → should see `realm="kasmproxy"` in 401 response
+- If credentials rejected before reaching container, check Traefik auth middleware (infrastructure issue, not code)
