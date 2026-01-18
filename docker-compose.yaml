@@ -13,6 +13,8 @@ services:
       context: .
       args:
         BUILD_DATE: ${BUILD_DATE:-unknown}
+    ports:
+      - "8080:80"
     environment:
       - PUID=1000
       - PGID=1000
@@ -27,6 +29,12 @@ services:
       - gmweb-config:/config
     shm_size: "1gb"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 volumes:
   gmweb-config:
