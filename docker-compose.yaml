@@ -12,11 +12,12 @@ services:
       - TZ=${TZ:-Etc/UTC}
       - PASSWORD=${VNC_PW:-password}
       - VNC_PW=${VNC_PW:-password}
+      - PORT=6901
     volumes:
       - gmweb-config:/config
     ports:
-      - "3000:3000"  # Webtop HTTP
-      - "3001:3001"  # Webtop HTTPS
+      - "6901:6901"  # Webtop HTTP
+      - "6902:6902"  # Webtop HTTPS
       - "80:80"      # kasmproxy-wrapper
     shm_size: "1gb"
     restart: unless-stopped

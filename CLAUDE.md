@@ -8,8 +8,8 @@ Uses `lscr.io/linuxserver/webtop:ubuntu-xfce` instead of KasmWeb.
 **Key differences from KasmWeb:**
 - Home directory: `/config` (not `/home/kasm-user`)
 - Default user: `abc` (not `kasm-user`)
-- Web UI port: 3000 (not 6901)
-- HTTPS port: 3001
+- Web UI port: 6901 (set via `PORT=6901` environment variable)
+- HTTPS port: 6902 (automatically PORT+1)
 - Init mechanism: `/custom-cont-init.d/` scripts
 - Environment: `PASSWORD` (also accepts `VNC_PW` for compatibility)
 
@@ -146,8 +146,8 @@ Routes through kasmproxy-wrapper on port 80:
 - `/ws` → port 9997 (Claude Code UI WebSocket) - path kept as-is
 - `/files` → port 9998 (standalone file-manager) - path stripped to `/`, **public (no auth)**
 - `/ssh` → port 9999 (ttyd terminal) - path stripped to `/`
-- `/websockify` → port 3000 (Webtop VNC WebSocket) - direct proxy
-- `/` → port 3000 (Webtop web UI)
+- `/websockify` → port 6901 (Webtop VNC WebSocket) - direct proxy
+- `/` → port 6901 (Webtop web UI)
 
 **WebSocket Upgrade Handling:**
 The kasmproxy-wrapper handles WebSocket upgrades for `/websockify` and `/ssh/ws` by forwarding the 101 Switching Protocols response and establishing bidirectional piping.

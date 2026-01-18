@@ -14,7 +14,7 @@ import http from 'http';
 import net from 'net';
 
 const KASMPROXY_PORT = 8080;
-const WEBTOP_PORT = 3000;  // LinuxServer webtop web UI port
+const WEBTOP_PORT = 6901;  // LinuxServer webtop web UI port (VNC WebSocket)
 const LISTEN_PORT = 80;
 const VNC_PW = process.env.VNC_PW || '';
 
