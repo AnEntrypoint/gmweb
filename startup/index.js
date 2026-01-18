@@ -25,6 +25,7 @@ async function main() {
     const serviceDir = join(__dirname, 'services');
     const serviceNames = [
       'kasmproxy',
+      'kasmproxy-wrapper',
       'proxypilot',
       'gemini-cli',
       'wrangler',
