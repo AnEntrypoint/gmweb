@@ -364,3 +364,45 @@ Supervisor creates separate log files for each service:
 | Desktop type | KasmVNC | Selkies (nginx + streaming) |
 
 **Important**: LinuxServer webtop does NOT listen on port 80 by default. We use CUSTOM_PORT=6901 to avoid conflicts.
+
+## Coolify & Docker Hub Integration
+
+### Automatic Docker Hub Push After Build
+
+To automatically push images to Docker Hub after Coolify builds:
+
+**Prerequisites:**
+- Docker CLI logged in: `docker login` (creates `~/.docker/config.json`)
+- Coolify has access to these credentials
+- Docker Hub account with repository created (e.g., `almagest/gmweb`)
+
+**Setup via coolify-cli:**
+1. List applications: `coolify app list` (get UUID)
+2. Configure Docker Hub push:
+   ```bash
+   coolify app update <uuid> \
+     --docker-image almagest/gmweb \
+     --docker-tag latest
+   ```
+3. Deploy (builds and pushes):
+   ```bash
+   coolify app start <uuid>
+   ```
+
+**Result:**
+After each deployment, Docker Hub will have:
+- `almagest/gmweb:latest` (latest stable)
+- `almagest/gmweb:<git-commit-sha>` (version tracking)
+
+**Verification:**
+```bash
+docker pull almagest/gmweb:latest
+```
+
+### Alternative: UI-Based Setup
+
+1. Open gmweb application in Coolify UI
+2. Go to **Settings → General**
+3. Set **Docker Image** field: `almagest/gmweb`
+4. Set **Docker Image Tag** field: `latest`
+5. Save and deploy
