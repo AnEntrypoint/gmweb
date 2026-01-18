@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
- * KasmProxy Authentication Wrapper
+ * KasmProxy Authentication Wrapper with SUBFOLDER Support
  *
  * Sits on port 80 and forwards to kasmproxy on port 8080
  * Selectively bypasses authentication for /files route while maintaining
  * HTTP Basic Auth for all other routes.
+ *
+ * Supports SUBFOLDER environment variable for running under a prefix path.
+ * Example: SUBFOLDER=/desk/ routes /desk/* to internal services as /*
  *
  * This is necessary because AnEntrypoint/kasmproxy doesn't support
  * per-route auth bypass configuration.
@@ -17,9 +20,32 @@ const KASMPROXY_PORT = 8080;
 const WEBTOP_PORT = 6901;  // LinuxServer webtop web UI port (VNC WebSocket)
 const LISTEN_PORT = 80;
 const VNC_PW = process.env.VNC_PW || '';
+const SUBFOLDER = (process.env.SUBFOLDER || '/').replace(/\/+$/, '') || '/';  // Normalized path without trailing slash
 
 /**
- * Determine which upstream port to use for a given path
+ * Strip SUBFOLDER prefix from request path
+ * Example: /desk/ui with SUBFOLDER=/desk/ becomes /ui
+ */
+function stripSubfolder(fullPath) {
+  if (SUBFOLDER === '/') return fullPath;
+
+  // Remove query string for comparison
+  const pathOnly = fullPath.split('?')[0];
+
+  if (pathOnly === SUBFOLDER.slice(0, -1) || pathOnly === SUBFOLDER) {
+    return '/';
+  }
+
+  if (pathOnly.startsWith(SUBFOLDER)) {
+    return pathOnly.slice(SUBFOLDER.length - 1) + (fullPath.includes('?') ? '?' + fullPath.split('?')[1] : '');
+  }
+
+  // Path doesn't match SUBFOLDER, return as-is
+  return fullPath;
+}
+
+/**
+ * Determine which upstream port to use for a given path (after SUBFOLDER stripping)
  */
 function getUpstreamPort(path) {
   // /websockify routes go directly to KasmVNC (port 6901)
@@ -31,7 +57,7 @@ function getUpstreamPort(path) {
 }
 
 /**
- * Routes that should bypass authentication
+ * Routes that should bypass authentication (after SUBFOLDER stripping)
  */
 function shouldBypassAuth(path) {
   // /files routes are public (file manager UI doesn't require auth)
@@ -75,7 +101,15 @@ function getBasicAuth() {
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
-  const path = req.url.split('?')[0];
+  // Strip SUBFOLDER prefix from request path
+  const path = stripSubfolder(req.url);
+
+  // Reject requests that don't match SUBFOLDER (if SUBFOLDER is set)
+  if (SUBFOLDER !== '/' && !req.url.startsWith(SUBFOLDER) && req.url !== SUBFOLDER.slice(0, -1)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
+    return;
+  }
 
   // Check if this route should bypass auth
   const bypassAuth = shouldBypassAuth(path);

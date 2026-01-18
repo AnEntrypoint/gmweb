@@ -15,6 +15,7 @@ services:
       - CUSTOM_PORT=6901
       - CUSTOM_HTTPS_PORT=6902
       - FILE_MANAGER_PATH=/config/Desktop
+      - SUBFOLDER=/desk/
     volumes:
       - gmweb-config:/config
     ports:
