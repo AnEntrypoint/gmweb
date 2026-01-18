@@ -185,17 +185,20 @@ Applications installed to `/opt/` during docker build are owned by root. Service
 - **Fix:** `custom_startup.sh` runs `chown -R kasm-user:kasm-user /opt/claudecodeui` at boot
 
 ### Kasmproxy Path Routing
-Routes through kasmproxy on port 80:
+Routes through kasmproxy-wrapper on port 80:
 - `/ui` → port 9997 (Claude Code UI) - path stripped to `/`
 - `/api` → port 9997 (Claude Code UI API) - path kept as-is
 - `/ws` → port 9997 (Claude Code UI WebSocket) - path kept as-is
-- `/files` → port 9998 (NHFS file-manager) - path stripped to `/`
+- `/files` → port 9998 (standalone file-manager) - path stripped to `/`, **public (no auth)**
 - `/ssh` → port 9999 (ttyd terminal) - path stripped to `/`
 - `/` → port 6901 (KasmVNC)
 
 **HTML Rewriting:** For `/ui` only, absolute paths like `/assets/`, `/icons/`, and `/favicon` are rewritten to `/ui/assets/`, `/ui/icons/`, etc. so browser requests route correctly through proxy. This does NOT apply to `/files` or `/ssh`.
 
-**Authentication:** Claude Code UI (port 9997) has its own authentication system. Kasmproxy skips basic auth for all routes to port 9997 (`/ui`, `/api`, `/ws`).
+**Authentication:**
+- Claude Code UI (port 9997) has its own authentication system - kasmproxy skips basic auth for `/ui`, `/api`, `/ws`
+- File manager (`/files`) is public - no authentication required (handled by kasmproxy-wrapper)
+- All other routes require HTTP Basic Auth with `VNC_PW`
 
 ### Claude Code UI Basename Fix (Critical)
 When Claude Code UI is accessed via `/ui` prefix, React Router needs a `basename` prop to match routes correctly. Without this fix, login succeeds but the app crashes because routes don't match.
@@ -347,45 +350,42 @@ exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y opencode-ai "$@"
 - Service: `startup/services/opencode.js` (type: 'install')
 - Verified working: `opencode --version` returns version
 
-## NHFS File Manager
+## File Manager (Standalone Server)
 
-### Pre-Built at Docker Build Time (Critical)
-NHFS (Next.js HTTP File Server) must be pre-built during docker build, not at runtime.
+### Lightweight HTTP File Server
+The file manager uses a custom standalone Node.js HTTP server (`standalone-server.mjs`) instead of external packages like NHFS or serve.
 
-**Why:** Next.js bundles environment variables at build time. Setting `NHFS_BASE_DIR` at runtime has no effect - the value is already compiled into the JavaScript bundle.
+**Why standalone:** External packages like NHFS (Next.js) bundle configuration at build time, making runtime configuration impossible. The standalone server reads `BASE_DIR` at startup.
 
-**Location:** `/opt/nhfs` (cloned from `https://github.com/AliSananS/NHFS`)
+**Location:** `/opt/gmweb-startup/standalone-server.mjs` (copied from `startup/standalone-server.mjs`)
 
-**Build steps in install.sh:**
-```bash
-git clone https://github.com/AliSananS/NHFS /opt/nhfs
-cd /opt/nhfs
-npm install
-npm run build
-npm run build:move
-```
+**Features:**
+- Zero external dependencies (pure Node.js)
+- Directory listing with file/folder icons
+- File downloads with proper MIME types
+- Path traversal protection
+- Breadcrumb navigation
+- `/files` prefix support for kasmproxy routing
 
-**Service startup:** The file-manager service runs the pre-built server directly:
+**Service startup:**
 ```javascript
-spawn('node', ['/opt/nhfs/bin.js', '--port', '9998', '--dir', '/home/kasm-user'], {
-  env: { ...env, NODE_ENV: 'production', NHFS_BASE_DIR: '/home/kasm-user' },
-  cwd: '/opt/nhfs'
+spawn('node', ['/opt/gmweb-startup/standalone-server.mjs'], {
+  env: { ...env, BASE_DIR: '/home/kasm-user', PORT: '9998', HOSTNAME: '0.0.0.0' }
 });
 ```
 
-### NHFS bin.js CLI Wrapper
-The NHFS package includes a `bin.js` CLI wrapper that:
-- Parses `--port`, `--dir`, `--hostname` arguments
-- Sets environment variables (`PORT`, `HOSTNAME`)
-- Spawns `dist/server.js` with proper configuration
+### Path Handling for Kasmproxy
+The standalone server handles the `/files` prefix from kasmproxy:
+- Strips `/files` prefix from incoming paths for file resolution
+- Adds `/files` prefix to generated links for correct routing
+- Normalizes multiple slashes (`//`) that result from path stripping
 
-**Do not call `dist/server.js` directly** - use `bin.js` to ensure proper environment setup.
-
-### Ownership at Boot
-NHFS is installed as root during build. Add to `custom_startup.sh`:
-```bash
-sudo chown -R kasm-user:kasm-user /opt/nhfs
+### IPv6 Dual-Stack Binding
+The server binds to `::` (IPv6 any) which enables dual-stack support:
+```javascript
+server.listen(PORT, '::', callback);
 ```
+This ensures the server accepts connections on both IPv4 and IPv6 interfaces.
 
 ## Supervisor Logging
 
