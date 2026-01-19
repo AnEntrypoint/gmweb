@@ -49,8 +49,9 @@ RUN mkdir -p /custom-cont-init.d && \
     echo 'bash /opt/gmweb-startup/custom_startup.sh' >> /custom-cont-init.d/01-gmweb-init && \
     chmod +x /custom-cont-init.d/01-gmweb-init
 
-# Copy our custom startup script
+# Copy our custom startup script and nginx configuration
 COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
+COPY docker/nginx-sites-enabled-default /opt/gmweb-startup/nginx-sites-enabled-default
 RUN chmod +x /opt/gmweb-startup/custom_startup.sh
 
 # Expose ports for web services
