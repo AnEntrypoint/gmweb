@@ -116,6 +116,18 @@ else
 fi
 
 # ============================================================================
+# Clear supervisor logs on fresh boot (prevent persistent volume cache)
+# ============================================================================
+SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
+if [ -f "$SUPERVISOR_LOG" ]; then
+  log "Clearing stale supervisor log from previous boot..."
+  > "$SUPERVISOR_LOG"
+  log "✓ Supervisor log cleared"
+else
+  log "✓ No prior supervisor log found (fresh deployment)"
+fi
+
+# ============================================================================
 # Start supervisor
 # ============================================================================
 log "Starting gmweb supervisor..."

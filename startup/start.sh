@@ -12,7 +12,8 @@ SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
 mkdir -p "$LOG_DIR"
 
 # Diagnostics
-echo "[start.sh] === STARTUP DIAGNOSTICS ==="
+BOOT_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+echo "[start.sh] === STARTUP DIAGNOSTICS (Boot: $BOOT_TIMESTAMP) ==="
 echo "[start.sh] HOME_DIR=$HOME_DIR"
 echo "[start.sh] LOG_DIR=$LOG_DIR"
 echo "[start.sh] NODE_BIN=$NODE_BIN (exists: $([ -f "$NODE_BIN" ] && echo YES || echo NO))"
@@ -38,10 +39,11 @@ echo "[start.sh] Supervisor log: $SUPERVISOR_LOG"
 # Give supervisor time to start and write logs
 sleep 3
 
-# Show supervisor logs
+# Show supervisor logs (tail to see fresh startup)
 if [ -f "$SUPERVISOR_LOG" ]; then
-  echo "[start.sh] === SUPERVISOR LOG (first 30 lines) ==="
-  head -30 "$SUPERVISOR_LOG"
+  TOTAL_LINES=$(wc -l < "$SUPERVISOR_LOG")
+  echo "[start.sh] === SUPERVISOR LOG (last 50 lines of $TOTAL_LINES total) ==="
+  tail -50 "$SUPERVISOR_LOG"
   echo "[start.sh] === END LOG ==="
 else
   echo "[start.sh] WARNING: No supervisor log file found yet"
@@ -51,6 +53,18 @@ fi
 sleep 5
 if kill -0 $SUPERVISOR_PID 2>/dev/null; then
   echo "[start.sh] ✓ Supervisor is RUNNING (PID: $SUPERVISOR_PID)"
+
+  # Give kasmproxy time to start and bind port 8080
+  sleep 3
+
+  # Verify kasmproxy is listening
+  if command -v lsof &> /dev/null; then
+    if lsof -i :8080 2>/dev/null | grep -q LISTEN; then
+      echo "[start.sh] ✓ kasmproxy is LISTENING on port 8080"
+    else
+      echo "[start.sh] ✗ kasmproxy NOT listening on port 8080 (may still be starting)"
+    fi
+  fi
 else
   echo "[start.sh] ✗ Supervisor exited (check logs)"
   [ -f "$SUPERVISOR_LOG" ] && tail -50 "$SUPERVISOR_LOG"
