@@ -14,11 +14,15 @@
 
 **Port 8080:** kasmproxy runs as non-root user "abc" and cannot bind privileged ports (< 1024). Port 8080 is used instead. Traefik/Coolify routes external requests to container:8080. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
 
-### kasmproxy Implementation (via gxe)
+### kasmproxy Implementation (Local HTTP Server)
 
-**Execution:** `npx -y gxe@latest AnEntrypoint/kasmproxy`
+**Execution:** Direct Node.js HTTP server running in gmweb supervisor
 
-kasmproxy is executed via gxe, which fetches and runs the latest code from the AnEntrypoint/kasmproxy GitHub repository. This ensures the proxy always runs the latest version without manual updates.
+kasmproxy is implemented as a native Node.js HTTP server that runs in the supervisor process. This provides:
+- Direct control over proxy behavior without external dependencies
+- Immediate startup without npm/gxe latency
+- Full inline logging and debugging
+- Synchronous startup guarantees
 
 **What it does:**
 - Listens on port 8080 (non-privileged, can bind as abc user)
@@ -26,16 +30,17 @@ kasmproxy is executed via gxe, which fetches and runs the latest code from the A
 - Routes `/data/*` and `/ws/*` to Selkies:8082 (bypasses auth)
 - Routes all other paths to Webtop:3000 (requires auth)
 - Strips SUBFOLDER prefix (`/desk/*` → `/*`)
+- Handles WebSocket upgrades for streaming
+
+**Why Local Implementation:**
+- gxe execution proved unreliable in Docker environments
+- npm/npx adds startup latency and requires network access
+- Local implementation ensures immediate port binding
+- Full control over startup flow and error handling
+- Simplified debugging with inline logging
 
 **Why Port 8080:**
-The supervisor runs as non-root user "abc" (from LinuxServer Webtop). Non-root processes cannot bind privileged ports (< 1024) without special capabilities. Port 8080 allows kasmproxy to start without requiring CAP_NET_BIND_SERVICE. Traefik/Coolify forwards external traffic to this port.
-
-**Why gxe Pattern:**
-All AnEntrypoint projects run via gxe: `npx -y gxe@latest AnEntrypoint/<project>`. This ensures:
-- Always fetch latest code from GitHub at startup
-- No manual image rebuilds needed for project updates
-- Automatic version management via gxe
-- Consistent execution pattern across all AnEntrypoint projects
+The supervisor runs as non-root user "abc" (from LinuxServer Webtop). Non-root processes cannot bind privileged ports (< 1024) without special capabilities. Port 8080 allows kasmproxy to start without requiring CAP_NET_BIND_SERVICE. Traefik/Coolify forwards external requests to container:8080.
 
 ### Environment Variables
 
@@ -94,6 +99,39 @@ const proxy = this.services.get(serviceName);
 ```
 
 ## Critical Fixes Applied
+
+### 5. kasmproxy Auth Bypass Removal (Commit eddfc15)
+
+**Bug:** Debug code in kasmproxy returned `true` for all auth checks, bypassing authentication entirely.
+
+**Root Cause:** `shouldBypassAuth()` function had debug code that always returned true instead of checking paths.
+
+**Fix:** Restored proper path-based bypass logic:
+```javascript
+function shouldBypassAuth(path) {
+  return path.startsWith('/data') || path.startsWith('/ws');
+}
+```
+
+**Result:** Authentication now properly enforced for all routes except /data/* and /ws/*.
+
+### 6. Local kasmproxy Service Implementation (Commit 8f03f41)
+
+**Decision:** Abandoned gxe-based approach in favor of direct local HTTP server implementation.
+
+**Reason:** gxe execution proved unreliable in Docker environments:
+- npm/npx requires network access and package installation
+- Adds startup latency (npm resolution, gxe download)
+- Silent failures when npm cache is unavailable
+- No guarantee of execution in container context
+
+**Implementation:** kasmproxy now runs as native Node.js HTTP server in supervisor:
+- Direct port binding without external tools
+- Immediate startup with synchronous server creation
+- Full inline error handling and logging
+- Promise-based startup ensures server is listening before returning
+
+**Result:** Reliable port 8080 binding guaranteed at supervisor initialization.
 
 ### 4. Persistent Volume Log Caching (Commit 29911a7)
 
