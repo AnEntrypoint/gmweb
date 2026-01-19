@@ -215,3 +215,18 @@ Automatically persisted by gmweb-config volume:
 - Plugin cache and MCP server configuration
 - Settings and preferences (settings.json)
 - Session plans and todos
+
+## Services Removed
+
+### Claude Code UI (Commits 06515b3, eeb0810)
+
+**Decision:** Claude Code UI removed completely - not needed for gmweb purpose.
+
+**Removal:**
+- Deleted `startup/services/claude-code-ui.js`
+- Removed from `startup/index.js` serviceNames array
+- Removed installation from `startup/install.sh`
+- Removed autostart desktop entry from `docker/custom_startup.sh`
+- Removed from `startup/config.json`
+
+**Rationale:** Claude Code UI was causing service bloat. The focus is on Claude Code CLI and kasmproxy as the primary entry point. No database persistence needed.
