@@ -1,4 +1,4 @@
-// File Manager service using NHFS (Next.js HTTP File Server)
+// File Manager service using lightweight standalone HTTP server
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -13,13 +13,14 @@ export default {
   async start(env) {
     const processEnv = {
       ...env,
-      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      NODE_ENV: 'production'
+      BASE_DIR: '/config',
+      PORT: '9998',
+      HOSTNAME: '0.0.0.0'
     };
 
-    // Run NHFS via npx (Next.js HTTP File Server)
-    // https://github.com/AliSananS/NHFS
-    const ps = spawn('npx', ['-y', 'nhfs', '--port', '9998', '--dir', '/config'], {
+    // Run lightweight standalone file server
+    // Pure Node.js, no external dependencies, no build required
+    const ps = spawn('node', ['/opt/gmweb-startup/standalone-server.mjs'], {
       env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
@@ -46,27 +47,11 @@ export default {
     };
   },
 
-  async health() {
+   async health() {
     try {
-      const http = await import('http');
-      return new Promise((resolve) => {
-        const req = http.request({
-          hostname: '127.0.0.1',
-          port: 9998,
-          path: '/',
-          method: 'GET',
-          timeout: 2000
-        }, (res) => {
-          resolve(res.statusCode >= 200 && res.statusCode < 500);
-          res.resume(); // Drain the response
-        });
-        req.on('error', () => resolve(false));
-        req.on('timeout', () => {
-          req.destroy();
-          resolve(false);
-        });
-        req.end();
-      });
+      const { execSync } = await import('child_process');
+      execSync('lsof -i :9998 | grep -q LISTEN', { stdio: 'pipe' });
+      return true;
     } catch (e) {
       return false;
     }
