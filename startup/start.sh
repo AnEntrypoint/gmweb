@@ -54,17 +54,17 @@ sleep 5
 if kill -0 $SUPERVISOR_PID 2>/dev/null; then
   echo "[start.sh] ✓ Supervisor is RUNNING (PID: $SUPERVISOR_PID)"
 
-  # Give kasmproxy time to start and bind port 8080
-  sleep 3
+   # Give kasmproxy time to start and bind port 80
+   sleep 3
 
-  # Verify kasmproxy is listening
-  if command -v lsof &> /dev/null; then
-    if lsof -i :8080 2>/dev/null | grep -q LISTEN; then
-      echo "[start.sh] ✓ kasmproxy is LISTENING on port 8080"
-    else
-      echo "[start.sh] ✗ kasmproxy NOT listening on port 8080 (may still be starting)"
-    fi
-  fi
+   # Verify kasmproxy is listening
+   if command -v lsof &> /dev/null; then
+     if lsof -i :80 2>/dev/null | grep -q LISTEN; then
+       echo "[start.sh] ✓ kasmproxy is LISTENING on port 80"
+     else
+       echo "[start.sh] ✗ kasmproxy NOT listening on port 80 (may still be starting)"
+     fi
+   fi
 else
   echo "[start.sh] ✗ Supervisor exited (check logs)"
   [ -f "$SUPERVISOR_LOG" ] && tail -50 "$SUPERVISOR_LOG"
