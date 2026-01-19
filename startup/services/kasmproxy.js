@@ -29,8 +29,7 @@ export default {
 
     const ps = spawn('npx', ['-y', 'gxe@latest', 'AnEntrypoint/kasmproxy'], {
       env: processEnv,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true
+      stdio: 'inherit'
     });
 
     const pid = ps.pid;
@@ -42,15 +41,6 @@ export default {
     ps.on('exit', (code, signal) => {
       console.log(`[kasmproxy] Process exited with code ${code} (${signal})`);
     });
-
-    ps.stdout?.on('data', (data) => {
-      console.log(`[kasmproxy] ${data.toString().trim()}`);
-    });
-    ps.stderr?.on('data', (data) => {
-      console.log(`[kasmproxy:err] ${data.toString().trim()}`);
-    });
-
-    ps.unref();
 
     return {
       pid,
