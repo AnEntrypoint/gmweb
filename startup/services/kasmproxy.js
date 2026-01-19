@@ -50,7 +50,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    const listenPort = 8080;
+    const listenPort = 80;
     const password = env.PASSWORD || 'password';
     const subfolder = (env.SUBFOLDER || '/').replace(/\/+$/, '') || '/';
 
@@ -201,7 +201,7 @@ export default {
   async health() {
     try {
       const { execSync } = await import('child_process');
-      execSync('lsof -i :8080 | grep -q LISTEN', { stdio: 'pipe' });
+      execSync('lsof -i :80 | grep -q LISTEN', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;

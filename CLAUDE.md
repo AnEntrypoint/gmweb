@@ -8,11 +8,11 @@
 
 **Architecture:**
 - Webtop web UI listens on port 3000 internally (CUSTOM_PORT=6901 is external config only)
-- kasmproxy listens on port 8080 (HTTP Basic Auth reverse proxy, non-privileged port for abc user)
+- kasmproxy listens on port 80 (HTTP Basic Auth reverse proxy, runs as root in supervisor)
 - Selkies WebSocket streaming on port 8082 (handles own authentication)
-- Traefik/Coolify routes external domain to container:8080
+- Traefik/Coolify routes external domain to container:80
 
-**Port 8080:** kasmproxy runs as non-root user "abc" and cannot bind privileged ports (< 1024). Port 8080 is used instead. Traefik/Coolify routes external requests to container:8080. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
+**Port 80:** kasmproxy runs as root (supervisor process) so it can bind privileged ports. Port 80 is the primary entry point. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
 
 ### kasmproxy Implementation (Local HTTP Server)
 
@@ -25,7 +25,7 @@ kasmproxy is implemented as a native Node.js HTTP server that runs in the superv
 - Synchronous startup guarantees
 
 **What it does:**
-- Listens on port 8080 (non-privileged, can bind as abc user)
+- Listens on port 80 (HTTP Basic Auth reverse proxy)
 - Enforces HTTP Basic Auth (`kasm_user:PASSWORD`)
 - Routes `/data/*` and `/ws/*` to Selkies:8082 (bypasses auth)
 - Routes all other paths to Webtop:3000 (requires auth)
@@ -39,8 +39,8 @@ kasmproxy is implemented as a native Node.js HTTP server that runs in the superv
 - Full control over startup flow and error handling
 - Simplified debugging with inline logging
 
-**Why Port 8080:**
-The supervisor runs as non-root user "abc" (from LinuxServer Webtop). Non-root processes cannot bind privileged ports (< 1024) without special capabilities. Port 8080 allows kasmproxy to start without requiring CAP_NET_BIND_SERVICE. Traefik/Coolify forwards external requests to container:8080.
+**Why Port 80:**
+The supervisor runs as root (via LinuxServer Webtop s6 supervision system). Root processes can bind privileged ports (< 1024). Port 80 is the standard HTTP port and serves as the primary entry point for external traffic. Traefik/Coolify forwards requests to container:80.
 
 ### Environment Variables
 
@@ -242,22 +242,23 @@ await new Promise(() => {});  // Never resolves - blocks forever in proper way
 
 **Critical Detail:** The `await new Promise(() => {})` blocks start() forever (correct behavior for immortal supervisor), but doesn't block initialization (monitorHealth runs in background).
 
-### Issue 2: kasmproxy Port 80 Binding Failure (Commit b24e959)
-**Problem:** kasmproxy was configured to listen on port 80 (privileged port):
-- LinuxServer Webtop runs services as non-root user `abc`
-- Non-root processes cannot bind privileged ports (< 1024) without CAP_NET_BIND_SERVICE
-- kasmproxy failed to start silently on port 80
-- Health check failed → HTTP 502 errors
+### Issue 2: kasmproxy Port 80 Binding (Resolved - Current)
+**Current Implementation:** kasmproxy configured to listen on port 80 (privileged port):
+- Supervisor runs as root (s6 supervision system)
+- Root processes can bind privileged ports (< 1024)
+- kasmproxy successfully starts on port 80
+- Health check verifies port 80 binding
 
-**Fix:** Changed kasmproxy to listen on port 8080 (non-privileged):
+**Implementation:**
 ```javascript
-const LISTEN_PORT = parseInt(process.env.LISTEN_PORT || '8080');
+const LISTEN_PORT = parseInt(process.env.LISTEN_PORT || '80');
 ```
-- User `abc` can now successfully bind port 8080
-- Traefik/Coolify routes external traffic to container:8080
+- Root supervisor can successfully bind port 80
+- Traefik/Coolify routes external traffic to container:80
 - All internal services continue working
+- HTTP Basic Auth enforced on all routes except /data/* and /ws/*
 
-**Summary:** Both fixes ensure supervisor initializes correctly and kasmproxy can start on a non-privileged port.
+**Summary:** Supervisor initializes correctly and kasmproxy binds to port 80 as the primary entry point.
 
 ## Persistent Storage & User Settings
 
