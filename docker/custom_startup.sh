@@ -131,8 +131,8 @@ for i in {1..10}; do
   sleep 1
 done
 
-# Launch Chromium
-/usr/bin/chromium http://abc:test123@127.0.0.1/code/ > /dev/null 2>&1 &
+# Launch Chromium with OpenCode credentials (opencode:test123)
+/usr/bin/chromium http://opencode:test123@127.0.0.1/code/ > /dev/null 2>&1 &
 SCRIPT_EOF
     chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
 
