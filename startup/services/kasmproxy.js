@@ -33,6 +33,8 @@ export default {
         PASSWORD: password,
         SUBFOLDER: subfolder,
         LISTEN_PORT: String(listenPort),
+        TARGET_PORT: '6901',
+        VNC_PW: password,
         NODE_OPTIONS: '--no-warnings'
       }
     });
