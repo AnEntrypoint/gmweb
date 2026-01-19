@@ -140,7 +140,13 @@ log "Starting gmweb supervisor..."
 export HOME="$HOME_DIR"
 
 if [ -f /opt/gmweb-startup/start.sh ]; then
+  # Run start.sh and capture exit code
   bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
+  START_EXIT_CODE=$?
+  if [ $START_EXIT_CODE -ne 0 ]; then
+    log "WARNING: start.sh exited with code $START_EXIT_CODE (supervisor may have failed to start)"
+    # Continue anyway - don't exit, Webtop can still provide limited functionality
+  fi
 else
   log "ERROR: start.sh not found at /opt/gmweb-startup/start.sh"
   exit 1
