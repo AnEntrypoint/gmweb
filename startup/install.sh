@@ -32,7 +32,7 @@ sudo apt update
 sudo apt-get install -y --no-install-recommends \
   curl bash git build-essential ca-certificates jq wget \
   software-properties-common apt-transport-https gnupg openssh-server \
-  openssh-client tmux lsof chromium xfce4-terminal xfce4 dbus-x11 \
+  openssh-client tmux lsof chromium chromium-sandbox xfce4-terminal xfce4 dbus-x11 \
   scrot
 
 sudo rm -rf /var/lib/apt/lists/*
@@ -176,6 +176,27 @@ PYEOF
 sudo chmod +x /usr/local/bin/enable_chromium_extension.py
 
 log "✓ Chromium extension enabler script created"
+
+# ============================================================================
+# 10d. CHROMIUM NO-SANDBOX WRAPPER
+# ============================================================================
+
+log "Creating Chromium no-sandbox wrapper..."
+
+# Backup original chromium binary
+sudo mv /usr/bin/chromium /usr/bin/chromium.real
+
+# Create wrapper script that adds --no-sandbox flag
+sudo tee /usr/bin/chromium > /dev/null << 'CHROMIUM_WRAPPER'
+#!/bin/sh
+# Chromium wrapper to add --no-sandbox flag for Docker/container environments
+# This is necessary because unprivileged user namespaces are disabled
+exec /usr/bin/chromium.real --no-sandbox "$@"
+CHROMIUM_WRAPPER
+
+sudo chmod +x /usr/bin/chromium
+
+log "✓ Chromium no-sandbox wrapper created"
 
 # ============================================================================
 # 11. TTYD WEB TERMINAL
