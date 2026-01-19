@@ -31,7 +31,6 @@ async function main() {
     // Dynamic service loader
     const serviceDir = join(__dirname, 'services');
      const serviceNames = [
-       'kasmproxy',
        'proxypilot',
        'gemini-cli',
        'wrangler',

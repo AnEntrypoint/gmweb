@@ -2,66 +2,61 @@
   "healthCheckInterval": 30000,
   "logDirectory": "/config/logs",
   "services": {
-    "kasmproxy": {
-      "enabled": false,
-      "type": "critical",
-      "requiresDesktop": false
-    },
     "proxypilot": {
-      "enabled": false,
+      "enabled": true,
       "type": "critical",
       "requiresDesktop": true
     },
     "gemini-cli": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "wrangler": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "gcloud": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "scrot": {
-      "enabled": false,
+      "enabled": true,
       "type": "system"
     },
     "chromium-ext": {
-      "enabled": false,
+      "enabled": true,
       "type": "system"
     },
     "claude-cli": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "claude-marketplace": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "claude-plugin-gm": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "webssh2": {
-      "enabled": false,
+      "enabled": true,
       "type": "web"
     },
     "file-manager": {
-      "enabled": false,
+      "enabled": true,
       "type": "web"
     },
     "sshd": {
-      "enabled": false,
+      "enabled": true,
       "type": "system"
     },
     "tmux": {
-      "enabled": false,
+      "enabled": true,
       "type": "system"
     },
     "opencode": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "opencode-web": {
