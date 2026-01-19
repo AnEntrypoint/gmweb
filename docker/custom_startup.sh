@@ -111,26 +111,45 @@ X-GNOME-Autostart-enabled=true
 StartupDelay=5
 AUTOSTART_EOF
 
-   # Create Chromium autostart wrapper script
-   mkdir -p "${HOME}/.local/bin"
-   cat > "${HOME}/.local/bin/chromium-autostart.sh" << 'SCRIPT_EOF'
+    # Create Chromium autostart wrapper script
+    mkdir -p "${HOME}/.local/bin"
+    cat > "${HOME}/.local/bin/chromium-autostart.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 # Chromium autostart wrapper - ensures DISPLAY is set and Playwriter auto-engages
 export DISPLAY=:1.0
+
+# Start Chromium with OpenCode page
+# The Playwriter extension should auto-engage when the page loads if it's configured
 /usr/bin/chromium http://abc:test123@127.0.0.1/code/ > /dev/null 2>&1 &
 CHROMIUM_PID=$!
-sleep 8
-# Auto-click Playwriter extension arrow icon to engage it (turn green)
-# Click in WINDOW SPACE (relative to the window, not desktop)
-# The arrow icon is at approximately x=570, y=45 within the Chromium window
+
+# Wait for Chromium to fully load (give it time for Playwriter to initialize)
+sleep 10
+
+# Attempt to engage Playwriter extension via multiple methods:
 WIN=$(xdotool search --pid $CHROMIUM_PID --name "Chromium" | head -1)
+
 if [ ! -z "$WIN" ]; then
+  # Method 1: Try opening the Playwriter extension directly via chrome-extension URL
+  # This opens the extension in a new tab if it exists
   xdotool windowfocus $WIN
   sleep 1
+  xdotool key ctrl+t
+  sleep 2
+  xdotool type "chrome-extension://jfeammnjpkecdekppnclgkkffahnhfhe/popup.html"
+  xdotool key Return
+  sleep 2
+  
+  # Method 2: Switch back to first tab (the OpenCode page)
+  xdotool key ctrl+1
+  sleep 1
+  
+  # Method 3: Attempt click on Playwriter extension icon as fallback
+  # The extension arrow icon should be in the toolbar
   xdotool mousemove --window $WIN 570 45 click 1 2>/dev/null || true
 fi
 SCRIPT_EOF
-   chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
+    chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
 
    # Autostart Chromium with Playwriter Extension Debugger
    cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
