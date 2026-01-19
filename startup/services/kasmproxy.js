@@ -29,7 +29,7 @@ export default {
 
     const ps = spawn('npx', ['-y', 'gxe@latest', 'AnEntrypoint/kasmproxy'], {
       env: processEnv,
-      stdio: 'inherit'
+      stdio: ['ignore', 'inherit', 'inherit']
     });
 
     const pid = ps.pid;
