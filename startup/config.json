@@ -3,12 +3,12 @@
   "logDirectory": "/config/logs",
   "services": {
     "kasmproxy": {
-      "enabled": false,
+      "enabled": true,
       "type": "critical",
       "requiresDesktop": false
     },
     "kasmproxy-wrapper": {
-      "enabled": true,
+      "enabled": false,
       "type": "critical",
       "requiresDesktop": false
     },

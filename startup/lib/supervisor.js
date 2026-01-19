@@ -70,13 +70,13 @@ export class Supervisor {
       this.env = await this.getEnvironment();
 
       // CRITICAL: Start proxy FIRST and wait for it to be healthy
-      // Check for kasmproxy-wrapper (Webtop architecture) or kasmproxy (legacy)
-      let proxyService = this.services.get('kasmproxy-wrapper');
-      let proxyName = 'kasmproxy-wrapper';
+      // Check for kasmproxy (Webtop architecture) or kasmproxy-wrapper (legacy)
+      let proxyService = this.services.get('kasmproxy');
+      let proxyName = 'kasmproxy';
 
       if (!proxyService) {
-        proxyService = this.services.get('kasmproxy');
-        proxyName = 'kasmproxy';
+        proxyService = this.services.get('kasmproxy-wrapper');
+        proxyName = 'kasmproxy-wrapper';
       }
 
       const proxyConfig = this.config.services?.[proxyName];
