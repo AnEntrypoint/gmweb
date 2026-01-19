@@ -202,30 +202,8 @@ log "Permissions are set at boot time by custom_startup.sh"
 # 14. NHFS PRE-BUILDING
 # ============================================================================
 
-log "Pre-building NHFS HTTP file server..."
-
-if [ -d /opt/nhfs ]; then
-  log "NHFS already exists, skipping clone"
-else
-  git clone https://github.com/AliSananS/NHFS /opt/nhfs
-  cd /opt/nhfs
-  npm install
-
-  log "Building NHFS with production configuration..."
-  npm run build
-  npm run build:move
-  log "✓ NHFS built successfully"
-
-  # Verify build output exists
-  if [ -f /opt/nhfs/dist/server.js ]; then
-    log "✓ NHFS dist/server.js verified"
-  else
-    log "WARNING: NHFS dist/server.js not found - build may have failed"
-  fi
-
-  cd -
-  log "✓ NHFS pre-built and ready to run"
-fi
+log "NHFS will be run via npx at startup (no pre-build needed)"
+log "✓ NHFS HTTP file server ready to launch"
 
 # ============================================================================
 # COMPLETION

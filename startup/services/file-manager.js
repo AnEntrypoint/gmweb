@@ -14,15 +14,13 @@ export default {
     const processEnv = {
       ...env,
       PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      NODE_ENV: 'production',
-      NHFS_BASE_DIR: '/config'
+      NODE_ENV: 'production'
     };
 
-    // Run pre-built NHFS using the bin.js CLI
-    // bin.js spawns dist/server.js with PORT and HOSTNAME set
-    const ps = spawn('node', ['/opt/nhfs/bin.js', '--port', '9998', '--dir', '/config'], {
+    // Run NHFS via npx (Next.js HTTP File Server)
+    // https://github.com/AliSananS/NHFS
+    const ps = spawn('npx', ['-y', 'nhfs', '--port', '9998', '--dir', '/config'], {
       env: processEnv,
-      cwd: '/opt/nhfs',
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
