@@ -190,11 +190,12 @@ fi
 log "Starting gmweb supervisor as abc user..."
 
 if [ -f /opt/gmweb-startup/start.sh ]; then
-  # Run start.sh as abc user with proper HOME
+  # Run start.sh as abc user with proper HOME and environment
   # sudo -u abc: run as abc user
   # -H: set HOME to /config (from /etc/passwd)
+  # -E: preserve environment variables (PASSWORD, etc)
   # bash /opt/gmweb-startup/start.sh: run the startup script
-  sudo -u abc -H bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
+  sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
   START_EXIT_CODE=$?
   if [ $START_EXIT_CODE -ne 0 ]; then
     log "WARNING: start.sh exited with code $START_EXIT_CODE (supervisor may have failed to start)"
