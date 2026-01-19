@@ -118,7 +118,7 @@ Type=Application
 Name=Chromium
 Comment=Open Chromium with Playwriter Extension Debugger
 Icon=chromium
-Exec=bash -c 'sleep 3 && DISPLAY=:1.0 chromium --app="chrome-extension://jfeammnjpkecdekppnclgkkffahnhfhe/index.html" --window-size=800,600 http://localhost/ &'
+Exec=bash -c 'sleep 3 && DISPLAY=:1.0 chromium http://127.0.0.1/code/ &'
 Categories=Network;WebBrowser;
 X-GNOME-Autostart-enabled=true
 Terminal=false
