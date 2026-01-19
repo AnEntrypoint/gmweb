@@ -26,15 +26,18 @@ export default {
       };
     }
 
-    console.log('[opencode-web] Starting OpenCode web on port 9997');
+    const password = env.PASSWORD || 'default';
+    console.log(`[opencode-web] Starting OpenCode web on port 9997`);
+    console.log(`[opencode-web] Using OPENCODE_SERVER_PASSWORD: ${password.substring(0, 3)}***`);
 
     // Start opencode web service with password from PASSWORD env var
+    // OpenCode expects HTTP Basic Auth with the password set via OPENCODE_SERVER_PASSWORD
     const ps = spawn(opencodeBinary, ['web', '--port', '9997', '--hostname', '127.0.0.1', '--print-logs'], {
       env: { 
         ...env,
-        OPENCODE_SERVER_PASSWORD: env.PASSWORD || 'default'
+        OPENCODE_SERVER_PASSWORD: password
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       detached: true
     });
 
