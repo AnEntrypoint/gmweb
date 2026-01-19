@@ -116,9 +116,9 @@ AUTOSTART_EOF
 [Desktop Entry]
 Type=Application
 Name=Chromium
-Comment=Open Chromium with Playwriter Extension Debugger
+Comment=Open Chromium with Playwriter
 Icon=chromium
-Exec=bash -c 'sleep 3 && DISPLAY=:1.0 chromium http://abc:test123@127.0.0.1/code/ & ~/.local/bin/auto-click-playwriter.sh &'
+Exec=/usr/bin/chromium http://abc:test123@127.0.0.1/code/
 Categories=Network;WebBrowser;
 X-GNOME-Autostart-enabled=true
 Terminal=false
