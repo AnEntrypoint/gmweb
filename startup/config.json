@@ -63,6 +63,10 @@
     "opencode": {
       "enabled": false,
       "type": "install"
+    },
+    "opencode-web": {
+      "enabled": true,
+      "type": "web"
     }
   }
 }
