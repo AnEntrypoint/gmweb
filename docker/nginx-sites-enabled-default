@@ -19,6 +19,10 @@ server {
     return 301 /files/;
   }
 
+  location = /code {
+    return 301 /code/;
+  }
+
   location /desk/ {
     alias /usr/share/selkies/web/;
     index index.html index.htm;
@@ -104,32 +108,48 @@ server {
     proxy_buffering off;
   }
 
-  location /ssh/ {
-    proxy_pass http://127.0.0.1:9999/;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_http_version 1.1;
-    proxy_read_timeout 3600s;
-    proxy_send_timeout 3600s;
-    proxy_buffering off;
-  }
+   location /ssh/ {
+     proxy_pass http://127.0.0.1:9999/;
+     proxy_set_header Upgrade $http_upgrade;
+     proxy_set_header Connection "upgrade";
+     proxy_set_header Host $host;
+     proxy_set_header X-Real-IP $remote_addr;
+     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+     proxy_set_header X-Forwarded-Proto $scheme;
+     proxy_http_version 1.1;
+     proxy_read_timeout 3600s;
+     proxy_send_timeout 3600s;
+     proxy_buffering off;
+   }
 
-  location /files/ {
-    proxy_pass http://127.0.0.1:9998/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
+   location /files/ {
+     proxy_pass http://127.0.0.1:9998/;
+     proxy_set_header Host $host;
+     proxy_set_header X-Real-IP $remote_addr;
+     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+     proxy_set_header X-Forwarded-Proto $scheme;
+   }
 
-  error_page 500 502 503 504 /50x.html;
-  location = /desk/50x.html {
-    root /usr/share/selkies/web/;
-  }
+   location /code/ {
+     proxy_pass http://127.0.0.1:9997/;
+     proxy_set_header Upgrade $http_upgrade;
+     proxy_set_header Connection "upgrade";
+     proxy_set_header Host $host;
+     proxy_set_header X-Real-IP $remote_addr;
+     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+     proxy_set_header X-Forwarded-Proto $scheme;
+     proxy_http_version 1.1;
+     proxy_read_timeout 3600s;
+     proxy_send_timeout 3600s;
+     proxy_connect_timeout 3600s;
+     proxy_buffering off;
+     client_max_body_size 10M;
+   }
+
+   error_page 500 502 503 504 /50x.html;
+   location = /desk/50x.html {
+     root /usr/share/selkies/web/;
+   }
 }
 
 server {

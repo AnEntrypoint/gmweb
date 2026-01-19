@@ -162,12 +162,16 @@ sudo tee /usr/local/bin/enable_chromium_extension.py > /dev/null << 'PYEOF'
 #!/usr/bin/env python3
 import json, os, sys
 prefs_file = os.path.expanduser("~/.config/chromium/Default/Preferences")
-if os.path.exists(prefs_file):
-    try:
+os.makedirs(os.path.dirname(prefs_file), exist_ok=True)
+try:
+    if os.path.exists(prefs_file):
         with open(prefs_file) as f: prefs = json.load(f)
-        prefs.setdefault("extensions", {}).setdefault("settings", {}).setdefault("jfeammnjpkecdekppnclgkkffahnhfhe", {})["active_bit"] = True
-        with open(prefs_file, "w") as f: json.dump(prefs, f)
-    except: pass
+    else:
+        prefs = {}
+    prefs.setdefault("extensions", {}).setdefault("settings", {}).setdefault("jfeammnjpkecdekppnclgkkffahnhfhe", {})["active_bit"] = True
+    with open(prefs_file, "w") as f: json.dump(prefs, f)
+except Exception as e: 
+    print(f"Error: {e}", file=sys.stderr)
 PYEOF
 sudo chmod +x /usr/local/bin/enable_chromium_extension.py
 
