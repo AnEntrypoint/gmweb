@@ -27,6 +27,14 @@ export default {
 
     const pid = ps.pid;
 
+    ps.on('error', (err) => {
+      console.error(`[kasmproxy] Failed to spawn: ${err.message}`);
+    });
+
+    ps.on('exit', (code, signal) => {
+      console.log(`[kasmproxy] Process exited with code ${code} (${signal})`);
+    });
+
     ps.stdout?.on('data', (data) => {
       console.log(`[kasmproxy] ${data.toString().trim()}`);
     });
