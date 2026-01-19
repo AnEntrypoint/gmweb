@@ -80,18 +80,29 @@ const server = http.createServer((req, res) => {
     port: upstreamPort,
     path: path,
     method: req.method,
-    headers
+    headers,
+    timeout: 5000
   };
 
+  console.log(`[kasmproxy] Forwarding ${req.method} ${req.url} -> localhost:${upstreamPort}${path}`);
+
   const proxyReq = http.request(options, (proxyRes) => {
+    console.log(`[kasmproxy] Upstream responded: ${proxyRes.statusCode}`);
     res.writeHead(proxyRes.statusCode, proxyRes.headers);
     proxyRes.pipe(res);
   });
 
   proxyReq.on('error', (err) => {
-    console.error('[kasmproxy] Error forwarding request:', err.message);
+    console.error('[kasmproxy] Upstream connection failed - localhost:' + upstreamPort + ' error:', err.code, err.message);
     res.writeHead(502, { 'Content-Type': 'text/plain' });
-    res.end('Bad Gateway');
+    res.end('Bad Gateway - Cannot reach upstream service on localhost:' + upstreamPort);
+  });
+
+  proxyReq.on('timeout', () => {
+    console.error('[kasmproxy] Upstream request timeout - localhost:' + upstreamPort);
+    proxyReq.destroy();
+    res.writeHead(504, { 'Content-Type': 'text/plain' });
+    res.end('Gateway Timeout');
   });
 
   req.pipe(proxyReq);
