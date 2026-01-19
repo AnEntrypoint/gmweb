@@ -2,48 +2,61 @@
 # gmweb Startup Script - Launches supervisor
 # Called from custom_startup.sh on EVERY boot
 
+set -o pipefail
 HOME_DIR="${HOME:-/config}"
 LOG_DIR="$HOME_DIR/logs"
 NODE_BIN="/usr/local/local/nvm/versions/node/v23.11.1/bin/node"
+SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
 
-# Write startup diagnostics to console (will appear in docker logs)
+# Diagnostics
+echo "[start.sh] === STARTUP DIAGNOSTICS ==="
 echo "[start.sh] HOME_DIR=$HOME_DIR"
 echo "[start.sh] LOG_DIR=$LOG_DIR"
-echo "[start.sh] NODE_BIN=$NODE_BIN"
-echo "[start.sh] NODE_BIN exists: $([ -f "$NODE_BIN" ] && echo YES || echo NO)"
-echo "[start.sh] supervisor index.js exists: $([ -f /opt/gmweb-startup/index.js ] && echo YES || echo NO)"
-echo "[start.sh] kasmproxy.js exists: $([ -f /opt/gmweb-startup/kasmproxy.js ] && echo YES || echo NO)"
-echo "[start.sh] config.json exists: $([ -f /opt/gmweb-startup/config.json ] && echo YES || echo NO)"
-echo "[start.sh] ls /opt/gmweb-startup:"
-ls -la /opt/gmweb-startup/ | grep -E "\.js|\.json" | head -10
-echo "[start.sh] Starting supervisor in background..."
+echo "[start.sh] NODE_BIN=$NODE_BIN (exists: $([ -f "$NODE_BIN" ] && echo YES || echo NO))"
+echo "[start.sh] supervisor index.js (exists: $([ -f /opt/gmweb-startup/index.js ] && echo YES || echo NO))"
+echo "[start.sh] kasmproxy.js (exists: $([ -f /opt/gmweb-startup/kasmproxy.js ] && echo YES || echo NO))"
+echo "[start.sh] config.json (exists: $([ -f /opt/gmweb-startup/config.json ] && echo YES || echo NO))"
+echo "[start.sh] === STARTING SUPERVISOR ==="
 
-# Background supervisor and capture PID
-"$NODE_BIN" /opt/gmweb-startup/index.js >> "$LOG_DIR/supervisor.log" 2>&1 &
+# Start supervisor in background with unbuffered output
+export NODE_OPTIONS="--no-warnings"
+
+# Try to use stdbuf if available, otherwise run directly
+if command -v stdbuf &> /dev/null; then
+  stdbuf -oL -eL "$NODE_BIN" /opt/gmweb-startup/index.js >> "$SUPERVISOR_LOG" 2>&1 &
+else
+  "$NODE_BIN" /opt/gmweb-startup/index.js >> "$SUPERVISOR_LOG" 2>&1 &
+fi
 SUPERVISOR_PID=$!
 
-echo "[start.sh] Supervisor spawned as PID: $SUPERVISOR_PID"
-echo "[start.sh] Logs: $LOG_DIR/supervisor.log"
-echo "[start.sh] Tailing logs for 5 seconds..."
+echo "[start.sh] Supervisor PID: $SUPERVISOR_PID"
+echo "[start.sh] Supervisor log: $SUPERVISOR_LOG"
 
-# Show first few lines of supervisor log
-sleep 2
-tail -20 "$LOG_DIR/supervisor.log" 2>/dev/null || echo "[start.sh] No supervisor log yet"
+# Give supervisor time to start and write logs
+sleep 3
 
-# Wait for supervisor to establish (don't block forever though)
-echo "[start.sh] Waiting for supervisor..."
-sleep 10
-echo "[start.sh] Checking supervisor status..."
-
-if kill -0 $SUPERVISOR_PID 2>/dev/null; then
-  echo "[start.sh] Supervisor is running (PID: $SUPERVISOR_PID)"
+# Show supervisor logs
+if [ -f "$SUPERVISOR_LOG" ]; then
+  echo "[start.sh] === SUPERVISOR LOG (first 30 lines) ==="
+  head -30 "$SUPERVISOR_LOG"
+  echo "[start.sh] === END LOG ==="
 else
-  echo "[start.sh] Supervisor exited unexpectedly - check logs"
-  tail -50 "$LOG_DIR/supervisor.log" 2>/dev/null || echo "[start.sh] No supervisor log"
+  echo "[start.sh] WARNING: No supervisor log file found yet"
 fi
 
-# Keep this script running so supervisor stays as child of this process
-wait
+# Check if supervisor is running
+sleep 5
+if kill -0 $SUPERVISOR_PID 2>/dev/null; then
+  echo "[start.sh] ✓ Supervisor is RUNNING (PID: $SUPERVISOR_PID)"
+else
+  echo "[start.sh] ✗ Supervisor exited (check logs)"
+  [ -f "$SUPERVISOR_LOG" ] && tail -50 "$SUPERVISOR_LOG"
+fi
+
+# Keep this script running (supervisor runs forever, but we want to survive if it somehow exits)
+while true; do
+  sleep 60
+done

@@ -3,7 +3,7 @@
   "logDirectory": "/config/logs",
   "services": {
     "kasmproxy": {
-      "enabled": false,
+      "enabled": true,
       "type": "critical",
       "requiresDesktop": false
     },
