@@ -19,7 +19,7 @@ export default {
       PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     };
 
-    const ps = spawn('node', ['/opt/gmweb-startup/kasmproxy.js'], {
+    const ps = spawn('npx', ['-y', 'gxe@latest', 'AnEntrypoint/kasmproxy'], {
       env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
