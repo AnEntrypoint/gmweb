@@ -127,3 +127,31 @@ Dockerfile clones gmweb repo from GitHub to `/opt/gmweb-startup` during build. S
 - HTTPS auto-provisioned by Let's Encrypt
 - No additional port configuration needed in compose file
 - Domain assignment in Coolify UI is required for external access
+
+### Supervisor Startup Blocker (Critical - Requires Investigation)
+
+**Current Issue:** Supervisor process launches via `nohup ... >> /config/logs/supervisor.log 2>&1 &` in start.sh but never produces any output in supervisor.log or docker logs.
+
+**Symptoms:**
+- Container shows "STARTUP COMPLETE" in custom_startup.sh
+- No [supervisor] or [kasmproxy] logs appear after startup completes
+- Endpoint returns HTTP 502
+- Supervisor output not captured in any log file (supervisor.log remains empty or absent)
+
+**Root Cause:** Unknown. Supervisor process either:
+1. Crashes immediately before logging anything
+2. Output file permissions prevent writing to /config/logs/supervisor.log
+3. Process never actually starts (nohup background job fails silently)
+
+**Evidence:**
+- Selkies (WebSocket) starts successfully on port 8082 (logs visible)
+- start.sh runs (startup completes marker present)
+- But supervisor process produces zero log output
+- supervisorlog file never appears in /config/logs/
+
+**Next Steps for Investigation:**
+1. Add logging to start.sh to verify nohup command actually succeeds
+2. Check if /config/logs directory has write permissions at runtime
+3. Add timeout monitoring to detect if supervisor crashes immediately
+4. Consider using exec instead of nohup to keep process attached to init system
+5. Add health check to supervisor startup that validates it's actually running
