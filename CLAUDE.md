@@ -2,175 +2,116 @@
 
 ## Core Architecture
 
-### LinuxServer Webtop + kasmproxy + Selkies
+### LinuxServer Webtop + nginx + Selkies
 
 **Base Image:** `lscr.io/linuxserver/webtop:ubuntu-xfce`
 
 **Architecture:**
 - Webtop web UI listens on port 3000 internally (CUSTOM_PORT=6901 is external config only)
-- kasmproxy listens on port 80 (HTTP Basic Auth reverse proxy, runs as root in supervisor)
+- nginx listens on ports 80/443 (HTTP/HTTPS with HTTP Basic Auth reverse proxy, pre-installed in LinuxServer)
 - Selkies WebSocket streaming on port 8082 (handles own authentication)
+- OpenCode web editor on port 9997 (configured via supervisor service)
 - Traefik/Coolify routes external domain to container:80
 
-**Port 80:** kasmproxy runs as root (supervisor process) so it can bind privileged ports. Port 80 is the primary entry point. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
+**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth. Port 80 is routed to Webtop:3000 for the main interface and to Selkies:8082 for desktop streaming. All other web services are routed based on path prefixes.
 
-### kasmproxy Implementation (gxe/npx)
+### nginx Implementation
 
-**Execution:** Launched via `npx -y gxe@latest AnEntrypoint/kasmproxy` in gmweb supervisor
+**Configuration:** Static nginx.conf template copied during Docker build
 
-kasmproxy runs as a separate process spawned by gxe, which fetches and executes the latest version directly from GitHub. This provides:
-- Always uses latest kasmproxy from GitHub repository
-- Automatic updates without redeployment
-- Decoupled from gmweb version management
-- Full control over proxy behavior
-- Proper process lifecycle management
+nginx comes pre-installed with LinuxServer Webtop and is configured via `/etc/nginx/sites-enabled/default`. The configuration:
+- Listens on ports 80 (HTTP) and 443 (HTTPS)
+- Enforces HTTP Basic Auth globally on all routes
+- Routes `/desk/` to Selkies web UI (`/usr/share/selkies/web/`)
+- Routes `/desk/websocket` to Selkies WebSocket (`127.0.0.1:8082`)
+- Routes `/desk/files` to file browser with fancy indexing
+- Routes `/devmode` to development server (port 5173)
+- Routes `/ui/` and `/api/` to OpenCode web interface (port 9997)
+- Routes `/ws/` to WebSocket proxy for real-time services
 
-**What it does:**
-- Listens on port 80 (HTTP Basic Auth reverse proxy)
-- Enforces HTTP Basic Auth (`kasm_user:PASSWORD`)
-- Routes `/data/*` and `/ws/*` to Selkies:8082 (bypasses auth)
-- Routes all other paths to Webtop:3000 (requires auth)
-- Strips SUBFOLDER prefix (`/desk/*` → `/*`)
-- Handles WebSocket upgrades for streaming
-
-**Why gxe/npx Execution:**
-- Runs latest version from GitHub without needing local repos
-- Supports hot updates without container rebuild
-- Consistent with other AnEntrypoint CLI tools
-- gxe handles installation and execution automatically
-- No npm cache issues or version conflicts
-
-**Why Port 80:**
-The supervisor runs as root (via LinuxServer Webtop s6 supervision system). Root processes can bind privileged ports (< 1024). Port 80 is the standard HTTP port and serves as the primary entry point for external traffic. Traefik/Coolify forwards requests to container:80.
-
-## AnEntrypoint Tools Standard Pattern
-
-### All npx-style AnEntrypoint tools must use gxe
-
-**Standard execution pattern:**
-```bash
-npx -y gxe@latest AnEntrypoint/<tool-name>
-```
-
-**Examples:**
-- `npx -y gxe@latest AnEntrypoint/kasmproxy` - HTTP/WS proxy
-- `npx -y gxe@latest AnEntrypoint/<other-tool>` - Any other AnEntrypoint tool
-
-**Why this pattern:**
-- Always runs latest version from GitHub, even if tool is updated between deployments
-- No local cloning or repository management needed
-- gxe handles npm installation and caching automatically
-- Supports seamless feature/security updates
-- Decoupled from gmweb versioning
-
-**In supervisor services:**
-```javascript
-// Launch tool via gxe
-const process = spawn('npx', [
-  '-y',
-  'gxe@latest',
-  'AnEntrypoint/<tool-name>'
-], {
-  stdio: ['ignore', 'inherit', 'inherit'],
-  env: {
-    ...process.env,
-    // Pass required environment variables
-  }
-});
-```
+**Why Static nginx Config:**
+- nginx is pre-installed and stable in LinuxServer base image
+- No additional process management or external dependencies needed
+- Standard, well-understood web server configuration
+- Automatic handling of HTTP/1.1 upgrades and WebSocket proxying
+- Supports HTTPS with Let's Encrypt via Traefik
 
 ### Environment Variables
 
 **PASSWORD (CRITICAL):**
 - LinuxServer Webtop uses PASSWORD (not VNC_PW)
-- Supervisor reads PASSWORD from container environment
-- All services receive PASSWORD via explicit env object
-- Must NOT use template string injection
+- Used to generate HTTP Basic Auth credentials (`abc:PASSWORD`)
+- nginx htpasswd file generated at startup via `custom_startup.sh`
+- All services receive PASSWORD via environment
 
 **CUSTOM_PORT:**
-- External configuration only (6901 for Webtop UI)
+- External configuration only (6901 for direct VNC access if needed)
 - Internal Webtop always listens on port 3000
-- kasmproxy hardcodes upstream port (3000 or 8082) based on request path
-- Setting CUSTOM_PORT does NOT change internal port routing
+- nginx routes all traffic based on paths, not ports
+- Setting CUSTOM_PORT does NOT change internal routing
 
 ## Startup System
 
 ### Supervisor Configuration (config.json)
 
-Only kasmproxy service is configured:
+All services are configured with their enabled status and type:
 ```json
 {
   "services": {
-    "kasmproxy": {
+    "proxypilot": {
       "enabled": true,
       "type": "critical",
-      "requiresDesktop": false
-    }
+      "requiresDesktop": true
+    },
+    "opencode-web": {
+      "enabled": true,
+      "type": "web"
+    },
+    // ... other services
   }
 }
 ```
 
-**CRITICAL:** kasmproxy must be `enabled: true` and `type: "critical"` to prioritize startup.
+**Critical services** (`type: "critical"`) must start successfully or supervisor attempts recovery. **Web services** (`type: "web"`) are optional - failures don't block other services.
 
-### kasmproxy Prioritization
+### Service Startup Order
 
-- Starts FIRST (critical path) - external entry point on port 80
-- Supervisor blocks other services until kasmproxy is healthy
-- Health check: `lsof -i :80 | grep LISTEN`
-- Timeout: 2 minutes max
+1. **nginx** - Started automatically by LinuxServer s6 supervision system (pre-installed)
+2. **Desktop services** (xorg, xfce, selkies) - Started by LinuxServer s6 supervision system
+3. **gmweb supervisor** - Started via `/custom-cont-init.d/01-gmweb-init` by LinuxServer init
+4. **Additional services** - Started by gmweb supervisor in topologically sorted order
 
-### Supervisor Health Check Bug (FIXED - 30677ec)
+nginx handles HTTP/HTTPS with Basic Auth before any other services run. This ensures all endpoints are protected.
 
-**Original Bug:** `waitForKasmproxyHealthy()` was checking hardcoded `kasmproxy` service instead of actual proxy service name.
+### nginx Startup
 
-**Impact:** 2-minute startup delay while waiting for wrong service.
-
-**Fix:** Pass actual service name to health check function.
-
-```javascript
-// Before (WRONG)
-const kasmproxy = this.services.get('kasmproxy');
-
-// After (CORRECT)
-const proxy = this.services.get(serviceName);
-```
+- nginx is pre-installed in LinuxServer base image
+- Listens on ports 80/443 immediately on container start
+- Configuration file copied at `/opt/gmweb-startup/nginx-sites-enabled-default` 
+- HTTP Basic Auth credentials generated at startup via custom_startup.sh
+- No dependencies on supervisor - runs immediately
 
 ## Critical Fixes Applied
 
-### 5. kasmproxy Auth Bypass Removal (Commit eddfc15)
+### 5. kasmproxy Removal - Migrated to nginx (Commits b0938ba - current)
 
-**Bug:** Debug code in kasmproxy returned `true` for all auth checks, bypassing authentication entirely.
+**Decision:** Removed kasmproxy service completely in favor of LinuxServer's pre-installed nginx.
 
-**Root Cause:** `shouldBypassAuth()` function had debug code that always returned true instead of checking paths.
+**Reason:** 
+- kasmproxy required complex gxe/npx execution with unreliable npm caching
+- nginx is already installed and proven stable in LinuxServer base image
+- nginx configuration is simpler and more standard
+- Eliminates dependency on external npm packages
 
-**Fix:** Restored proper path-based bypass logic:
-```javascript
-function shouldBypassAuth(path) {
-  return path.startsWith('/data') || path.startsWith('/ws');
-}
-```
+**Implementation:** 
+- nginx listens on ports 80/443 with HTTP Basic Auth
+- Static configuration template at `docker/nginx-sites-enabled-default`
+- Config copied to container during Docker build
+- Authentication setup via htpasswd in custom_startup.sh
 
-**Result:** Authentication now properly enforced for all routes except /data/* and /ws/*.
+**Result:** More reliable, simpler architecture with fewer external dependencies.
 
-### 6. Local kasmproxy Service Implementation (Commit 8f03f41)
-
-**Decision:** Abandoned gxe-based approach in favor of direct local HTTP server implementation.
-
-**Reason:** gxe execution proved unreliable in Docker environments:
-- npm/npx requires network access and package installation
-- Adds startup latency (npm resolution, gxe download)
-- Silent failures when npm cache is unavailable
-- No guarantee of execution in container context
-
-**Implementation:** kasmproxy now runs as native Node.js HTTP server in supervisor:
-- Direct port binding without external tools
-- Immediate startup with synchronous server creation
-- Full inline error handling and logging
-- Promise-based startup ensures server is listening before returning
-
-**Result:** Reliable port 8080 binding guaranteed at supervisor initialization.
-
-### 4. Persistent Volume Log Caching (Commit 29911a7)
+### 6. Persistent Volume Log Caching (Commit 29911a7)
 
 **Bug:** Old supervisor.log from persistent /config/logs volume was cached across deployments, masking fresh startup logs and preventing visibility into whether new code was executing.
 
@@ -184,7 +125,7 @@ function shouldBypassAuth(path) {
 1. Clear supervisor.log on every boot (before supervisor starts) - `docker/custom_startup.sh`
 2. Changed start.sh to show TAIL (last 50 lines) instead of HEAD - captures fresh startup
 3. Added boot timestamp to all diagnostics - `[start.sh] === STARTUP DIAGNOSTICS (Boot: YYYY-MM-DD HH:MM:SS) ===`
-4. Added kasmproxy port 8080 listening verification - detects silent startup failures
+4. Added port 80 listening verification - detects silent startup failures
 
 **Result:** Fresh deployments are now visible - logs show current boot, not old cached data.
 
@@ -208,96 +149,27 @@ function shouldBypassAuth(path) {
 
 **Result:** Eliminated 2-minute startup timeout.
 
-### 3. Authentication Isolation
+### 1. Port Forwarding (05e09ed)
 
-kasmproxy deletes Authorization header before forwarding upstream. This prevents double-authentication and ensures upstream services never see credentials.
+**Bug:** Used `parseInt(process.env.CUSTOM_PORT)` for upstream routing → forwarded to port 6901 instead of 3000.
 
-```javascript
-delete headers.authorization;
-headers.host = `localhost:${upstreamPort}`;
-```
+**Root Cause:** CUSTOM_PORT (6901) is external configuration. Internal Webtop UI always listens on port 3000.
 
-## Deployment
+**Fix:** Hardcoded ports based on path:
+- `/data/*` and `/ws/*` → port 8082 (Selkies)
+- All other routes → port 3000 (Webtop)
 
-### Docker Build
+**Result:** 401 Unauthorized errors resolved.
 
-Dockerfile clones gmweb repo from GitHub to `/opt/gmweb-startup` during build. Startup system files are in container at `/opt/gmweb-startup/`.
+### 2. Supervisor Health Check (30677ec)
 
-### Coolify Integration
+**Bug:** Health check looked for disabled service, never detected enabled one.
 
-- Coolify automatically forwards domain requests to container port 80
-- HTTPS auto-provisioned by Let's Encrypt
-- No additional port configuration needed in compose file
-- Domain assignment in Coolify UI is required for external access
+**Fix:** Pass correct service name to health check.
 
-### Supervisor Not Starting (Blocker - Investigation Complete)
+**Result:** Eliminated 2-minute startup timeout.
 
-**Status:** Supervisor process backgrounded via nohup in start.sh but fails to execute or produce output.
-
-**Verified Facts:**
-- Container starts successfully and runs indefinitely (no crashes)
-- STARTUP COMPLETE message appears in logs
-- Selkies on port 8082 starts and functions correctly
-- NO supervisor logs appear anywhere (not in docker logs, supervisor.log, or startup.log)
-- NO kasmproxy logs appear
-- Endpoint returns HTTP 502 (no service listening on port 80)
-
-**Root Cause:** When supervisor is backgrounded with `nohup "$NODE_BIN" /opt/gmweb-startup/index.js > "$LOG_DIR/supervisor.log" 2>&1 &` in start.sh:
-- The nohup background job appears to succeed (no error message)
-- But the supervisor process never actually starts or its output is not being captured
-- The supervisor.log file never appears
-- No output reaches docker logs
-
-**Theories:**
-1. Nohup background job exits immediately (unnoticed by start.sh which returns 0)
-2. Output file redirection fails silently (/config/logs may not have write permissions at runtime)
-3. Node.js path or supervisor code path is incorrect in container
-4. Environmental variables (HOME, PATH) cause supervisor to fail during startup
-
-**Changes Made:**
-- Added diagnostics to start.sh (not effective - supervisor still fails)
-- Simplified start.sh to remove exit codes (needed to prevent container from exiting)
-- Added error logging to custom_startup.sh (no errors captured)
-
-**RESOLVED - Two Critical Issues Fixed:**
-
-### Issue 1: supervisor.start() Infinite Loop (Commit 9861a62)
-**Problem:** The `monitorHealth()` function is an infinite loop that was being awaited in `supervisor.start()`:
-```javascript
-// OLD - BLOCKS FOREVER:
-await this.monitorHealth();  // Never returns - infinite loop
-```
-
-**Impact:** supervisor.start() never completed, so supervisor initialization hung indefinitely. Custom_startup.sh would complete but no services actually started.
-
-**Fix:** Run monitorHealth() as fire-and-forget background task and keep start() alive properly:
-```javascript
-// NEW - WORKS:
-this.monitorHealth().catch(err => this.log('ERROR', 'Health monitoring crashed', err));
-await new Promise(() => {});  // Never resolves - blocks forever in proper way
-```
-
-**Critical Detail:** The `await new Promise(() => {})` blocks start() forever (correct behavior for immortal supervisor), but doesn't block initialization (monitorHealth runs in background).
-
-### Issue 2: kasmproxy Port 80 Binding (Resolved - Current)
-**Current Implementation:** kasmproxy configured to listen on port 80 (privileged port):
-- Supervisor runs as root (s6 supervision system)
-- Root processes can bind privileged ports (< 1024)
-- kasmproxy successfully starts on port 80
-- Health check verifies port 80 binding
-
-**Implementation:**
-```javascript
-const LISTEN_PORT = parseInt(process.env.LISTEN_PORT || '80');
-```
-- Root supervisor can successfully bind port 80
-- Traefik/Coolify routes external traffic to container:80
-- All internal services continue working
-- HTTP Basic Auth enforced on all routes except /data/* and /ws/*
-
-**Summary:** Supervisor initializes correctly and kasmproxy binds to port 80 as the primary entry point.
-
-### Issue 3: Init Script Blocking s6-rc Service Startup (Fixed)
+### 3. Init Script Blocking s6-rc Service Startup (Fixed)
 
 **Problem:** The `start.sh` script had an infinite loop `while true; sleep 60` that blocked s6-rc from starting other services.
 
@@ -327,6 +199,38 @@ exit 0
 
 **Result:** s6-rc now proceeds to start svc-xorg, svc-de, and other services after gmweb init completes.
 
+### 4. Supervisor Initialization (Commit 9861a62)
+
+**Problem:** The `monitorHealth()` function is an infinite loop that was being awaited in `supervisor.start()`:
+```javascript
+// OLD - BLOCKS FOREVER:
+await this.monitorHealth();  // Never returns - infinite loop
+```
+
+**Impact:** supervisor.start() never completed, so supervisor initialization hung indefinitely.
+
+**Fix:** Run monitorHealth() as fire-and-forget background task and keep start() alive properly:
+```javascript
+// NEW - WORKS:
+this.monitorHealth().catch(err => this.log('ERROR', 'Health monitoring crashed', err));
+await new Promise(() => {});  // Never resolves - blocks forever in proper way
+```
+
+**Result:** Supervisor initializes correctly and manages services independently.
+
+## Deployment
+
+### Docker Build
+
+Dockerfile clones gmweb repo from GitHub to `/opt/gmweb-startup` during build. Startup system files are in container at `/opt/gmweb-startup/`. The nginx configuration template is copied from `docker/nginx-sites-enabled-default` to the container.
+
+### Coolify Integration
+
+- Coolify automatically forwards domain requests to container port 80
+- HTTPS auto-provisioned by Let's Encrypt
+- No additional port configuration needed in compose file
+- Domain assignment in Coolify UI is required for external access
+
 ## Persistent Storage & User Settings
 
 ### Docker-Compose Volume
@@ -348,6 +252,17 @@ Automatically persisted by gmweb-config volume:
 
 ## Services Removed
 
+### kasmproxy Service (Commit b0938ba)
+
+**Decision:** kasmproxy service removed completely in favor of LinuxServer's pre-installed nginx.
+
+**Removal:**
+- Deleted `startup/services/kasmproxy.js`
+- Removed from `startup/index.js` serviceNames array
+- Removed from `startup/config.json`
+
+**Rationale:** kasmproxy required complex gxe/npx execution with unreliable npm caching. nginx provides a simpler, more reliable alternative that's already part of the LinuxServer base image.
+
 ### Claude Code UI (Commits 06515b3, eeb0810)
 
 **Decision:** Claude Code UI removed completely - not needed for gmweb purpose.
@@ -359,4 +274,4 @@ Automatically persisted by gmweb-config volume:
 - Removed autostart desktop entry from `docker/custom_startup.sh`
 - Removed from `startup/config.json`
 
-**Rationale:** Claude Code UI was causing service bloat. The focus is on Claude Code CLI and kasmproxy as the primary entry point. No database persistence needed.
+**Rationale:** Claude Code UI was causing service bloat. The focus is on Claude Code CLI and nginx as the primary entry point. No database persistence needed.
