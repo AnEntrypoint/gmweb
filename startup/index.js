@@ -14,9 +14,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function main() {
   try {
+    console.log('[startup] === SUPERVISOR STARTING ===');
+    console.log('[startup] PID:', process.pid);
+    console.log('[startup] CWD:', process.cwd());
+    console.log('[startup] Node:', process.version);
+
     // Load configuration
     const configPath = join(__dirname, 'config.json');
+    console.log('[startup] Loading config from:', configPath);
     const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    console.log('[startup] Config loaded successfully');
 
     // Create supervisor
     const supervisor = new Supervisor(config);
@@ -43,33 +50,49 @@ async function main() {
     ];
 
     console.log('[startup] Loading services...');
+    let loadedCount = 0;
+    let skippedCount = 0;
 
     for (const name of serviceNames) {
       try {
+        const serviceConfig = config.services[name];
+        const isEnabled = serviceConfig?.enabled !== false;
+
+        if (!isEnabled) {
+          console.log(`[startup] Skipping disabled service: ${name}`);
+          skippedCount++;
+          continue;
+        }
+
+        console.log(`[startup] Loading service: ${name}...`);
         const module = await import(`./services/${name}.js`);
         const service = module.default;
 
         // Inject config for this service
-        service.enabled = config.services[name]?.enabled ?? true;
+        service.enabled = true;
 
         supervisor.register(service);
-        console.log(`[startup] Registered: ${name}`);
+        console.log(`[startup] ✓ Registered: ${name}`);
+        loadedCount++;
       } catch (err) {
-        console.error(`[startup] Failed to load service ${name}:`, err.message);
+        console.error(`[startup] ✗ Failed to load service ${name}:`, err.message);
       }
     }
 
-    console.log('[startup] All services loaded');
+    console.log(`[startup] Service loading complete: ${loadedCount} loaded, ${skippedCount} skipped`);
 
     // Start supervisor - this runs forever
+    console.log('[startup] Starting supervisor...');
     await supervisor.start();
 
     // If we get here, supervisor has stopped
-    console.log('[startup] Supervisor stopped');
+    console.log('[startup] Supervisor stopped (unexpected)');
     process.exit(0);
   } catch (err) {
-    console.error('[startup] FATAL:', err);
+    console.error('[startup] FATAL:', err.message);
+    console.error('[startup] Stack:', err.stack);
     // Try to recover
+    console.log('[startup] Retrying in 5 seconds...');
     setTimeout(main, 5000);
   }
 }

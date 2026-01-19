@@ -8,64 +8,64 @@
       "requiresDesktop": false
     },
     "proxypilot": {
-      "enabled": true,
+      "enabled": false,
       "type": "critical",
       "requiresDesktop": true
     },
     "gemini-cli": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "wrangler": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "gcloud": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "scrot": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "chromium-ext": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "claude-cli": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "claude-marketplace": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "claude-plugin-gm": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "webssh2": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "file-manager": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "claude-code-ui": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "sshd": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "tmux": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "opencode": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     }
   }

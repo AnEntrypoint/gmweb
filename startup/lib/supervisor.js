@@ -11,6 +11,7 @@ const sleep = promisify(setTimeout);
 
 export class Supervisor {
   constructor(config = {}) {
+    console.log('[supervisor] Initializing supervisor...');
     this.config = {
       healthCheckInterval: 30000,
       maxRestartAttempts: 5,
@@ -21,6 +22,8 @@ export class Supervisor {
       ...config
     };
 
+    console.log('[supervisor] Log directory:', this.config.logDirectory);
+
     this.services = new Map();
     this.running = true;
     this.restartAttempts = new Map();
@@ -29,6 +32,7 @@ export class Supervisor {
 
     // Setup log directories
     this.setupLogDirectories();
+    console.log('[supervisor] Constructor complete');
 
     // Global error handlers - never let anything crash
     process.on('uncaughtException', (err) => {
