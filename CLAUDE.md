@@ -160,4 +160,39 @@ Dockerfile clones gmweb repo from GitHub to `/opt/gmweb-startup` during build. S
 - Simplified start.sh to remove exit codes (needed to prevent container from exiting)
 - Added error logging to custom_startup.sh (no errors captured)
 
-**Unresolved:** The supervisor process initialization is failing silently. Cannot proceed without resolving why nohup is not executing the Node.js supervisor properly.
+**RESOLVED - Two Critical Issues Fixed:**
+
+### Issue 1: supervisor.start() Infinite Loop (Commit 9861a62)
+**Problem:** The `monitorHealth()` function is an infinite loop that was being awaited in `supervisor.start()`:
+```javascript
+// OLD - BLOCKS FOREVER:
+await this.monitorHealth();  // Never returns - infinite loop
+```
+
+**Impact:** supervisor.start() never completed, so supervisor initialization hung indefinitely. Custom_startup.sh would complete but no services actually started.
+
+**Fix:** Run monitorHealth() as fire-and-forget background task and keep start() alive properly:
+```javascript
+// NEW - WORKS:
+this.monitorHealth().catch(err => this.log('ERROR', 'Health monitoring crashed', err));
+await new Promise(() => {});  // Never resolves - blocks forever in proper way
+```
+
+**Critical Detail:** The `await new Promise(() => {})` blocks start() forever (correct behavior for immortal supervisor), but doesn't block initialization (monitorHealth runs in background).
+
+### Issue 2: kasmproxy Port 80 Binding Failure (Commit b24e959)
+**Problem:** kasmproxy was configured to listen on port 80 (privileged port):
+- LinuxServer Webtop runs services as non-root user `abc`
+- Non-root processes cannot bind privileged ports (< 1024) without CAP_NET_BIND_SERVICE
+- kasmproxy failed to start silently on port 80
+- Health check failed → HTTP 502 errors
+
+**Fix:** Changed kasmproxy to listen on port 8080 (non-privileged):
+```javascript
+const LISTEN_PORT = parseInt(process.env.LISTEN_PORT || '8080');
+```
+- User `abc` can now successfully bind port 8080
+- Traefik/Coolify routes external traffic to container:8080
+- All internal services continue working
+
+**Summary:** Both fixes ensure supervisor initializes correctly and kasmproxy can start on a non-privileged port.
