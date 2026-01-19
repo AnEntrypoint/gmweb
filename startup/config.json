@@ -52,10 +52,6 @@
       "enabled": false,
       "type": "web"
     },
-    "claude-code-ui": {
-      "enabled": false,
-      "type": "web"
-    },
     "sshd": {
       "enabled": false,
       "type": "system"

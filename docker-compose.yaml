@@ -24,7 +24,6 @@ services:
       - SUBFOLDER=/desk/
     volumes:
       - gmweb-config:/config
-      - gmweb-claudeui-db:/opt/claudecodeui/server/database
     shm_size: "1gb"
     restart: unless-stopped
     labels:
@@ -33,6 +32,4 @@ services:
 
 volumes:
   gmweb-config:
-    driver: local
-  gmweb-claudeui-db:
     driver: local

@@ -196,3 +196,22 @@ const LISTEN_PORT = parseInt(process.env.LISTEN_PORT || '8080');
 - All internal services continue working
 
 **Summary:** Both fixes ensure supervisor initializes correctly and kasmproxy can start on a non-privileged port.
+
+## Persistent Storage & User Settings
+
+### Docker-Compose Volume
+
+**gmweb-config** (`/config`):
+- Home directory for user `abc` (UID 1000, GID 1000)
+- Contains all Kasm Webtop desktop files, Desktop/, Downloads/
+- Contains Claude Code settings in `~/.claude/` (history, plugins, MCP servers, sessions)
+- Preserves `.bashrc` PATH configuration and marker files
+
+### Claude Code Persistence (`~/.claude/`)
+
+Automatically persisted by gmweb-config volume:
+- Session history (history.jsonl)
+- Project metadata and file history
+- Plugin cache and MCP server configuration
+- Settings and preferences (settings.json)
+- Session plans and todos
