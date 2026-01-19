@@ -48,9 +48,25 @@ export default {
 
   async health() {
     try {
-      const { execSync } = await import('child_process');
-      execSync('lsof -i :9998 | grep -q LISTEN', { stdio: 'pipe' });
-      return true;
+      const http = await import('http');
+      return new Promise((resolve) => {
+        const req = http.request({
+          hostname: '127.0.0.1',
+          port: 9998,
+          path: '/',
+          method: 'GET',
+          timeout: 2000
+        }, (res) => {
+          resolve(res.statusCode >= 200 && res.statusCode < 500);
+          res.resume(); // Drain the response
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => {
+          req.destroy();
+          resolve(false);
+        });
+        req.end();
+      });
     } catch (e) {
       return false;
     }
