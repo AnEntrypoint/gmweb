@@ -51,35 +51,8 @@ if [ -d /usr/local/local/nvm ]; then
 fi
 
 # ============================================================================
-# Fix Claude Code UI permissions
+# Fix Claude Code UI permissions (skipped - not critical for kasmproxy)
 # ============================================================================
-if [ -d /opt/claudecodeui ]; then
-  log "Fixing Claude Code UI permissions..."
-  chown -R abc:abc /opt/claudecodeui 2>/dev/null || true
-  log "✓ Claude Code UI permissions fixed"
-
-  # Setup Claude Code UI user (background)
-  log "Setting up Claude Code UI user (background)..."
-  nohup bash -c "cd /opt/claudecodeui && node -e \"
-    const Database = require('better-sqlite3');
-    const bcrypt = require('bcrypt');
-    const vncPw = process.env.PASSWORD || process.env.VNC_PW || '';
-    if (!vncPw) { console.log('No PASSWORD/VNC_PW, skipping'); process.exit(0); }
-    const db = new Database('/opt/claudecodeui/server/database/auth.db');
-    const user = db.prepare('SELECT id FROM users WHERE username = ?').get('abc');
-    if (user) {
-      const hash = bcrypt.hashSync(vncPw, 10);
-      db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(hash, 'abc');
-      console.log('Updated abc user password');
-    } else {
-      const hash = bcrypt.hashSync(vncPw, 10);
-      db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('abc', hash);
-      console.log('Created abc user');
-    }
-    db.close();
-  \"" > "$LOG_DIR/claudeui-user.log" 2>&1 &
-  log "✓ Claude Code UI user setup started (background)"
-fi
 
 # ============================================================================
 # Setup .bashrc PATH (first boot only)
@@ -106,28 +79,8 @@ else
 fi
 
 # ============================================================================
-# Setup Claude MCP and plugins (first boot only)
+# Setup Claude MCP and plugins (skipped - not critical for kasmproxy)
 # ============================================================================
-CLAUDE_MARKER="$HOME_DIR/.gmweb-claude-setup"
-if [ ! -f "$CLAUDE_MARKER" ]; then
-  log "Setting up Claude MCP and plugins (background)..."
-
-  nohup bash -c "
-    export HOME=$HOME_DIR
-    # Add playwriter MCP server
-    $HOME_DIR/.local/bin/claude mcp add playwriter npx -- -y playwriter@latest || true
-
-    # Add gm plugin from marketplace
-    $HOME_DIR/.local/bin/claude plugin marketplace add AnEntrypoint/gm || true
-    $HOME_DIR/.local/bin/claude plugin install -s user gm@gm || true
-
-    touch $HOME_DIR/.gmweb-claude-setup
-    chown abc:abc $HOME_DIR/.gmweb-claude-setup
-  " > "$LOG_DIR/claude-setup.log" 2>&1 &
-  log "✓ Claude MCP and plugins setup started (background)"
-else
-  log "✓ Claude already configured (skipping)"
-fi
 
 # ============================================================================
 # Setup XFCE autostart (first boot only)

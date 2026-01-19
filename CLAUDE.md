@@ -7,50 +7,46 @@
 **Base Image:** `lscr.io/linuxserver/webtop:ubuntu-xfce`
 
 **Architecture:**
-- Webtop web UI listens on port 3000 internally
+- Webtop web UI listens on port 3000 internally (CUSTOM_PORT=6901 is external config only)
 - kasmproxy listens on port 80 (HTTP Basic Auth reverse proxy)
 - Selkies WebSocket streaming on port 8082 (handles own authentication)
-- Traefik/Coolify handles external HTTPS via domain assignment
+- Traefik/Coolify routes external domain to container:80
 
-**Port 80:** Internal only - NOT exposed to host. Traefik routes domain to container:80, kasmproxy internally routes to Webtop:3000 or Selkies:8082.
+**Port 80:** Internal only. Coolify automatically forwards domain requests to container port 80. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
 
-### kasmproxy Service Architecture
+### kasmproxy Implementation
 
-**Execution:** `npx -y gxe@latest AnEntrypoint/kasmproxy`
+**Execution:** Direct Node.js: `node /opt/gmweb-startup/kasmproxy.js`
 
-Kasmproxy is executed from the upstream GitHub repository (AnEntrypoint/kasmproxy) via gxe, eliminating need for local wrapper code.
+Kasmproxy is a local HTTP reverse proxy implementation that:
+- Listens on port 80
+- Enforces HTTP Basic Auth (`kasm_user:PASSWORD`)
+- Routes `/data/*` and `/ws/*` to Selkies:8082 (bypasses auth)
+- Routes all other paths to Webtop:3000 (requires auth)
+- Strips SUBFOLDER prefix (`/desk/*` → `/*`)
 
-**Routing Logic:**
-- `/data/*` and `/ws/*` → Selkies:8082 (no auth required)
-- All other routes → Webtop:3000 (requires HTTP Basic Auth)
+**Why Local Implementation:**
+gxe execution via `npx -y gxe@latest AnEntrypoint/kasmproxy` was unreliable. Local Node.js execution ensures kasmproxy starts and binds to port 80 consistently.
 
-**Authentication:**
-- Enforced at port 80 (kasmproxy level)
-- Credentials: `kasm_user:PASSWORD` (from container environment)
-- Authorization header deleted before forwarding to upstream (no double-auth)
+### Environment Variables
 
-**SUBFOLDER Support:**
-- Environment variable: `SUBFOLDER=/desk/`
-- Strips prefix before routing: `/desk/ui` → `/ui` to upstream
-- Allows running Webtop under path prefix
-
-### Environment Variables (PASSWORD)
-
-- **Use PASSWORD** (not VNC_PW) - native to LinuxServer Webtop
+**PASSWORD (CRITICAL):**
+- LinuxServer Webtop uses PASSWORD (not VNC_PW)
 - Supervisor reads PASSWORD from container environment
-- All services receive PASSWORD via explicit env object:
-  ```javascript
-  const child = spawn(cmd, args, {
-    env: { ...process.env, PASSWORD: env.PASSWORD || 'password' }
-  });
-  ```
-- Do NOT use template string injection
+- All services receive PASSWORD via explicit env object
+- Must NOT use template string injection
+
+**CUSTOM_PORT:**
+- External configuration only (6901 for Webtop UI)
+- Internal Webtop always listens on port 3000
+- kasmproxy hardcodes upstream port (3000 or 8082) based on request path
+- Setting CUSTOM_PORT does NOT change internal port routing
 
 ## Startup System
 
 ### Supervisor Configuration (config.json)
 
-Only kasmproxy service is referenced:
+Only kasmproxy service is configured:
 ```json
 {
   "services": {
@@ -63,63 +59,71 @@ Only kasmproxy service is referenced:
 }
 ```
 
-**CRITICAL:** kasmproxy must be enabled and type must be "critical" to prioritize startup.
+**CRITICAL:** kasmproxy must be `enabled: true` and `type: "critical"` to prioritize startup.
 
 ### kasmproxy Prioritization
 
-- Must start FIRST (critical path) - it's the external entry point on port 80
+- Starts FIRST (critical path) - external entry point on port 80
 - Supervisor blocks other services until kasmproxy is healthy
 - Health check: `lsof -i :80 | grep LISTEN`
-- Timeout: 2 minutes
+- Timeout: 2 minutes max
 
-### Supervisor Health Check Bug (FIXED)
+### Supervisor Health Check Bug (FIXED - 30677ec)
 
-**Original Bug:** Supervisor was checking wrong service name in health check.
+**Original Bug:** `waitForKasmproxyHealthy()` was checking hardcoded `kasmproxy` service instead of actual proxy service name.
 
-**Fix Applied:** Supervisor now passes correct service name to `waitForKasmproxyHealthy()` function.
+**Impact:** 2-minute startup delay while waiting for wrong service.
 
-This prevents 2-minute startup delays when waiting for the wrong service.
+**Fix:** Pass actual service name to health check function.
 
-## Critical Fixes
+```javascript
+// Before (WRONG)
+const kasmproxy = this.services.get('kasmproxy');
 
-### Port Forwarding (05e09ed)
+// After (CORRECT)
+const proxy = this.services.get(serviceName);
+```
 
-**Issue:** kasmproxy-wrapper was forwarding to `parseInt(process.env.CUSTOM_PORT)` which resolved to 6901 instead of 3000.
+## Critical Fixes Applied
 
-**Root Cause:** CUSTOM_PORT (6901) is external configuration for LinuxServer Webtop. Internal Webtop UI always listens on port 3000.
+### 1. Port Forwarding (05e09ed)
 
-**Fix:** Hardcoded upstream port to 3000 (Webtop) or 8082 (Selkies) based on request path.
+**Bug:** Used `parseInt(process.env.CUSTOM_PORT)` for upstream routing → forwarded to port 6901 instead of 3000.
 
-**Impact:** 401 Unauthorized errors resolved - requests now forward to correct port.
+**Root Cause:** CUSTOM_PORT (6901) is external configuration. Internal Webtop UI always listens on port 3000.
 
-### Supervisor Service Name Check (30677ec)
+**Fix:** Hardcoded ports based on path:
+- `/data/*` and `/ws/*` → port 8082 (Selkies)
+- All other routes → port 3000 (Webtop)
 
-**Issue:** Supervisor health check was looking for disabled 'kasmproxy' service when enabled 'kasmproxy-wrapper' was running.
+**Result:** 401 Unauthorized errors resolved.
 
-**Fix:** Pass actual proxy service name to health check function.
+### 2. Supervisor Health Check (30677ec)
 
-**Impact:** Eliminated 2-minute startup timeout.
+**Bug:** Health check looked for disabled service, never detected enabled one.
 
-## Deployment Notes
+**Fix:** Pass correct service name to health check.
 
-### Docker Build Process
+**Result:** Eliminated 2-minute startup timeout.
 
-Dockerfile clones gmweb repo from GitHub to `/opt/gmweb-startup` during build. This ensures startup system is available in container.
+### 3. Authentication Isolation
+
+kasmproxy deletes Authorization header before forwarding upstream. This prevents double-authentication and ensures upstream services never see credentials.
+
+```javascript
+delete headers.authorization;
+headers.host = `localhost:${upstreamPort}`;
+```
+
+## Deployment
+
+### Docker Build
+
+Dockerfile clones gmweb repo from GitHub to `/opt/gmweb-startup` during build. Startup system files are in container at `/opt/gmweb-startup/`.
 
 ### Coolify Integration
 
-- Code is production-ready
-- Deployment requires manual domain assignment in Coolify UI
-- HTTPS is auto-provisioned by Let's Encrypt (via Coolify)
-- Without domain assignment, service returns 502
-
-### Verification
-
-**Auth working indicators:**
-- Unauthenticated requests: HTTP 401
-- Wrong credentials: HTTP 401
-- Correct credentials: HTTP 200 (or 502 if upstream not ready)
-
-**Port binding verification:**
-- `lsof -i :80 | grep LISTEN` should show kasmproxy listening
-- Indicates kasmproxy started successfully
+- Coolify automatically forwards domain requests to container port 80
+- HTTPS auto-provisioned by Let's Encrypt
+- No additional port configuration needed in compose file
+- Domain assignment in Coolify UI is required for external access
