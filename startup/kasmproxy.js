@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const http = require('http');
+import http from 'http';
 
 const WEBTOP_UI_PORT = 3000;
 const SELKIES_WS_PORT = 8082;
