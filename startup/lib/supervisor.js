@@ -132,8 +132,19 @@ export class Supervisor {
         }
       }
 
-      // Monitor health continuously
-      await this.monitorHealth();
+      // Monitor health continuously (runs forever)
+      // This runs forever and never returns - keep it running in background
+      this.monitorHealth().catch(err => {
+        this.log('ERROR', 'Health monitoring crashed', err);
+        // Restart health monitoring on crash
+        this.start();
+      });
+
+      // Supervisor now runs indefinitely - keeps services alive
+      this.log('INFO', 'Supervisor ready - monitoring services');
+
+      // Keep start() alive forever (doesn't return)
+      await new Promise(() => {});  // Never resolves - blocks forever
     } catch (err) {
       this.log('ERROR', 'Supervisor crash prevented', err);
       await sleep(5000);
