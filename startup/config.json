@@ -66,6 +66,10 @@
     "glootie-oc": {
       "enabled": true,
       "type": "install"
+    },
+    "playwriter": {
+      "enabled": true,
+      "type": "system"
     }
   }
 }

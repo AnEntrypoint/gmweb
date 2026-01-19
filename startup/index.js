@@ -30,23 +30,25 @@ async function main() {
 
     // Dynamic service loader
     const serviceDir = join(__dirname, 'services');
-     const serviceNames = [
-       'proxypilot',
-       'gemini-cli',
-       'wrangler',
-       'gcloud',
-       'scrot',
-       'chromium-ext',
-       'claude-cli',
-       'claude-marketplace',
-       'claude-plugin-gm',
-       'webssh2',
-       'file-manager',
-       'sshd',
-       'tmux',
-       'opencode',
-       'opencode-web'
-     ];
+      const serviceNames = [
+        'proxypilot',
+        'gemini-cli',
+        'wrangler',
+        'gcloud',
+        'scrot',
+        'chromium-ext',
+        'claude-cli',
+        'claude-marketplace',
+        'claude-plugin-gm',
+        'webssh2',
+        'file-manager',
+        'sshd',
+        'tmux',
+        'opencode',
+        'opencode-web',
+        'playwriter',
+        'glootie-oc'
+      ];
 
     console.log('[startup] Loading services...');
     let loadedCount = 0;
