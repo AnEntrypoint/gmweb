@@ -54,13 +54,12 @@ export default {
     const password = env.PASSWORD || 'password';
     const subfolder = (env.SUBFOLDER || '/').replace(/\/+$/, '') || '/';
 
-    return new Promise((resolve, reject) => {
-      console.log('[kasmproxy] Starting local HTTP proxy');
-      console.log('[kasmproxy] LISTEN_PORT:', listenPort);
-      console.log('[kasmproxy] PASSWORD:', password ? password.substring(0, 3) + '***' : '(not set)');
-      console.log('[kasmproxy] SUBFOLDER:', subfolder);
+    console.log('[kasmproxy] Starting local HTTP proxy');
+    console.log('[kasmproxy] LISTEN_PORT:', listenPort);
+    console.log('[kasmproxy] PASSWORD:', password ? password.substring(0, 3) + '***' : '(not set)');
+    console.log('[kasmproxy] SUBFOLDER:', subfolder);
 
-      const server = http.createServer((req, res) => {
+    const server = http.createServer((req, res) => {
       const path = stripSubfolder(req.url, subfolder);
       const bypassAuth = shouldBypassAuth(path);
 
@@ -171,6 +170,7 @@ export default {
       proxyReq.end(head);
     });
 
+    return new Promise((resolve, reject) => {
       server.listen(listenPort, '0.0.0.0', () => {
         console.log(`[kasmproxy] Listening on port ${listenPort}`);
         console.log(`[kasmproxy] Forwarding to Webtop UI on port ${WEBTOP_UI_PORT}`);
