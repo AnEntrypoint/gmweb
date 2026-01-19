@@ -33,7 +33,7 @@ export default {
         PASSWORD: password,
         SUBFOLDER: subfolder,
         LISTEN_PORT: String(listenPort),
-        WEBTOP_UI_PORT: '6901',
+        WEBTOP_UI_PORT: '3000',
         SELKIES_WS_PORT: '8082',
         NODE_OPTIONS: '--no-warnings'
       }
