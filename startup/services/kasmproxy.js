@@ -54,12 +54,13 @@ export default {
     const password = env.PASSWORD || 'password';
     const subfolder = (env.SUBFOLDER || '/').replace(/\/+$/, '') || '/';
 
-    console.log('[kasmproxy] Starting local HTTP proxy');
-    console.log('[kasmproxy] LISTEN_PORT:', listenPort);
-    console.log('[kasmproxy] PASSWORD:', password ? password.substring(0, 3) + '***' : '(not set)');
-    console.log('[kasmproxy] SUBFOLDER:', subfolder);
+    return new Promise((resolve, reject) => {
+      console.log('[kasmproxy] Starting local HTTP proxy');
+      console.log('[kasmproxy] LISTEN_PORT:', listenPort);
+      console.log('[kasmproxy] PASSWORD:', password ? password.substring(0, 3) + '***' : '(not set)');
+      console.log('[kasmproxy] SUBFOLDER:', subfolder);
 
-    const server = http.createServer((req, res) => {
+      const server = http.createServer((req, res) => {
       const path = stripSubfolder(req.url, subfolder);
       const bypassAuth = shouldBypassAuth(path);
 
@@ -170,31 +171,31 @@ export default {
       proxyReq.end(head);
     });
 
-    server.listen(listenPort, '0.0.0.0', () => {
-      console.log(`[kasmproxy] Listening on port ${listenPort}`);
-      console.log(`[kasmproxy] Forwarding to Webtop UI on port ${WEBTOP_UI_PORT}`);
-      console.log(`[kasmproxy] Forwarding /data and /ws to Selkies on port ${SELKIES_WS_PORT}`);
-      console.log('[kasmproxy] Public routes: /data/*, /ws/*');
-    });
+      server.listen(listenPort, '0.0.0.0', () => {
+        console.log(`[kasmproxy] Listening on port ${listenPort}`);
+        console.log(`[kasmproxy] Forwarding to Webtop UI on port ${WEBTOP_UI_PORT}`);
+        console.log(`[kasmproxy] Forwarding /data and /ws to Selkies on port ${SELKIES_WS_PORT}`);
+        console.log('[kasmproxy] Public routes: /data/*, /ws/*');
 
-    server.on('error', (err) => {
-      console.error('[kasmproxy] Server error:', err);
-      process.exit(1);
-    });
+        resolve({
+          pid: process.pid,
+          process: null,
+          cleanup: async () => {
+            server.close();
+          }
+        });
+      });
 
-    process.on('SIGTERM', () => {
-      console.log('[kasmproxy] Shutting down...');
-      server.close(() => process.exit(0));
-    });
+      server.on('error', (err) => {
+        console.error('[kasmproxy] Server error:', err);
+        reject(err);
+      });
 
-    return {
-      pid: process.pid,
-      process: null,
-      cleanup: async () => {
-        server.close();
-        process.exit(0);
-      }
-    };
+      process.on('SIGTERM', () => {
+        console.log('[kasmproxy] Shutting down...');
+        server.close(() => process.exit(0));
+      });
+    });
   },
 
   async health() {
