@@ -66,9 +66,22 @@ export default {
 
   async health() {
     try {
-      const { execSync } = await import('child_process');
-      execSync('lsof -i :9997 | grep -q LISTEN', { stdio: 'pipe' });
-      return true;
+      // Try to connect to the port
+      const net = await import('net');
+      return await new Promise((resolve) => {
+        const socket = net.createConnection({ port: 9997, host: '127.0.0.1' });
+        socket.on('connect', () => {
+          socket.destroy();
+          resolve(true);
+        });
+        socket.on('error', () => {
+          resolve(false);
+        });
+        socket.setTimeout(2000, () => {
+          socket.destroy();
+          resolve(false);
+        });
+      });
     } catch (e) {
       return false;
     }
