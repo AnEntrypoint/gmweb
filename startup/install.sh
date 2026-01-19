@@ -210,9 +210,9 @@ cat > /opt/gmweb-startup/chromium-autostart.desktop << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=Chromium
-Comment=Open Chromium with Playwriter Extension
+Comment=Open Chromium with Playwriter Extension Debugger
 Icon=chromium
-Exec=chromium http://localhost/ "chrome-extension://jfeammnjpkecdekppnclgkkffahnhfhe/index.html"
+Exec=chromium --app="chrome-extension://jfeammnjpkecdekppnclgkkffahnhfhe/index.html" --window-size=800,600 http://localhost/
 Categories=Network;WebBrowser;
 X-GNOME-Autostart-enabled=true
 AUTOSTART_EOF
