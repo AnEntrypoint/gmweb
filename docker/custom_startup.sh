@@ -118,12 +118,17 @@ AUTOSTART_EOF
 # Chromium autostart wrapper - ensures DISPLAY is set and Playwriter auto-engages
 export DISPLAY=:1.0
 /usr/bin/chromium http://abc:test123@127.0.0.1/code/ > /dev/null 2>&1 &
+CHROMIUM_PID=$!
 sleep 8
 # Auto-click Playwriter extension arrow icon to engage it (turn green)
-# The arrow icon is located at x=1150, y=145 (right of URL bar, left of puzzle piece)
-xdotool search --name "Chromium" windowactivate 2>/dev/null || true
-sleep 1
-xdotool mousemove 1150 145 click 1 2>/dev/null || true
+# Click in WINDOW SPACE (relative to the window, not desktop)
+# The arrow icon is at approximately x=570, y=45 within the Chromium window
+WIN=$(xdotool search --pid $CHROMIUM_PID --name "Chromium" | head -1)
+if [ ! -z "$WIN" ]; then
+  xdotool windowfocus $WIN
+  sleep 1
+  xdotool mousemove --window $WIN 570 45 click 1 2>/dev/null || true
+fi
 SCRIPT_EOF
    chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
 
