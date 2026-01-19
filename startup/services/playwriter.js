@@ -17,20 +17,18 @@ export default {
     
     try {
       // Start playwriter-ws-server in background
-      const ps = spawn('bash', ['-c', `
-        cd /tmp
-        export HOME=/config
-        exec playwriter-ws-server
-      `], {
+      // Use npx to install and run the latest playwriter package
+      const ps = spawn('bash', ['-c', 'npx -y playwriter-ws-server@latest'], {
         env: { ...env, HOME: '/config' },
         stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true
+        detached: true,
+        cwd: '/tmp'
       });
 
       ps.unref();
       
       // Give it a moment to start
-      await sleep(2000);
+      await sleep(3000);
       
       // Verify it started
       const isRunning = await this.health();
