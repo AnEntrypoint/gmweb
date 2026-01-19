@@ -7,11 +7,6 @@
       "type": "critical",
       "requiresDesktop": false
     },
-    "kasmproxy-wrapper": {
-      "enabled": false,
-      "type": "critical",
-      "requiresDesktop": false
-    },
     "proxypilot": {
       "enabled": true,
       "type": "critical",

@@ -70,14 +70,8 @@ export class Supervisor {
       this.env = await this.getEnvironment();
 
       // CRITICAL: Start proxy FIRST and wait for it to be healthy
-      // Check for kasmproxy (Webtop architecture) or kasmproxy-wrapper (legacy)
-      let proxyService = this.services.get('kasmproxy');
-      let proxyName = 'kasmproxy';
-
-      if (!proxyService) {
-        proxyService = this.services.get('kasmproxy-wrapper');
-        proxyName = 'kasmproxy-wrapper';
-      }
+      const proxyService = this.services.get('kasmproxy');
+      const proxyName = 'kasmproxy';
 
       const proxyConfig = this.config.services?.[proxyName];
       const proxyEnabled = proxyConfig?.enabled !== false;
@@ -110,8 +104,8 @@ export class Supervisor {
 
       // Start all other services (proxy already started)
       for (const service of sorted) {
-        // Skip proxy services - already started
-        if (service.name === 'kasmproxy' || service.name === 'kasmproxy-wrapper') continue;
+        // Skip proxy - already started
+        if (service.name === 'kasmproxy') continue;
 
         // Check if service is explicitly disabled (default is enabled)
         const serviceConfig = this.config.services?.[service.name];
