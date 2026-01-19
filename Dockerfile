@@ -33,12 +33,17 @@ RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
     cp -r /tmp/gmweb/startup /opt/gmweb-startup && \
     rm -rf /tmp/gmweb
 
+# Copy custom startup script and nginx config BEFORE setup (needed by startup system)
+COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
+COPY docker/nginx-sites-enabled-default /opt/gmweb-startup/nginx-sites-enabled-default
+
 # Setup startup system
 RUN cd /opt/gmweb-startup && \
     npm install --production && \
     chmod +x /opt/gmweb-startup/install.sh && \
     chmod +x /opt/gmweb-startup/start.sh && \
-    chmod +x /opt/gmweb-startup/index.js
+    chmod +x /opt/gmweb-startup/index.js && \
+    chmod +x /opt/gmweb-startup/custom_startup.sh
 
 # RUN install.sh at BUILD TIME (installs all system packages and software)
 RUN bash /opt/gmweb-startup/install.sh
@@ -49,14 +54,10 @@ RUN mkdir -p /custom-cont-init.d && \
     echo 'bash /opt/gmweb-startup/custom_startup.sh' >> /custom-cont-init.d/01-gmweb-init && \
     chmod +x /custom-cont-init.d/01-gmweb-init
 
-# Copy our custom startup script and nginx configuration
-COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
-COPY docker/nginx-sites-enabled-default /opt/gmweb-startup/nginx-sites-enabled-default
-RUN chmod +x /opt/gmweb-startup/custom_startup.sh
-
 # Expose ports for web services
-# Port 80: kasmproxy reverse proxy (routes all traffic, runs as root)
+# Port 80/443: nginx reverse proxy with HTTP Basic Auth (routes all traffic)
 # Port 3000: LinuxServer webtop web UI (internal only)
 # Port 8082: Selkies WebSocket streaming (internal only)
 # Port 6901: VNC websocket (backup port if needed)
-EXPOSE 80 3000 6901 8082
+# Port 9997: OpenCode web editor (internal only)
+EXPOSE 80 443 3000 6901 8082 9997
