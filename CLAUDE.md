@@ -89,6 +89,24 @@ const proxy = this.services.get(serviceName);
 
 ## Critical Fixes Applied
 
+### 4. Persistent Volume Log Caching (Commit 29911a7)
+
+**Bug:** Old supervisor.log from persistent /config/logs volume was cached across deployments, masking fresh startup logs and preventing visibility into whether new code was executing.
+
+**Root Cause:**
+- Container restarts retain /config/logs from previous deployments
+- start.sh showed HEAD (first 30 lines) - old logs, not new logs appended at end
+- No boot timestamp to verify fresh vs stale deployment
+- Impossible to tell if supervisor actually started with new code
+
+**Fix:**
+1. Clear supervisor.log on every boot (before supervisor starts) - `docker/custom_startup.sh`
+2. Changed start.sh to show TAIL (last 50 lines) instead of HEAD - captures fresh startup
+3. Added boot timestamp to all diagnostics - `[start.sh] === STARTUP DIAGNOSTICS (Boot: YYYY-MM-DD HH:MM:SS) ===`
+4. Added kasmproxy port 8080 listening verification - detects silent startup failures
+
+**Result:** Fresh deployments are now visible - logs show current boot, not old cached data.
+
 ### 1. Port Forwarding (05e09ed)
 
 **Bug:** Used `parseInt(process.env.CUSTOM_PORT)` for upstream routing → forwarded to port 6901 instead of 3000.
