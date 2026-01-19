@@ -70,7 +70,8 @@ else
   [ -f "$SUPERVISOR_LOG" ] && tail -50 "$SUPERVISOR_LOG"
 fi
 
-# Keep this script running (supervisor runs forever, but we want to survive if it somehow exits)
-while true; do
-  sleep 60
-done
+# Exit after starting supervisor
+# The supervisor runs as a background process (detached) and will continue running
+# We must return from this script to allow s6-rc to proceed with other services
+echo "[start.sh] === STARTUP COMPLETE ==="
+exit 0
