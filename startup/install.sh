@@ -193,33 +193,7 @@ else
 fi
 
 # ============================================================================
-# 12. CLAUDE CODE UI
-# ============================================================================
-
-log "Installing Claude Code UI..."
-
-if [ -d /opt/claudecodeui ]; then
-  log "Claude Code UI already exists, skipping clone"
-else
-  git clone https://github.com/siteboon/claudecodeui /opt/claudecodeui
-  cd /opt/claudecodeui
-  npm install
-
-  # Patch App.jsx to add basename detection for proxy routing support
-  # When accessed via /ui prefix, React Router needs basename="/ui" to match routes
-  log "Patching Claude Code UI for proxy basename support..."
-  sed -i 's|// Root App component with router|// Detect basename from current URL path for proxy routing support\n// When accessed via /ui, the router needs basename="/ui" to match routes correctly\nfunction getBasename() {\n  const path = window.location.pathname;\n  if (path.startsWith("/ui")) return "/ui";\n  return "/";\n}\n\n// Root App component with router|' src/App.jsx
-  sed -i 's|function App() {|function App() {\n  const basename = getBasename();|' src/App.jsx
-  sed -i 's|<Router>|<Router basename={basename}>|' src/App.jsx
-  log "✓ Claude Code UI patched for proxy support"
-
-  npm run build
-  cd -
-  log "✓ Claude Code UI installed and built"
-fi
-
-# ============================================================================
-# 13. PERMISSIONS (moved to custom_startup.sh)
+# 12. PERMISSIONS (moved to custom_startup.sh)
 # ============================================================================
 
 log "Permissions are set at boot time by custom_startup.sh"

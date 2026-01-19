@@ -51,10 +51,6 @@ if [ -d /usr/local/local/nvm ]; then
 fi
 
 # ============================================================================
-# Fix Claude Code UI permissions (skipped - not critical for kasmproxy)
-# ============================================================================
-
-# ============================================================================
 # Setup .bashrc PATH (first boot only)
 # ============================================================================
 BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
@@ -99,18 +95,6 @@ Exec=xfce4-terminal -e "tmux new-session -A -s main bash"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
-AUTOSTART_EOF
-
-  # Autostart Claude Code UI in browser
-  cat > "$AUTOSTART_DIR/claude-code-ui.desktop" << 'AUTOSTART_EOF'
-[Desktop Entry]
-Type=Application
-Name=Claude Code UI
-Exec=firefox http://localhost/ui
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-StartupDelay=5
 AUTOSTART_EOF
 
   # Autostart File Manager in browser

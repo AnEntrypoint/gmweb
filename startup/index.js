@@ -43,7 +43,6 @@ async function main() {
       'claude-plugin-gm',
       'webssh2',
       'file-manager',
-      'claude-code-ui',
       'sshd',
       'tmux',
       'opencode'
