@@ -1,4 +1,4 @@
-// File Manager service using standalone HTTP server
+// File Manager service using NHFS (Next.js HTTP File Server)
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -13,15 +13,16 @@ export default {
   async start(env) {
     const processEnv = {
       ...env,
-      BASE_DIR: '/config',  // LinuxServer webtop home directory
-      PORT: '9998',
-      HOSTNAME: '0.0.0.0'
+      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+      NODE_ENV: 'production',
+      NHFS_BASE_DIR: '/config'
     };
 
-    // Run lightweight standalone file server
-    // Serves files from BASE_DIR with proper content types and no external dependencies
-    const ps = spawn('node', ['/opt/gmweb-startup/standalone-server.mjs'], {
+    // Run pre-built NHFS using the bin.js CLI
+    // bin.js spawns dist/server.js with PORT and HOSTNAME set
+    const ps = spawn('node', ['/opt/nhfs/bin.js', '--port', '9998', '--dir', '/config'], {
       env: processEnv,
+      cwd: '/opt/nhfs',
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
