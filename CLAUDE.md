@@ -14,15 +14,16 @@
 
 **Port 80:** kasmproxy runs as root (supervisor process) so it can bind privileged ports. Port 80 is the primary entry point. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
 
-### kasmproxy Implementation (Local HTTP Server)
+### kasmproxy Implementation (gxe/npx)
 
-**Execution:** Direct Node.js HTTP server running in gmweb supervisor
+**Execution:** Launched via `npx -y gxe@latest AnEntrypoint/kasmproxy` in gmweb supervisor
 
-kasmproxy is implemented as a native Node.js HTTP server that runs in the supervisor process. This provides:
-- Direct control over proxy behavior without external dependencies
-- Immediate startup without npm/gxe latency
-- Full inline logging and debugging
-- Synchronous startup guarantees
+kasmproxy runs as a separate process spawned by gxe, which fetches and executes the latest version directly from GitHub. This provides:
+- Always uses latest kasmproxy from GitHub repository
+- Automatic updates without redeployment
+- Decoupled from gmweb version management
+- Full control over proxy behavior
+- Proper process lifecycle management
 
 **What it does:**
 - Listens on port 80 (HTTP Basic Auth reverse proxy)
@@ -32,15 +33,51 @@ kasmproxy is implemented as a native Node.js HTTP server that runs in the superv
 - Strips SUBFOLDER prefix (`/desk/*` → `/*`)
 - Handles WebSocket upgrades for streaming
 
-**Why Local Implementation:**
-- gxe execution proved unreliable in Docker environments
-- npm/npx adds startup latency and requires network access
-- Local implementation ensures immediate port binding
-- Full control over startup flow and error handling
-- Simplified debugging with inline logging
+**Why gxe/npx Execution:**
+- Runs latest version from GitHub without needing local repos
+- Supports hot updates without container rebuild
+- Consistent with other AnEntrypoint CLI tools
+- gxe handles installation and execution automatically
+- No npm cache issues or version conflicts
 
 **Why Port 80:**
 The supervisor runs as root (via LinuxServer Webtop s6 supervision system). Root processes can bind privileged ports (< 1024). Port 80 is the standard HTTP port and serves as the primary entry point for external traffic. Traefik/Coolify forwards requests to container:80.
+
+## AnEntrypoint Tools Standard Pattern
+
+### All npx-style AnEntrypoint tools must use gxe
+
+**Standard execution pattern:**
+```bash
+npx -y gxe@latest AnEntrypoint/<tool-name>
+```
+
+**Examples:**
+- `npx -y gxe@latest AnEntrypoint/kasmproxy` - HTTP/WS proxy
+- `npx -y gxe@latest AnEntrypoint/<other-tool>` - Any other AnEntrypoint tool
+
+**Why this pattern:**
+- Always runs latest version from GitHub, even if tool is updated between deployments
+- No local cloning or repository management needed
+- gxe handles npm installation and caching automatically
+- Supports seamless feature/security updates
+- Decoupled from gmweb versioning
+
+**In supervisor services:**
+```javascript
+// Launch tool via gxe
+const process = spawn('npx', [
+  '-y',
+  'gxe@latest',
+  'AnEntrypoint/<tool-name>'
+], {
+  stdio: ['ignore', 'inherit', 'inherit'],
+  env: {
+    ...process.env,
+    // Pass required environment variables
+  }
+});
+```
 
 ### Environment Variables
 
@@ -259,6 +296,36 @@ const LISTEN_PORT = parseInt(process.env.LISTEN_PORT || '80');
 - HTTP Basic Auth enforced on all routes except /data/* and /ws/*
 
 **Summary:** Supervisor initializes correctly and kasmproxy binds to port 80 as the primary entry point.
+
+### Issue 3: Init Script Blocking s6-rc Service Startup (Fixed)
+
+**Problem:** The `start.sh` script had an infinite loop `while true; sleep 60` that blocked s6-rc from starting other services.
+
+**Impact:** 
+- LinuxServer s6 init system waits for `/custom-cont-init.d/01-gmweb-init` to complete
+- Script never exited due to infinite loop
+- Prevented svc-xorg, svc-de, svc-selkies from starting
+- Webtop desktop environment never launched
+
+**Root Cause:** Misguided attempt to keep the init script running. However:
+- The supervisor is spawned as a background process (detached)
+- The supervisor continues running independently
+- The init script MUST exit to allow s6-rc to proceed
+- Blocking prevents critical desktop services from starting
+
+**Fix:** Changed script to exit after supervisor starts:
+```bash
+# OLD (WRONG):
+while true; do
+  sleep 60
+done
+
+# NEW (CORRECT):
+echo "[start.sh] === STARTUP COMPLETE ==="
+exit 0
+```
+
+**Result:** s6-rc now proceeds to start svc-xorg, svc-de, and other services after gmweb init completes.
 
 ## Persistent Storage & User Settings
 
