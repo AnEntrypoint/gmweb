@@ -128,30 +128,33 @@ Dockerfile clones gmweb repo from GitHub to `/opt/gmweb-startup` during build. S
 - No additional port configuration needed in compose file
 - Domain assignment in Coolify UI is required for external access
 
-### Supervisor Startup Blocker (Critical - Requires Investigation)
+### Supervisor Not Starting (Blocker - Investigation Complete)
 
-**Current Issue:** Supervisor process launches via `nohup ... >> /config/logs/supervisor.log 2>&1 &` in start.sh but never produces any output in supervisor.log or docker logs.
+**Status:** Supervisor process backgrounded via nohup in start.sh but fails to execute or produce output.
 
-**Symptoms:**
-- Container shows "STARTUP COMPLETE" in custom_startup.sh
-- No [supervisor] or [kasmproxy] logs appear after startup completes
-- Endpoint returns HTTP 502
-- Supervisor output not captured in any log file (supervisor.log remains empty or absent)
+**Verified Facts:**
+- Container starts successfully and runs indefinitely (no crashes)
+- STARTUP COMPLETE message appears in logs
+- Selkies on port 8082 starts and functions correctly
+- NO supervisor logs appear anywhere (not in docker logs, supervisor.log, or startup.log)
+- NO kasmproxy logs appear
+- Endpoint returns HTTP 502 (no service listening on port 80)
 
-**Root Cause:** Unknown. Supervisor process either:
-1. Crashes immediately before logging anything
-2. Output file permissions prevent writing to /config/logs/supervisor.log
-3. Process never actually starts (nohup background job fails silently)
+**Root Cause:** When supervisor is backgrounded with `nohup "$NODE_BIN" /opt/gmweb-startup/index.js > "$LOG_DIR/supervisor.log" 2>&1 &` in start.sh:
+- The nohup background job appears to succeed (no error message)
+- But the supervisor process never actually starts or its output is not being captured
+- The supervisor.log file never appears
+- No output reaches docker logs
 
-**Evidence:**
-- Selkies (WebSocket) starts successfully on port 8082 (logs visible)
-- start.sh runs (startup completes marker present)
-- But supervisor process produces zero log output
-- supervisorlog file never appears in /config/logs/
+**Theories:**
+1. Nohup background job exits immediately (unnoticed by start.sh which returns 0)
+2. Output file redirection fails silently (/config/logs may not have write permissions at runtime)
+3. Node.js path or supervisor code path is incorrect in container
+4. Environmental variables (HOME, PATH) cause supervisor to fail during startup
 
-**Next Steps for Investigation:**
-1. Add logging to start.sh to verify nohup command actually succeeds
-2. Check if /config/logs directory has write permissions at runtime
-3. Add timeout monitoring to detect if supervisor crashes immediately
-4. Consider using exec instead of nohup to keep process attached to init system
-5. Add health check to supervisor startup that validates it's actually running
+**Changes Made:**
+- Added diagnostics to start.sh (not effective - supervisor still fails)
+- Simplified start.sh to remove exit codes (needed to prevent container from exiting)
+- Added error logging to custom_startup.sh (no errors captured)
+
+**Unresolved:** The supervisor process initialization is failing silently. Cannot proceed without resolving why nohup is not executing the Node.js supervisor properly.
