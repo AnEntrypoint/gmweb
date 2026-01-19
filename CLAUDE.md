@@ -14,11 +14,13 @@
 
 **Port 8080:** kasmproxy runs as non-root user "abc" and cannot bind privileged ports (< 1024). Port 8080 is used instead. Traefik/Coolify routes external requests to container:8080. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
 
-### kasmproxy Implementation
+### kasmproxy Implementation (via gxe)
 
-**Execution:** Direct Node.js: `node /opt/gmweb-startup/kasmproxy.js`
+**Execution:** `npx -y gxe@latest AnEntrypoint/kasmproxy`
 
-Kasmproxy is a local HTTP reverse proxy implementation that:
+kasmproxy is executed via gxe, which fetches and runs the latest code from the AnEntrypoint/kasmproxy GitHub repository. This ensures the proxy always runs the latest version without manual updates.
+
+**What it does:**
 - Listens on port 8080 (non-privileged, can bind as abc user)
 - Enforces HTTP Basic Auth (`kasm_user:PASSWORD`)
 - Routes `/data/*` and `/ws/*` to Selkies:8082 (bypasses auth)
@@ -28,8 +30,12 @@ Kasmproxy is a local HTTP reverse proxy implementation that:
 **Why Port 8080:**
 The supervisor runs as non-root user "abc" (from LinuxServer Webtop). Non-root processes cannot bind privileged ports (< 1024) without special capabilities. Port 8080 allows kasmproxy to start without requiring CAP_NET_BIND_SERVICE. Traefik/Coolify forwards external traffic to this port.
 
-**Why Local Implementation:**
-gxe execution via `npx -y gxe@latest AnEntrypoint/kasmproxy` was unreliable. Local Node.js execution ensures kasmproxy starts consistently.
+**Why gxe Pattern:**
+All AnEntrypoint projects run via gxe: `npx -y gxe@latest AnEntrypoint/<project>`. This ensures:
+- Always fetch latest code from GitHub at startup
+- No manual image rebuilds needed for project updates
+- Automatic version management via gxe
+- Consistent execution pattern across all AnEntrypoint projects
 
 ### Environment Variables
 
