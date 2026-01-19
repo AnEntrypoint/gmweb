@@ -115,9 +115,14 @@ AUTOSTART_EOF
    mkdir -p "${HOME}/.local/bin"
    cat > "${HOME}/.local/bin/chromium-autostart.sh" << 'SCRIPT_EOF'
 #!/bin/bash
-# Chromium autostart wrapper - ensures DISPLAY is set
+# Chromium autostart wrapper - ensures DISPLAY is set and Playwriter auto-engages
 export DISPLAY=:1.0
-exec /usr/bin/chromium http://abc:test123@127.0.0.1/code/
+/usr/bin/chromium http://abc:test123@127.0.0.1/code/ > /dev/null 2>&1 &
+sleep 8
+# Auto-click Playwriter extension icon to engage it (turn green)
+xdotool search --name "Chromium" windowactivate 2>/dev/null || true
+sleep 1
+xdotool mousemove 1350 65 click 1 2>/dev/null || true
 SCRIPT_EOF
    chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
 
