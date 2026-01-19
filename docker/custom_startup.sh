@@ -119,10 +119,11 @@ AUTOSTART_EOF
 export DISPLAY=:1.0
 /usr/bin/chromium http://abc:test123@127.0.0.1/code/ > /dev/null 2>&1 &
 sleep 8
-# Auto-click Playwriter extension icon to engage it (turn green)
+# Auto-click Playwriter extension arrow icon to engage it (turn green)
+# The arrow icon is located at x=1150, y=145 (right of URL bar, left of puzzle piece)
 xdotool search --name "Chromium" windowactivate 2>/dev/null || true
 sleep 1
-xdotool mousemove 1350 65 click 1 2>/dev/null || true
+xdotool mousemove 1150 145 click 1 2>/dev/null || true
 SCRIPT_EOF
    chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
 
