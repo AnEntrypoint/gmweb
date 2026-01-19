@@ -26,10 +26,10 @@ ENV PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:$PATH"
 
 # Cache-bust to force fresh git clone (ensures latest code from GitHub)
 ARG BUILD_DATE=unknown
-ARG CACHE_BUST=3
+ARG CACHE_BUST=4
 
-# Clone gmweb repo to get startup system
-RUN git clone --depth 1 https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
+# Clone gmweb repo to get startup system (no depth limit to ensure latest commits)
+RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
     cp -r /tmp/gmweb/startup /opt/gmweb-startup && \
     rm -rf /tmp/gmweb
 
