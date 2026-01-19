@@ -14,7 +14,7 @@ export default {
     const processEnv = {
       ...env,
       PASSWORD: env.PASSWORD || 'password',
-      LISTEN_PORT: '80',
+      LISTEN_PORT: '8080',
       SUBFOLDER: env.SUBFOLDER || '/desk/',
       PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     };
@@ -52,7 +52,7 @@ export default {
   async health() {
     try {
       const { execSync } = await import('child_process');
-      execSync('lsof -i :80 | grep -q LISTEN', { stdio: 'pipe' });
+      execSync('lsof -i :8080 | grep -q LISTEN', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;

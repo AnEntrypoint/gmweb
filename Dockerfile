@@ -54,7 +54,7 @@ COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
 RUN chmod +x /opt/gmweb-startup/custom_startup.sh
 
 # Expose ports for web services
-# Port 80: kasmproxy-wrapper (routes all traffic)
+# Port 8080: kasmproxy reverse proxy (routes all traffic)
 # Port 3000: LinuxServer webtop web UI
 # Port 6901: VNC websocket (backup port if needed)
-EXPOSE 80 3000 6901
+EXPOSE 8080 3000 6901

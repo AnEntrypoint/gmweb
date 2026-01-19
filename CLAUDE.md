@@ -8,25 +8,28 @@
 
 **Architecture:**
 - Webtop web UI listens on port 3000 internally (CUSTOM_PORT=6901 is external config only)
-- kasmproxy listens on port 80 (HTTP Basic Auth reverse proxy)
+- kasmproxy listens on port 8080 (HTTP Basic Auth reverse proxy, non-privileged port for abc user)
 - Selkies WebSocket streaming on port 8082 (handles own authentication)
-- Traefik/Coolify routes external domain to container:80
+- Traefik/Coolify routes external domain to container:8080
 
-**Port 80:** Internal only. Coolify automatically forwards domain requests to container port 80. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
+**Port 8080:** kasmproxy runs as non-root user "abc" and cannot bind privileged ports (< 1024). Port 8080 is used instead. Traefik/Coolify routes external requests to container:8080. kasmproxy then routes internally to Webtop:3000 or Selkies:8082.
 
 ### kasmproxy Implementation
 
 **Execution:** Direct Node.js: `node /opt/gmweb-startup/kasmproxy.js`
 
 Kasmproxy is a local HTTP reverse proxy implementation that:
-- Listens on port 80
+- Listens on port 8080 (non-privileged, can bind as abc user)
 - Enforces HTTP Basic Auth (`kasm_user:PASSWORD`)
 - Routes `/data/*` and `/ws/*` to Selkies:8082 (bypasses auth)
 - Routes all other paths to Webtop:3000 (requires auth)
 - Strips SUBFOLDER prefix (`/desk/*` → `/*`)
 
+**Why Port 8080:**
+The supervisor runs as non-root user "abc" (from LinuxServer Webtop). Non-root processes cannot bind privileged ports (< 1024) without special capabilities. Port 8080 allows kasmproxy to start without requiring CAP_NET_BIND_SERVICE. Traefik/Coolify forwards external traffic to this port.
+
 **Why Local Implementation:**
-gxe execution via `npx -y gxe@latest AnEntrypoint/kasmproxy` was unreliable. Local Node.js execution ensures kasmproxy starts and binds to port 80 consistently.
+gxe execution via `npx -y gxe@latest AnEntrypoint/kasmproxy` was unreliable. Local Node.js execution ensures kasmproxy starts consistently.
 
 ### Environment Variables
 
