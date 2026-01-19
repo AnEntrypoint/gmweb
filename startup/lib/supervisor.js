@@ -88,7 +88,7 @@ export class Supervisor {
           await this.startService(proxyService);
 
           // Wait for proxy to be healthy (blocks other services)
-          await this.waitForKasmproxyHealthy();
+          await this.waitForKasmproxyHealthy(proxyName);
           this.kasmproxyHealthy = true;
           this.log('INFO', `${proxyName} is healthy - proceeding with other services`);
         } catch (err) {
@@ -143,17 +143,17 @@ export class Supervisor {
     }
   }
 
-  async waitForKasmproxyHealthy() {
+  async waitForKasmproxyHealthy(serviceName = 'kasmproxy-wrapper') {
     const startTime = Date.now();
     const timeout = this.config.kasmproxyStartupTimeout;
 
-    this.log('INFO', 'Waiting for kasmproxy to be healthy...');
+    this.log('INFO', `Waiting for ${serviceName} to be healthy...`);
 
     while (Date.now() - startTime < timeout) {
       try {
-        const kasmproxy = this.services.get('kasmproxy');
-        if (kasmproxy && await kasmproxy.health()) {
-          this.log('INFO', 'kasmproxy is healthy!');
+        const proxy = this.services.get(serviceName);
+        if (proxy && await proxy.health()) {
+          this.log('INFO', `${serviceName} is healthy!`);
           return;
         }
       } catch (err) {
@@ -163,7 +163,7 @@ export class Supervisor {
       await sleep(2000);
     }
 
-    this.log('WARN', 'kasmproxy health check timeout after ' + Math.round((Date.now() - startTime) / 1000) + 's - continuing anyway');
+    this.log('WARN', `${serviceName} health check timeout after ` + Math.round((Date.now() - startTime) / 1000) + 's - continuing anyway');
   }
 
   async startService(service) {
