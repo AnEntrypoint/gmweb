@@ -111,6 +111,16 @@ X-GNOME-Autostart-enabled=true
 StartupDelay=5
 AUTOSTART_EOF
 
+   # Create Chromium autostart wrapper script
+   mkdir -p "${HOME}/.local/bin"
+   cat > "${HOME}/.local/bin/chromium-autostart.sh" << 'SCRIPT_EOF'
+#!/bin/bash
+# Chromium autostart wrapper - ensures DISPLAY is set
+export DISPLAY=:1.0
+exec /usr/bin/chromium http://abc:test123@127.0.0.1/code/
+SCRIPT_EOF
+   chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
+
    # Autostart Chromium with Playwriter Extension Debugger
    cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
@@ -118,13 +128,13 @@ Type=Application
 Name=Chromium
 Comment=Open Chromium with Playwriter
 Icon=chromium
-Exec=/usr/bin/chromium http://abc:test123@127.0.0.1/code/
+Exec=~/.local/bin/chromium-autostart.sh
 Categories=Network;WebBrowser;
 X-GNOME-Autostart-enabled=true
 Terminal=false
 AUTOSTART_EOF
 
-   chown -R abc:abc "$AUTOSTART_DIR"
+   chown -R abc:abc "$AUTOSTART_DIR" "${HOME}/.local/bin"
    log "✓ XFCE autostart configured"
 else
   log "✓ XFCE autostart already configured (skipping)"
