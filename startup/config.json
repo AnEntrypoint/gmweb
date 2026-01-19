@@ -62,6 +62,10 @@
     "opencode-web": {
       "enabled": true,
       "type": "web"
+    },
+    "glootie-oc": {
+      "enabled": true,
+      "type": "install"
     }
   }
 }

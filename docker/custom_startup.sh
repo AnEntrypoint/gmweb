@@ -184,16 +184,16 @@ if command -v nginx &> /dev/null; then
 fi
 
 # ============================================================================
-# Start supervisor
+# Start supervisor as abc user (not root)
 # ============================================================================
-log "Starting gmweb supervisor..."
-
-# Export HOME for supervisor
-export HOME="$HOME_DIR"
+log "Starting gmweb supervisor as abc user..."
 
 if [ -f /opt/gmweb-startup/start.sh ]; then
-  # Run start.sh and capture exit code
-  bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
+  # Run start.sh as abc user with proper HOME
+  # sudo -u abc: run as abc user
+  # -H: set HOME to /config (from /etc/passwd)
+  # bash /opt/gmweb-startup/start.sh: run the startup script
+  sudo -u abc -H bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
   START_EXIT_CODE=$?
   if [ $START_EXIT_CODE -ne 0 ]; then
     log "WARNING: start.sh exited with code $START_EXIT_CODE (supervisor may have failed to start)"
