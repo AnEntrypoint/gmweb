@@ -11,13 +11,21 @@ export default {
   dependencies: [],
 
   async start(env) {
+    console.log('[kasmproxy] Preparing environment...');
+    console.log('[kasmproxy] PASSWORD:', env.PASSWORD ? env.PASSWORD.substring(0, 3) + '***' : '(not set)');
+    console.log('[kasmproxy] SUBFOLDER:', env.SUBFOLDER);
+
     const processEnv = {
       ...env,
       PASSWORD: env.PASSWORD || 'password',
       LISTEN_PORT: '8080',
       SUBFOLDER: env.SUBFOLDER || '/desk/',
-      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+      PATH: env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+      NODE_OPTIONS: '--no-warnings'
     };
+
+    console.log('[kasmproxy] Spawning: npx -y gxe@latest AnEntrypoint/kasmproxy');
+    console.log('[kasmproxy] Final PASSWORD:', processEnv.PASSWORD ? processEnv.PASSWORD.substring(0, 3) + '***' : '(not set)');
 
     const ps = spawn('npx', ['-y', 'gxe@latest', 'AnEntrypoint/kasmproxy'], {
       env: processEnv,
