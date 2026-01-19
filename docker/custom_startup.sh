@@ -128,6 +128,48 @@ else
 fi
 
 # ============================================================================
+# Setup nginx configuration and authentication
+# ============================================================================
+NGINX_CONF_SRC="/opt/gmweb-startup/nginx-sites-enabled-default"
+NGINX_CONF_DEST="/etc/nginx/sites-enabled/default"
+HTPASSWD_FILE="/etc/nginx/.htpasswd"
+
+if [ -f "$NGINX_CONF_SRC" ]; then
+  log "Configuring nginx..."
+  cp "$NGINX_CONF_SRC" "$NGINX_CONF_DEST"
+  log "✓ Nginx config updated"
+else
+  log "WARNING: nginx config template not found at $NGINX_CONF_SRC (skipping)"
+fi
+
+# Setup htpasswd for basic auth (if PASSWORD is set)
+if [ -z "$PASSWORD" ]; then
+  log "WARNING: PASSWORD not set, nginx auth will not work"
+else
+  # Generate apr1 hash for the password
+  HASH=$(echo "$PASSWORD" | openssl passwd -apr1 -stdin)
+  if [ -z "$HASH" ]; then
+    log "ERROR: Failed to generate password hash"
+  else
+    # Write htpasswd file (this script runs as root via LinuxServer init system)
+    echo "abc:$HASH" > "$HTPASSWD_FILE"
+    chmod 644 "$HTPASSWD_FILE"
+    log "✓ HTTP Basic Auth configured (abc:****)"
+  fi
+fi
+
+# Validate nginx config
+if command -v nginx &> /dev/null; then
+  if nginx -t 2>/dev/null; then
+    log "✓ Nginx config valid"
+    # Try to reload nginx (may fail if not running yet, that's OK)
+    nginx -s reload 2>/dev/null || log "Note: nginx reload skipped (may not be running yet)"
+  else
+    log "WARNING: Nginx config has errors (continuing anyway)"
+  fi
+fi
+
+# ============================================================================
 # Start supervisor
 # ============================================================================
 log "Starting gmweb supervisor..."
