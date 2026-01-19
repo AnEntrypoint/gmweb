@@ -199,6 +199,27 @@ sudo chmod +x /usr/bin/chromium
 log "✓ Chromium no-sandbox wrapper created"
 
 # ============================================================================
+# 10e. CHROMIUM AUTOSTART ENTRY
+# ============================================================================
+
+log "Creating Chromium autostart desktop entry..."
+
+# Note: Desktop entry will be created at first boot when user directories exist
+# Store the entry content in a file for later creation
+cat > /opt/gmweb-startup/chromium-autostart.desktop << 'AUTOSTART_EOF'
+[Desktop Entry]
+Type=Application
+Name=Chromium
+Comment=Open Chromium with Playwriter Extension
+Icon=chromium
+Exec=chromium http://localhost/ "chrome-extension://jfeammnjpkecdekppnclgkkffahnhfhe/index.html"
+Categories=Network;WebBrowser;
+X-GNOME-Autostart-enabled=true
+AUTOSTART_EOF
+
+log "✓ Chromium autostart entry template stored (will be installed on first boot)"
+
+# ============================================================================
 # 11. TTYD WEB TERMINAL
 # ============================================================================
 

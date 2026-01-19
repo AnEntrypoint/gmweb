@@ -97,8 +97,8 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART_EOF
 
-  # Autostart File Manager in browser
-  cat > "$AUTOSTART_DIR/file-manager.desktop" << 'AUTOSTART_EOF'
+   # Autostart File Manager in browser
+   cat > "$AUTOSTART_DIR/file-manager.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=File Manager
@@ -109,8 +109,20 @@ X-GNOME-Autostart-enabled=true
 StartupDelay=5
 AUTOSTART_EOF
 
-  chown -R abc:abc "$AUTOSTART_DIR"
-  log "✓ XFCE autostart configured"
+   # Autostart Chromium with Playwriter Extension
+   cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
+[Desktop Entry]
+Type=Application
+Name=Chromium
+Comment=Open Chromium with Playwriter Extension
+Icon=chromium
+Exec=chromium http://localhost/ "chrome-extension://jfeammnjpkecdekppnclgkkffahnhfhe/index.html"
+Categories=Network;WebBrowser;
+X-GNOME-Autostart-enabled=true
+AUTOSTART_EOF
+
+   chown -R abc:abc "$AUTOSTART_DIR"
+   log "✓ XFCE autostart configured"
 else
   log "✓ XFCE autostart already configured (skipping)"
 fi
