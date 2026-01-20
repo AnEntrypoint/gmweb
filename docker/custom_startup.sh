@@ -190,12 +190,13 @@ else
   HASH=$(echo "$PASSWORD" | openssl passwd -apr1 -stdin)
   if [ -z "$HASH" ]; then
     log "ERROR: Failed to generate password hash"
-  else
-    # Write htpasswd file (this script runs as root via LinuxServer init system)
-    echo "abc:$HASH" > "$HTPASSWD_FILE"
-    chmod 644 "$HTPASSWD_FILE"
-    log "✓ HTTP Basic Auth configured (abc:****)"
-  fi
+   else
+     # Write htpasswd file with both abc and opencode users (script runs as root)
+     echo "abc:$HASH" > "$HTPASSWD_FILE"
+     echo "opencode:$HASH" >> "$HTPASSWD_FILE"
+     chmod 644 "$HTPASSWD_FILE"
+     log "✓ HTTP Basic Auth configured (abc:**** and opencode:****)"
+   fi
 fi
 
 # Validate nginx config
