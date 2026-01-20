@@ -31,11 +31,10 @@ echo "[start.sh] === STARTING SUPERVISOR ==="
 export NODE_OPTIONS="--no-warnings"
 
 # Try to use stdbuf if available, otherwise run directly
-# Change to home directory before starting supervisor
 if command -v stdbuf &> /dev/null; then
-  cd "$HOME_DIR" && stdbuf -oL -eL "$NODE_BIN" /opt/gmweb-startup/index.js >> "$SUPERVISOR_LOG" 2>&1 &
+  stdbuf -oL -eL "$NODE_BIN" /opt/gmweb-startup/index.js >> "$SUPERVISOR_LOG" 2>&1 &
 else
-  cd "$HOME_DIR" && "$NODE_BIN" /opt/gmweb-startup/index.js >> "$SUPERVISOR_LOG" 2>&1 &
+  "$NODE_BIN" /opt/gmweb-startup/index.js >> "$SUPERVISOR_LOG" 2>&1 &
 fi
 SUPERVISOR_PID=$!
 
