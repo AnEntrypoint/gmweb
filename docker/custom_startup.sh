@@ -237,12 +237,19 @@ fi
 # Setup nginx configuration and authentication
 # ============================================================================
 NGINX_CONF_SRC="/opt/gmweb-startup/nginx-sites-enabled-default"
-NGINX_CONF_DEST="/etc/nginx/sites-enabled/default"
+NGINX_CONF_AVAILABLE="/etc/nginx/sites-available/default"
+NGINX_CONF_ENABLED="/etc/nginx/sites-enabled/default"
 HTPASSWD_FILE="/etc/nginx/.htpasswd"
 
 if [ -f "$NGINX_CONF_SRC" ]; then
   log "Configuring nginx..."
-  cp "$NGINX_CONF_SRC" "$NGINX_CONF_DEST"
+  # Copy to both locations to ensure it's always used
+  # sites-available is the source, sites-enabled may be symlinked
+  cp "$NGINX_CONF_SRC" "$NGINX_CONF_AVAILABLE"
+  # If sites-enabled/default is not a symlink, also update it
+  if [ ! -L "$NGINX_CONF_ENABLED" ]; then
+    cp "$NGINX_CONF_SRC" "$NGINX_CONF_ENABLED"
+  fi
   log "✓ Nginx config updated"
 else
   log "WARNING: nginx config template not found at $NGINX_CONF_SRC (skipping)"
@@ -266,13 +273,21 @@ else
 fi
 
 # Validate and reload nginx config
-# nginx config is deployed at build time to /etc/nginx/sites-available/default
-# Just need to validate and reload if nginx is already running
 if command -v nginx &> /dev/null; then
   if nginx -t 2>/dev/null; then
     log "✓ Nginx config valid"
-    # Reload nginx if it's already running (it should be from s6-rc)
-    sudo /etc/init.d/nginx reload 2>/dev/null || log "Note: nginx reload skipped (may not be running yet)"
+    # Force reload nginx to pick up the new config
+    # Try init.d reload first, then pkill -HUP as fallback
+    if sudo /etc/init.d/nginx reload 2>/dev/null; then
+      log "✓ Nginx reloaded on ports 80/443"
+    else
+      # If reload fails, try sending HUP signal directly
+      if sudo pkill -HUP nginx 2>/dev/null; then
+        log "✓ Nginx reloaded (SIGHUP)"
+      else
+        log "Note: nginx reload skipped (may not be running yet)"
+      fi
+    fi
   else
     log "WARNING: Nginx config has errors (continuing anyway)"
   fi
