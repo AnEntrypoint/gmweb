@@ -16,9 +16,9 @@ export default {
     console.log('[playwriter] Starting Playwriter relay server...');
     
     try {
-      // Start playwriter-ws-server in background
+      // Start playwriter MCP server in background
       // Use npx to install and run the latest playwriter package
-      const ps = spawn('bash', ['-c', 'npx -y playwriter-ws-server@latest'], {
+      const ps = spawn('bash', ['-c', 'npx -y playwriter'], {
         env: { ...env, HOME: '/config' },
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true,
