@@ -166,6 +166,10 @@ rm -rf "$HOME_DIR/.config/chromium/Singleton" 2>/dev/null || true
 rm -rf "$HOME_DIR/.config/chromium/SingletonSocket" 2>/dev/null || true
 rm -rf "$HOME_DIR/.config/chromium/.com.google.Chrome.* " 2>/dev/null || true
 rm -rf "$HOME_DIR/.config/chromium/Profile*/.*lock" 2>/dev/null || true
+find "$HOME_DIR/.config/chromium" -name "*lock*" -delete 2>/dev/null || true
+find "$HOME_DIR/.config/chromium" -name "*Socket*" -delete 2>/dev/null || true
+# Also clean First Run file to prevent splash screen
+rm -f "$HOME_DIR/.config/chromium/Default/First Run" 2>/dev/null || true
 log "✓ Chromium profile locks cleaned"
 
 # ============================================================================
@@ -215,6 +219,16 @@ echo "[$(date)] Starting chromium autostart" >> "$LOG_FILE"
 PASSWORD="${PASSWORD:-Joker@212Joker@212}"
 FQDN="${COOLIFY_FQDN:-127.0.0.1}"
 
+# Aggressively clean Chromium profile locks (stale locks from previous boots)
+echo "[$(date)] Cleaning stale Chromium profile locks..." >> "$LOG_FILE"
+rm -rf "${HOME}/.config/chromium/Singleton" 2>/dev/null || true
+rm -rf "${HOME}/.config/chromium/SingletonSocket" 2>/dev/null || true
+rm -rf "${HOME}/.config/chromium/Profile"*/.*lock 2>/dev/null || true
+rm -rf "${HOME}/.config/chromium/Profile*/Lock 2>/dev/null || true
+rm -rf "${HOME}/.config/chromium/Default/.*lock 2>/dev/null || true
+find "${HOME}/.config/chromium" -name "*lock*" -delete 2>/dev/null || true
+find "${HOME}/.config/chromium" -name "*Socket*" -delete 2>/dev/null || true
+
 # Wait for nginx to be ready (max 30 seconds)
 echo "[$(date)] Waiting for nginx on port 80/443..." >> "$LOG_FILE"
 for i in {1..30}; do
@@ -235,12 +249,9 @@ else
   URL="https://abc:${PASSWORD}@${FQDN}/code/"
 fi
 
-# Remove any stale Chromium profile locks
-rm -rf "${HOME}/.config/chromium/Singleton" 2>/dev/null || true
-rm -rf "${HOME}/.config/chromium/SingletonSocket" 2>/dev/null || true
-
 echo "[$(date)] Launching Chromium to: $FQDN" >> "$LOG_FILE"
-/usr/bin/chromium --new-window "$URL" >> "$LOG_FILE" 2>&1 &
+# Use --user-data-dir to isolate profile and avoid lock conflicts
+/usr/bin/chromium --new-window --no-first-run "$URL" >> "$LOG_FILE" 2>&1 &
 CHROMIUM_PID=$!
 echo "[$(date)] Chromium launched with PID $CHROMIUM_PID" >> "$LOG_FILE"
 SCRIPT_EOF
