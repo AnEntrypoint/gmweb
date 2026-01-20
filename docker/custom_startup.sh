@@ -89,6 +89,8 @@ NHFS_DIR="/opt/nhfs"
 if [ ! -d "$NHFS_DIR" ]; then
   log "Cloning NHFS repository..."
   git clone https://github.com/AliSananS/NHFS.git "$NHFS_DIR" 2>&1 | head -3
+  # Fix ownership immediately after cloning
+  chown -R abc:abc "$NHFS_DIR" 2>/dev/null || true
   log "✓ NHFS cloned"
 else
   log "Updating NHFS repository..."
@@ -144,11 +146,17 @@ log "Setting up Glootie-OC (OpenCode plugin)..."
 
 GLOOTIE_DIR="$HOME_DIR/.opencode/glootie-oc"
 
+# Ensure parent directory exists with proper ownership
+mkdir -p "$(dirname "$GLOOTIE_DIR")"
+chown abc:abc "$(dirname "$GLOOTIE_DIR")" 2>/dev/null || true
+
 # Run Glootie setup in background so startup continues immediately
 {
   if [ ! -d "$GLOOTIE_DIR" ]; then
     log "Cloning Glootie-OC repository (background)..."
     sudo -u abc git clone https://github.com/AnEntrypoint/glootie-oc.git "$GLOOTIE_DIR" 2>&1 | head -3
+    # Fix ownership immediately after cloning
+    chown -R abc:abc "$GLOOTIE_DIR" 2>/dev/null || true
     log "✓ Glootie-OC cloned"
     
     if [ -d "$GLOOTIE_DIR" ]; then
@@ -410,6 +418,13 @@ if [ -f "$HOME_DIR/startup.sh" ]; then
   bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
   log "User startup hook completed"
 fi
+
+# ============================================================================
+# Fix ownership of any files created as root during startup
+# ============================================================================
+log "Fixing ownership of /config files created as root..."
+chown -R abc:abc "$HOME_DIR" 2>/dev/null || true
+log "✓ Ownership fixed for /config directory"
 
 log "===== GMWEB STARTUP COMPLETE ====="
 exit 0

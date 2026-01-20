@@ -366,6 +366,15 @@ export class Supervisor {
       mkdirSync(baseDir, { recursive: true });
       mkdirSync(join(baseDir, 'services'), { recursive: true });
 
+      // Fix ownership if running as root
+      if (process.getuid() === 0) {
+        try {
+          execSync(`chown -R abc:abc "${baseDir}"`, { stdio: 'ignore' });
+        } catch (e) {
+          // Ignore ownership errors
+        }
+      }
+
       // Create log index file for easy reference
       const indexPath = join(baseDir, 'LOG_INDEX.txt');
       const indexContent = `GMWEB Log Directory
