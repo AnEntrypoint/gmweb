@@ -52,16 +52,8 @@ exec ${NPX_PATH} -y opencode-ai "$@"
   },
 
   async health() {
-    // Check if wrapper exists and works
-    try {
-      if (!existsSync(WRAPPER_PATH)) {
-        return false;
-      }
-      // Verify it actually runs
-      execSync(`${WRAPPER_PATH} --help`, { stdio: 'pipe', timeout: 30000 });
-      return true;
-    } catch (e) {
-      return false;
-    }
+    // For install services, just check if wrapper was created
+    // Don't try to run --help as that downloads packages
+    return existsSync(WRAPPER_PATH);
   }
 };

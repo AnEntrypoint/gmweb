@@ -1,6 +1,5 @@
 // Immortal Supervisor: Never crashes, always recovers
 // Follows gm:state:machine mandatory rules
-// UPDATED: Prioritizes kasmproxy startup - starts first, blocks others until healthy
 
 import { spawnSync, spawn, execSync } from 'child_process';
 import { existsSync, appendFileSync, mkdirSync, writeFileSync } from 'fs';
@@ -18,7 +17,6 @@ export class Supervisor {
       baseBackoffDelay: 5000,
       maxBackoffDelay: 60000,
       logDirectory: process.env.HOME ? `${process.env.HOME}/logs` : '/config/logs',
-      kasmproxyStartupTimeout: 120000, // 2 minutes max to wait for kasmproxy
       ...config
     };
 
@@ -28,7 +26,6 @@ export class Supervisor {
     this.running = true;
     this.restartAttempts = new Map();
     this.processes = new Map();
-    this.kasmproxyHealthy = false;
 
     // Setup log directories
     this.setupLogDirectories();
@@ -70,46 +67,18 @@ export class Supervisor {
         await this.waitForDesktop();
       }
 
-      // Setup environment once
-      this.env = await this.getEnvironment();
+       // Setup environment once
+       this.env = await this.getEnvironment();
 
-      // CRITICAL: Start proxy FIRST and wait for it to be healthy
-      const proxyService = this.services.get('kasmproxy');
-      const proxyName = 'kasmproxy';
+       // Resolve dependencies and sort services
+       const sorted = this.topologicalSort();
+       if (!sorted) {
+         this.log('ERROR', 'Circular dependency detected');
+         return;
+       }
 
-      const proxyConfig = this.config.services?.[proxyName];
-      const proxyEnabled = proxyConfig?.enabled !== false;
-
-      if (proxyService && proxyEnabled) {
-        this.log('INFO', `=== CRITICAL: Starting ${proxyName} first ===`);
-        try {
-          await this.startService(proxyService);
-
-          // Wait for proxy to be healthy (blocks other services)
-          await this.waitForKasmproxyHealthy(proxyName);
-          this.kasmproxyHealthy = true;
-          this.log('INFO', `${proxyName} is healthy - proceeding with other services`);
-        } catch (err) {
-          this.log('ERROR', `Failed to start ${proxyName}`, err);
-          this.log('WARN', 'Attempting recovery...');
-          await sleep(2000);
-          await this.startService(proxyService);
-        }
-      } else if (proxyService && !proxyEnabled) {
-        this.log('INFO', `${proxyName} is disabled in config - skipping`);
-      }
-
-      // Resolve dependencies and sort remaining services
-      const sorted = this.topologicalSort();
-      if (!sorted) {
-        this.log('ERROR', 'Circular dependency detected');
-        return;
-      }
-
-      // Start all other services (proxy already started)
-      for (const service of sorted) {
-        // Skip proxy - already started
-        if (service.name === 'kasmproxy') continue;
+       // Start all services in dependency order
+       for (const service of sorted) {
 
         // Check if service is explicitly disabled (default is enabled)
         const serviceConfig = this.config.services?.[service.name];
@@ -152,28 +121,7 @@ export class Supervisor {
     }
   }
 
-  async waitForKasmproxyHealthy(serviceName = 'kasmproxy-wrapper') {
-    const startTime = Date.now();
-    const timeout = this.config.kasmproxyStartupTimeout;
 
-    this.log('INFO', `Waiting for ${serviceName} to be healthy...`);
-
-    while (Date.now() - startTime < timeout) {
-      try {
-        const proxy = this.services.get(serviceName);
-        if (proxy && await proxy.health()) {
-          this.log('INFO', `${serviceName} is healthy!`);
-          return;
-        }
-      } catch (err) {
-        // Continue waiting
-      }
-
-      await sleep(2000);
-    }
-
-    this.log('WARN', `${serviceName} health check timeout after ` + Math.round((Date.now() - startTime) / 1000) + 's - continuing anyway');
-  }
 
   async startService(service) {
     this.log('INFO', `Starting service`, null, service.name);
