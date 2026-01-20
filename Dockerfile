@@ -48,18 +48,10 @@ RUN cd /opt/gmweb-startup && \
 # RUN install.sh at BUILD TIME (installs all system packages and software)
 RUN bash /opt/gmweb-startup/install.sh
 
-# Pre-install nginx config to active location during build
-# This ensures nginx starts with the correct config on first boot
-# s6-rc may start nginx before custom_startup.sh runs, so we need this
-RUN mkdir -p /etc/nginx/sites-enabled && \
-    cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-enabled/default
-
-# Configure sudo for abc user (needed for nginx reload and service management)
-# Allow abc user to run /etc/init.d/nginx and pkill without password
-RUN mkdir -p /etc/sudoers.d && \
-    echo "abc ALL=(ALL) NOPASSWD: /etc/init.d/nginx" > /etc/sudoers.d/gmweb-nginx && \
-    echo "abc ALL=(ALL) NOPASSWD: /bin/pkill" >> /etc/sudoers.d/gmweb-nginx && \
-    chmod 0440 /etc/sudoers.d/gmweb-nginx
+# Deploy nginx config to the actual active location
+# Copy directly to /etc/nginx/sites-available/ which is the source
+# The symlink /etc/nginx/sites-enabled/default -> sites-available/default will resolve correctly
+RUN cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
 
 # Create LinuxServer custom init script (runs at container start)
 RUN mkdir -p /custom-cont-init.d && \
