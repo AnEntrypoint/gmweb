@@ -33,6 +33,14 @@ RUN git clone https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb && \
     cp -r /tmp/gmweb/startup /opt/gmweb-startup && \
     rm -rf /tmp/gmweb
 
+# Clone and pre-build NHFS (file manager with upload support)
+# Build at image time so it's ready to run at container start
+RUN git clone https://github.com/AliSananS/NHFS.git /opt/nhfs && \
+    cd /opt/nhfs && \
+    npm install --legacy-peer-deps --production=false && \
+    npm run build && \
+    npm prune --production
+
 # Copy custom startup script and nginx config BEFORE setup (needed by startup system)
 COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
 COPY docker/nginx-sites-enabled-default /opt/gmweb-startup/nginx-sites-enabled-default
