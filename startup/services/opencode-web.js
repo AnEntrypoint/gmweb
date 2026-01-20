@@ -13,12 +13,13 @@ export default {
   dependencies: [],
 
   async start(env) {
-    // Use the opencode binary from home directory
-    const opencodeBinary = `${env.HOME || '/config'}/.opencode/bin/opencode`;
+    // Use the opencode binary from NVM path (created by opencode service)
+    const opencodeBinary = '/usr/local/local/nvm/versions/node/v23.11.1/bin/opencode';
 
     // Check if opencode binary exists
     if (!existsSync(opencodeBinary)) {
       console.log('[opencode-web] opencode binary not found at', opencodeBinary);
+      console.log('[opencode-web] Make sure opencode service runs first (it creates the wrapper)');
       return {
         pid: null,
         process: null,
