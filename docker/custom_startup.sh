@@ -265,12 +265,25 @@ else
    fi
 fi
 
-# Validate nginx config
+# Validate nginx config and force hard restart
+# We use stop/start (not reload) because nginx was started with wrong config at boot
+# Reload won't pick up port changes - must do full restart
 if command -v nginx &> /dev/null; then
   if nginx -t 2>/dev/null; then
     log "✓ Nginx config valid"
-    # Try to reload nginx (may fail if not running yet, that's OK)
-    nginx -s reload 2>/dev/null || log "Note: nginx reload skipped (may not be running yet)"
+    # Force hard restart of nginx - critical for port changes (80/443 vs 6901)
+    # Using stop/start instead of reload because reload doesn't pick up config path changes
+    if sudo /etc/init.d/nginx stop 2>/dev/null; then
+      log "Nginx stopped (preparing hard restart)"
+      sleep 1
+      if sudo /etc/init.d/nginx start 2>/dev/null; then
+        log "✓ Nginx started on ports 80/443"
+      else
+        log "WARNING: Failed to start nginx (may already be running)"
+      fi
+    else
+      log "WARNING: nginx stop failed (may not be running yet)"
+    fi
   else
     log "WARNING: Nginx config has errors (continuing anyway)"
   fi
