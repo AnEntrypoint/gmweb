@@ -222,7 +222,7 @@ cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << AUTOSTART_EOF
 Type=Application
 Name=Terminal
 Comment=Shared tmux session
-Exec=xfce4-terminal -e "$HOME_DIR/.local/bin/terminal-autostart.sh"
+Exec=bash -c "xfce4-terminal -e $HOME_DIR/.local/bin/terminal-autostart.sh"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
