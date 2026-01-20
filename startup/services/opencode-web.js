@@ -36,7 +36,11 @@ export default {
       try {
         // Run opencode --version to initialize the config directory
         execSync(`${opencodeBinary} --version`, {
-          env: { ...env, HOME: homeDir },
+          env: { 
+            ...env, 
+            PATH: `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`,
+            HOME: homeDir 
+          },
           stdio: 'pipe',
           timeout: 30000
         });
@@ -70,11 +74,10 @@ export default {
     // OpenCode expects HTTP Basic Auth with the password set via OPENCODE_SERVER_PASSWORD
     // Pass FQDN for proper CORS/CSP configuration
     // Run as user 'abc' to ensure config goes to user's home directory
-    const nodebin = '/usr/local/local/nvm/versions/node/v23.11.1/bin/node';
-    const ps = spawn('sudo', ['-u', 'abc', '-E', nodebin, opencodeBinary, 'web', '--port', '9997', '--hostname', '127.0.0.1', '--print-logs'], {
+    const ps = spawn('sudo', ['-u', 'abc', '-E', opencodeBinary, 'web', '--port', '9997', '--hostname', '127.0.0.1', '--print-logs'], {
       env: { 
         ...env,
-        PATH: `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH}`,
+        PATH: `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`,
         HOME: homeDir,
         OPENCODE_SERVER_PASSWORD: password,
         OPENCODE_EXTERNAL_URL: `https://${fqdn}/code/`,
