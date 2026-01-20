@@ -46,6 +46,9 @@ export default {
       console.log('[opencode-web] Warning: Could not clear port 9997:', e.message);
     }
 
+    // Start opencode web service from glootie-oc directory so it loads the opencode.json config
+    const glootieDir = '/config/.opencode/glootie-oc';
+    
     // Start opencode web service with password from PASSWORD env var
     // OpenCode expects HTTP Basic Auth with the password set via OPENCODE_SERVER_PASSWORD
     // Pass FQDN for proper CORS/CSP configuration
@@ -56,6 +59,7 @@ export default {
         OPENCODE_EXTERNAL_URL: `https://${fqdn}/code/`,
         OPENCODE_FQDN: fqdn
       },
+      cwd: glootieDir, // Run from glootie-oc directory to load agents/config
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: true
     });
