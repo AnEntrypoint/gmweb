@@ -217,12 +217,12 @@ exec tmux attach-session -t main 2>/dev/null || exec bash -i -l
 TERM_SCRIPT_EOF
 chmod +x "${HOME}/.local/bin/terminal-autostart.sh"
 
-cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << 'AUTOSTART_EOF'
+cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << AUTOSTART_EOF
 [Desktop Entry]
 Type=Application
 Name=Terminal
 Comment=Shared tmux session
-Exec=xfce4-terminal -e "~/.local/bin/terminal-autostart.sh"
+Exec=xfce4-terminal -e "$HOME_DIR/.local/bin/terminal-autostart.sh"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true

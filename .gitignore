@@ -2,3 +2,8 @@
 .env
 
 .code-search/
+# Screenshots and temporary files
+*.png
+*.jpg
+*.jpeg
+*.gif
