@@ -181,16 +181,29 @@ mkdir -p "$AUTOSTART_DIR"
 log "Configuring XFCE autostart (with current environment variables)..."
 
 # Autostart terminal with shared tmux session
-# Simply attach to main session (tmux service creates it with bash -i -l)
+# Add startup delay to ensure tmux session is created first
+# Use wrapper script to handle any tmux issues
+mkdir -p "${HOME}/.local/bin"
+cat > "${HOME}/.local/bin/terminal-autostart.sh" << 'TERM_SCRIPT_EOF'
+#!/bin/bash
+# Terminal autostart wrapper - ensures tmux session exists before attaching
+export DISPLAY=:1.0
+sleep 2  # Wait for tmux to create session
+# Attach to main tmux session
+exec tmux attach-session -t main 2>/dev/null || exec bash -i -l
+TERM_SCRIPT_EOF
+chmod +x "${HOME}/.local/bin/terminal-autostart.sh"
+
 cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=Terminal
 Comment=Shared tmux session
-Exec=xfce4-terminal -e "tmux attach-session -t main"
+Exec=xfce4-terminal -e "~/.local/bin/terminal-autostart.sh"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
+StartupDelay=10
 AUTOSTART_EOF
 
 # Autostart File Manager in browser
