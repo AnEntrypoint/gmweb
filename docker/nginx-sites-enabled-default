@@ -19,11 +19,23 @@ server {
     return 301 /files/;
   }
 
-  location = /code {
-    return 301 /code/;
-  }
+   location = /code {
+     return 301 /code/;
+   }
 
-  location /desk/ {
+   # NHFS asset rewrite - /files uses basePath so assets are at /_next/static/
+   # When accessed from /files/, the browser requests /_next/static/ which needs to go to NHFS
+   location /_next/ {
+     proxy_pass http://127.0.0.1:9998/files/_next/;
+     proxy_set_header Host $host;
+     proxy_set_header X-Real-IP $remote_addr;
+     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+     proxy_set_header X-Forwarded-Proto $scheme;
+     proxy_cache_valid 200 1d;
+     add_header Cache-Control "public, max-age=31536000, immutable";
+   }
+
+   location /desk/ {
     alias /usr/share/selkies/web/;
     index index.html index.htm;
     try_files $uri $uri/ =404;
