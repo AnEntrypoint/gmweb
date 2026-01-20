@@ -3,6 +3,7 @@
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { promisify } from 'util';
+import { execSync } from 'child_process';
 
 const sleep = promisify(setTimeout);
 
@@ -10,11 +11,13 @@ export default {
   name: 'opencode-web',
   type: 'web',
   requiresDesktop: false,
-  dependencies: [],
+  dependencies: ['glootie-oc'], // Wait for glootie-oc to be installed first
 
   async start(env) {
     // Use the opencode binary from NVM path (created by opencode service)
     const opencodeBinary = '/usr/local/local/nvm/versions/node/v23.11.1/bin/opencode';
+    const homeDir = '/config';
+    const opencodeUserDir = `${homeDir}/.opencode`;
 
     // Check if opencode binary exists
     if (!existsSync(opencodeBinary)) {
@@ -27,12 +30,29 @@ export default {
       };
     }
 
+    // Initialize OpenCode user directory if it doesn't exist
+    if (!existsSync(opencodeUserDir)) {
+      console.log('[opencode-web] Initializing OpenCode user directory at', opencodeUserDir);
+      try {
+        // Run opencode --version to initialize the config directory
+        execSync(`${opencodeBinary} --version`, {
+          env: { ...env, HOME: homeDir },
+          stdio: 'pipe',
+          timeout: 30000
+        });
+        console.log('[opencode-web] ✓ OpenCode user directory initialized');
+      } catch (e) {
+        console.log('[opencode-web] Warning: OpenCode initialization returned:', e.message);
+      }
+    }
+
     const password = env.PASSWORD || 'default';
     const fqdn = env.COOLIFY_FQDN || 'localhost:9997';
     
     console.log(`[opencode-web] Starting OpenCode web on port 9997`);
     console.log(`[opencode-web] Using OPENCODE_SERVER_PASSWORD: ${password.substring(0, 3)}***`);
     console.log(`[opencode-web] External FQDN: ${fqdn}`);
+    console.log(`[opencode-web] User config directory: ${opencodeUserDir}`);
 
     // Kill any existing process on port 9997 to prevent "Address already in use" errors
     try {
@@ -46,20 +66,18 @@ export default {
       console.log('[opencode-web] Warning: Could not clear port 9997:', e.message);
     }
 
-    // Start opencode web service from glootie-oc directory so it loads the opencode.json config
-    const glootieDir = '/config/.opencode/glootie-oc';
-    
     // Start opencode web service with password from PASSWORD env var
     // OpenCode expects HTTP Basic Auth with the password set via OPENCODE_SERVER_PASSWORD
     // Pass FQDN for proper CORS/CSP configuration
-    const ps = spawn(opencodeBinary, ['web', '--port', '9997', '--hostname', '127.0.0.1', '--print-logs'], {
+    // Run as user 'abc' to ensure config goes to user's home directory
+    const ps = spawn('sudo', ['-u', 'abc', '-E', opencodeBinary, 'web', '--port', '9997', '--hostname', '127.0.0.1', '--print-logs'], {
       env: { 
         ...env,
+        HOME: homeDir,
         OPENCODE_SERVER_PASSWORD: password,
         OPENCODE_EXTERNAL_URL: `https://${fqdn}/code/`,
         OPENCODE_FQDN: fqdn
       },
-      cwd: glootieDir, // Run from glootie-oc directory to load agents/config
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: true
     });
