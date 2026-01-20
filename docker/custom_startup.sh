@@ -169,16 +169,16 @@ rm -rf "$HOME_DIR/.config/chromium/Profile*/.*lock" 2>/dev/null || true
 log "✓ Chromium profile locks cleaned"
 
 # ============================================================================
-# Setup XFCE autostart (first boot only)
+# Setup XFCE autostart (every boot - regenerate with current env vars)
 # ============================================================================
 AUTOSTART_DIR="$HOME_DIR/.config/autostart"
-if [ ! -d "$AUTOSTART_DIR" ]; then
-  log "Setting up XFCE autostart..."
-  mkdir -p "$AUTOSTART_DIR"
+mkdir -p "$AUTOSTART_DIR"
 
-   # Autostart terminal with shared tmux session
-   # Uses 'bash -i -l' to ensure login shell that sources .bashrc and user profile
-   cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << 'AUTOSTART_EOF'
+log "Configuring XFCE autostart (with current environment variables)..."
+
+# Autostart terminal with shared tmux session
+# Uses 'bash -i -l' to ensure login shell that sources .bashrc and user profile
+cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=Terminal
@@ -189,8 +189,8 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART_EOF
 
-   # Autostart File Manager in browser
-   cat > "$AUTOSTART_DIR/file-manager.desktop" << 'AUTOSTART_EOF'
+# Autostart File Manager in browser
+cat > "$AUTOSTART_DIR/file-manager.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=File Manager
@@ -201,9 +201,9 @@ X-GNOME-Autostart-enabled=true
 StartupDelay=5
 AUTOSTART_EOF
 
-    # Create Chromium autostart wrapper script
-    mkdir -p "${HOME}/.local/bin"
-    cat > "${HOME}/.local/bin/chromium-autostart.sh" << 'SCRIPT_EOF'
+# Create Chromium autostart wrapper script (always regenerate with current PASSWORD/FQDN)
+mkdir -p "${HOME}/.local/bin"
+cat > "${HOME}/.local/bin/chromium-autostart.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 # Chromium autostart wrapper - launches Chromium with OpenCode page
 export DISPLAY=:1.0
@@ -244,10 +244,10 @@ echo "[$(date)] Launching Chromium to: $FQDN" >> "$LOG_FILE"
 CHROMIUM_PID=$!
 echo "[$(date)] Chromium launched with PID $CHROMIUM_PID" >> "$LOG_FILE"
 SCRIPT_EOF
-    chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
+chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
 
-    # Autostart Chromium with Playwriter Extension Debugger
-    cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
+# Autostart Chromium with Playwriter Extension Debugger
+cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=Chromium
@@ -260,11 +260,8 @@ Terminal=false
 StartupNotify=false
 AUTOSTART_EOF
 
-   chown -R abc:abc "$AUTOSTART_DIR" "${HOME}/.local/bin"
-   log "✓ XFCE autostart configured"
-else
-  log "✓ XFCE autostart already configured (skipping)"
-fi
+chown -R abc:abc "$AUTOSTART_DIR" "${HOME}/.local/bin"
+log "✓ XFCE autostart configured (regenerated with current env vars)"
 
 # ============================================================================
 # Clear supervisor logs on fresh boot (prevent persistent volume cache)

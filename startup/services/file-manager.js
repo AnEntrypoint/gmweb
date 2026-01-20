@@ -1,6 +1,7 @@
 // NHFS (Next-HTTP-File-Server) - File manager with drag & drop uploads
 // GitHub: https://github.com/AliSananS/NHFS
 // Uses pre-built version from /opt/nhfs (built at container autostart time)
+// NO FALLBACKS - waits for NHFS to be ready before starting
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -15,67 +16,41 @@ export default {
   async start(env) {
     const { existsSync } = await import('fs');
     
-    // Try to start NHFS first (feature-rich file manager with uploads)
-    const nhfsReady = existsSync('/opt/nhfs/dist/server.js');
+    // NHFS (Next-HTTP-File-Server) - feature-rich file manager with uploads
+    // Built at container autostart in custom_startup.sh (backgrounded, non-blocking)
+    // Supervisor waits for it to be ready before declaring service started
+    console.log('[file-manager] Starting NHFS file server with upload support...');
     
-    if (nhfsReady) {
-      console.log('[file-manager] Starting NHFS file server with upload support...');
+    // Wait for NHFS to be built (poll for up to 5 minutes)
+    let nhfsReady = existsSync('/opt/nhfs/dist/server.js');
+    let retries = 0;
+    const maxRetries = 300; // 5 minutes at 1 second intervals
+    
+    while (!nhfsReady && retries < maxRetries) {
+      await sleep(1000);
+      nhfsReady = existsSync('/opt/nhfs/dist/server.js');
+      retries++;
       
-      try {
-        // Start pre-built NHFS on port 9998, serving /config directory
-        // NHFS features: file uploads with drag & drop, preview, file operations
-        // Built at container autostart in custom_startup.sh (may still be building)
-        const ps = spawn('bash', ['-c', 'PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config node /opt/nhfs/dist/server.js'], {
-          env: { ...env, HOME: '/config' },
-          stdio: ['ignore', 'pipe', 'pipe'],
-          detached: true,
-          cwd: '/opt/nhfs'
-        });
-
-        ps.unref();
-        
-        // Give it a moment to start
-        await sleep(2000);
-        
-        // Verify it started
-        const isRunning = await this.health();
-        if (isRunning) {
-          console.log('[file-manager] ✓ NHFS started successfully on port 9998 at /files/');
-          return {
-            pid: ps.pid,
-            process: ps,
-            cleanup: async () => {
-              try {
-                process.kill(-ps.pid, 'SIGTERM');
-                await sleep(1000);
-                process.kill(-ps.pid, 'SIGKILL');
-              } catch (e) {}
-            }
-          };
-        } else {
-          console.log('[file-manager] NHFS failed to start, falling back to lightweight server');
-        }
-      } catch (err) {
-        console.log('[file-manager] Error starting NHFS:', err.message, '- falling back to lightweight server');
+      if (retries % 30 === 0) {
+        console.log(`[file-manager] Waiting for NHFS build to complete (${retries}s elapsed)...`);
       }
-    } else {
-      console.log('[file-manager] NHFS not ready yet, using lightweight file server (will auto-upgrade when NHFS ready)');
     }
     
-    // Fallback: Start lightweight standalone file server
-    console.log('[file-manager] Starting lightweight file server on port 9998...');
+    if (!nhfsReady) {
+      const err = new Error('NHFS build did not complete within 5 minutes');
+      console.error(`[file-manager] ${err.message}`);
+      throw err;
+    }
     
-    const processEnv = {
-      ...env,
-      BASE_DIR: '/config',
-      PORT: '9998',
-      HOSTNAME: '0.0.0.0'
-    };
-
-    const ps = spawn('node', ['/opt/gmweb-startup/standalone-server.mjs'], {
-      env: processEnv,
+    console.log(`[file-manager] NHFS ready, starting server...`);
+    
+    // Start pre-built NHFS on port 9998, serving /config directory
+    // NHFS features: file uploads with drag & drop, preview, file operations
+    const ps = spawn('bash', ['-c', 'PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config node /opt/nhfs/dist/server.js'], {
+      env: { ...env, HOME: '/config' },
       stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true
+      detached: true,
+      cwd: '/opt/nhfs'
     });
 
     ps.stdout?.on('data', (data) => {
@@ -87,13 +62,25 @@ export default {
 
     ps.unref();
     
+    // Give it a moment to start
+    await sleep(2000);
+    
+    // Verify it started
+    const isRunning = await this.health();
+    if (!isRunning) {
+      const err = new Error('NHFS failed to start on port 9998');
+      console.error(`[file-manager] ${err.message}`);
+      throw err;
+    }
+    
+    console.log('[file-manager] ✓ NHFS started successfully on port 9998 at /files/');
     return {
       pid: ps.pid,
       process: ps,
       cleanup: async () => {
         try {
           process.kill(-ps.pid, 'SIGTERM');
-          await sleep(2000);
+          await sleep(1000);
           process.kill(-ps.pid, 'SIGKILL');
         } catch (e) {}
       }

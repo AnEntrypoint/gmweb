@@ -33,6 +33,18 @@ export default {
     console.log(`[opencode-web] Using OPENCODE_SERVER_PASSWORD: ${password.substring(0, 3)}***`);
     console.log(`[opencode-web] External FQDN: ${fqdn}`);
 
+    // Kill any existing process on port 9997 to prevent "Address already in use" errors
+    try {
+      const { exec } = await import('child_process');
+      const util = await import('util');
+      const execPromise = util.promisify(exec);
+      await execPromise('lsof -ti:9997 | xargs -r kill -9 2>/dev/null || true');
+      console.log('[opencode-web] Cleared any existing process on port 9997');
+      await sleep(500); // Give time for port to be released
+    } catch (e) {
+      console.log('[opencode-web] Warning: Could not clear port 9997:', e.message);
+    }
+
     // Start opencode web service with password from PASSWORD env var
     // OpenCode expects HTTP Basic Auth with the password set via OPENCODE_SERVER_PASSWORD
     // Pass FQDN for proper CORS/CSP configuration
