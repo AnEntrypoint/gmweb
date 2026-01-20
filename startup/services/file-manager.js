@@ -79,7 +79,9 @@ export default {
       HOSTNAME: '0.0.0.0'
     };
 
-    const ps = spawn('node', ['/opt/gmweb-startup/standalone-server.mjs'], {
+    // Use full path to node since PATH may not include NVM when spawned as service
+    const nodePath = '/usr/local/local/nvm/versions/node/v23.11.1/bin/node';
+    const ps = spawn(nodePath, ['/opt/gmweb-startup/standalone-server.mjs'], {
       env: processEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
