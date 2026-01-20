@@ -27,15 +27,21 @@ export default {
     }
 
     const password = env.PASSWORD || 'default';
+    const fqdn = env.COOLIFY_FQDN || 'localhost:9997';
+    
     console.log(`[opencode-web] Starting OpenCode web on port 9997`);
     console.log(`[opencode-web] Using OPENCODE_SERVER_PASSWORD: ${password.substring(0, 3)}***`);
+    console.log(`[opencode-web] External FQDN: ${fqdn}`);
 
     // Start opencode web service with password from PASSWORD env var
     // OpenCode expects HTTP Basic Auth with the password set via OPENCODE_SERVER_PASSWORD
+    // Pass FQDN for proper CORS/CSP configuration
     const ps = spawn(opencodeBinary, ['web', '--port', '9997', '--hostname', '127.0.0.1', '--print-logs'], {
       env: { 
         ...env,
-        OPENCODE_SERVER_PASSWORD: password
+        OPENCODE_SERVER_PASSWORD: password,
+        OPENCODE_EXTERNAL_URL: `https://${fqdn}/code/`,
+        OPENCODE_FQDN: fqdn
       },
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: true
