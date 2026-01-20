@@ -91,9 +91,11 @@ if [ ! -d "$NHFS_DIR" ]; then
 else
   log "Updating NHFS repository..."
   cd "$NHFS_DIR"
-  # Configure git to trust this directory (security fix for "dubious ownership")
+  # Fix permissions and git ownership issues
+  sudo chown -R abc:abc "$NHFS_DIR" 2>/dev/null || true
   git config --global --add safe.directory "$NHFS_DIR" 2>/dev/null || true
-  git pull origin main > /dev/null 2>&1
+  # Use timeout to prevent hanging on network issues
+  timeout 10 git pull origin main > /dev/null 2>&1 || log "Note: NHFS git pull timed out or failed"
   log "✓ NHFS updated"
 fi
 
@@ -143,9 +145,11 @@ GLOOTIE_DIR="$HOME_DIR/.opencode/glootie-oc"
   else
     log "Updating Glootie-OC repository (background)..."
     cd "$GLOOTIE_DIR"
-    # Configure git to trust this directory (security fix for "dubious ownership")
+    # Fix permissions and git ownership issues
+    sudo chown -R abc:abc "$GLOOTIE_DIR" 2>/dev/null || true
     sudo -u abc git config --global --add safe.directory "$GLOOTIE_DIR" 2>/dev/null || true
-    sudo -u abc git pull origin main > /dev/null 2>&1
+    # Use timeout to prevent hanging on network issues
+    timeout 10 sudo -u abc git pull origin main > /dev/null 2>&1 || log "Note: Glootie-OC git pull timed out or failed"
     log "Running Glootie-OC setup (background)..."
     bash ./setup.sh > /dev/null 2>&1
     log "✓ Glootie-OC updated"
@@ -153,6 +157,16 @@ GLOOTIE_DIR="$HOME_DIR/.opencode/glootie-oc"
 } &
 
 log "✓ Glootie-OC setup started in background (startup continues immediately)"
+
+# ============================================================================
+# Clean up Chromium profile locks to prevent startup failures
+# ============================================================================
+log "Cleaning up Chromium profile locks..."
+rm -rf "$HOME_DIR/.config/chromium/Singleton" 2>/dev/null || true
+rm -rf "$HOME_DIR/.config/chromium/SingletonSocket" 2>/dev/null || true
+rm -rf "$HOME_DIR/.config/chromium/.com.google.Chrome.* " 2>/dev/null || true
+rm -rf "$HOME_DIR/.config/chromium/Profile*/.*lock" 2>/dev/null || true
+log "✓ Chromium profile locks cleaned"
 
 # ============================================================================
 # Setup XFCE autostart (first boot only)
@@ -192,37 +206,58 @@ AUTOSTART_EOF
     cat > "${HOME}/.local/bin/chromium-autostart.sh" << 'SCRIPT_EOF'
 #!/bin/bash
 # Chromium autostart wrapper - launches Chromium with OpenCode page
-# Playwriter relay server must be running (managed by supervisor)
 export DISPLAY=:1.0
 
-# Wait for Playwriter relay server to be ready (max 10 seconds)
-for i in {1..10}; do
-  if ss -tlnp 2>/dev/null | grep -q 19988; then
-    echo "[chromium-autostart] Playwriter relay server ready"
+LOG_FILE="/tmp/chromium-autostart.log"
+echo "[$(date)] Starting chromium autostart" >> "$LOG_FILE"
+
+# Get credentials from environment (set during boot in custom_startup.sh)
+PASSWORD="${PASSWORD:-Joker@212Joker@212}"
+FQDN="${COOLIFY_FQDN:-127.0.0.1}"
+
+# Wait for nginx to be ready (max 30 seconds)
+echo "[$(date)] Waiting for nginx on port 80/443..." >> "$LOG_FILE"
+for i in {1..30}; do
+  if ss -tlnp 2>/dev/null | grep -qE ":(80|443)"; then
+    echo "[$(date)] nginx ready" >> "$LOG_FILE"
     break
   fi
-  if [ $i -eq 10 ]; then
-    echo "[chromium-autostart] Warning: Playwriter relay server not ready, proceeding anyway"
+  if [ $i -eq 30 ]; then
+    echo "[$(date)] WARNING: nginx not ready after 30s, proceeding anyway" >> "$LOG_FILE"
   fi
   sleep 1
 done
 
-# Launch Chromium with OpenCode credentials (opencode:test123)
-/usr/bin/chromium http://opencode:test123@127.0.0.1/code/ > /dev/null 2>&1 &
+# Determine URL based on domain
+if [ "$FQDN" = "127.0.0.1" ]; then
+  URL="http://abc:${PASSWORD}@127.0.0.1/code/"
+else
+  URL="https://abc:${PASSWORD}@${FQDN}/code/"
+fi
+
+# Remove any stale Chromium profile locks
+rm -rf "${HOME}/.config/chromium/Singleton" 2>/dev/null || true
+rm -rf "${HOME}/.config/chromium/SingletonSocket" 2>/dev/null || true
+
+echo "[$(date)] Launching Chromium to: $FQDN" >> "$LOG_FILE"
+/usr/bin/chromium --new-window "$URL" >> "$LOG_FILE" 2>&1 &
+CHROMIUM_PID=$!
+echo "[$(date)] Chromium launched with PID $CHROMIUM_PID" >> "$LOG_FILE"
 SCRIPT_EOF
     chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
 
-   # Autostart Chromium with Playwriter Extension Debugger
-   cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
+    # Autostart Chromium with Playwriter Extension Debugger
+    cat > "$AUTOSTART_DIR/chromium.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=Chromium
 Comment=Open Chromium with Playwriter
 Icon=chromium
-Exec=~/.local/bin/chromium-autostart.sh
+Exec=bash -c "sleep 5 && ~/.local/bin/chromium-autostart.sh"
 Categories=Network;WebBrowser;
 X-GNOME-Autostart-enabled=true
 Terminal=false
+StartupNotify=false
 AUTOSTART_EOF
 
    chown -R abc:abc "$AUTOSTART_DIR" "${HOME}/.local/bin"
