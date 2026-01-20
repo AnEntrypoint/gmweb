@@ -13,7 +13,9 @@ export default {
   dependencies: [],
 
   async start(env) {
-    const homeDir = env.HOME || '/config';
+    // Always use /config as home directory for tmux session
+    // env.HOME might not be set correctly when supervisor runs
+    const homeDir = '/config';
     const tmuxConfPath = `${homeDir}/.tmux.conf`;
     
     console.log('[tmux] Setting up tmux configuration and session...');
