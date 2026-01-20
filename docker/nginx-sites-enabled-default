@@ -146,6 +146,9 @@ server {
       }
 
         location /code/ {
+        # Disable nginx auth for /code/ - OpenCode has its own authentication
+        auth_basic off;
+        
         proxy_pass http://127.0.0.1:9997/;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -344,6 +347,9 @@ server {
     }
 
     location /code/ {
+      # Disable nginx auth for /code/ - OpenCode has its own authentication
+      auth_basic off;
+      
       proxy_pass http://127.0.0.1:9997/;
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
