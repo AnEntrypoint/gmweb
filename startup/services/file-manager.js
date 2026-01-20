@@ -1,6 +1,6 @@
 // NHFS (Next-HTTP-File-Server) - File manager with drag & drop uploads
 // GitHub: https://github.com/AliSananS/NHFS
-// Uses pre-built version from /opt/nhfs (built at Docker build time)
+// Uses pre-built version from /opt/nhfs (built at container autostart time)
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -18,7 +18,7 @@ export default {
     try {
       // Start pre-built NHFS on port 9998, serving /config directory
       // NHFS features: file uploads with drag & drop, preview, file operations
-      // Uses dist/server.js from /opt/nhfs (built at Docker image time)
+      // Uses dist/server.js from /opt/nhfs (built at container autostart in custom_startup.sh)
       const ps = spawn('bash', ['-c', 'PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config node /opt/nhfs/dist/server.js'], {
         env: { ...env, HOME: '/config' },
         stdio: ['ignore', 'pipe', 'pipe'],
