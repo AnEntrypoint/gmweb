@@ -104,6 +104,19 @@ fi
 if [ -d "$NHFS_DIR" ]; then
   cd "$NHFS_DIR"
   
+  # Patch NHFS next.config.js to add basePath for /files routing
+  log "Patching NHFS next.config.js for /files basePath..."
+  if [ -f "$NHFS_DIR/next.config.js" ]; then
+    # Only add basePath if it's not already there
+    if ! grep -q "basePath:" "$NHFS_DIR/next.config.js"; then
+      # Insert basePath after output: 'standalone',
+      sed -i "/output: 'standalone',/a\\  basePath: '/files'," "$NHFS_DIR/next.config.js"
+      log "✓ NHFS patched with basePath: '/files'"
+    else
+      log "✓ NHFS already has basePath configured"
+    fi
+  fi
+  
   # Run NHFS setup in background so supervisor can start immediately
   # This prevents the long build process from blocking other services
   {
