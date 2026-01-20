@@ -1,7 +1,6 @@
 // NHFS (Next-HTTP-File-Server) - File manager with drag & drop uploads
 // GitHub: https://github.com/AliSananS/NHFS
-// Uses pre-built version from /opt/nhfs (built at container autostart time)
-// Strategy: Start lightweight server immediately for fast boot, auto-upgrade to NHFS when ready
+// NO FALLBACKS - Only NHFS. Service returns immediately, NHFS starts when ready (up to 5 min).
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 
@@ -16,75 +15,35 @@ export default {
   async start(env) {
     const { existsSync } = await import('fs');
     
-    console.log('[file-manager] Starting file server...');
+    console.log('[file-manager] Starting NHFS file server (waiting for build)...');
     
-    // Try NHFS immediately (if already built from previous boot)
+    // Check if NHFS is already built from previous boot
     const nhfsReady = existsSync('/opt/nhfs/dist/server.js');
     
     if (nhfsReady) {
-      console.log('[file-manager] NHFS detected, starting NHFS server with upload support...');
-      
-      // Start pre-built NHFS on port 9998, serving /config directory
-      // NHFS features: file uploads with drag & drop, preview, file operations
-      // Use full path to node since PATH may not include NVM when spawned as service
-      const nodePath = '/usr/local/local/nvm/versions/node/v23.11.1/bin/node';
-      const ps = spawn('bash', ['-c', `PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config ${nodePath} /opt/nhfs/dist/server.js`], {
-        env: { ...env, HOME: '/config' },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-        cwd: '/opt/nhfs'
-      });
-
-      ps.stdout?.on('data', (data) => {
-        console.log(`[file-manager] ${data.toString().trim()}`);
-      });
-      ps.stderr?.on('data', (data) => {
-        console.log(`[file-manager:err] ${data.toString().trim()}`);
-      });
-
-      ps.unref();
-      
-      // Give it a moment to start
-      await sleep(2000);
-      
-      // Verify it started
-      const isRunning = await this.health();
-      if (isRunning) {
-        console.log('[file-manager] ✓ NHFS started successfully on port 9998 at /files/');
-        return {
-          pid: ps.pid,
-          process: ps,
-          cleanup: async () => {
-            try {
-              process.kill(-ps.pid, 'SIGTERM');
-              await sleep(1000);
-              process.kill(-ps.pid, 'SIGKILL');
-            } catch (e) {}
-          }
-        };
-      } else {
-        console.log('[file-manager] NHFS failed to start, falling back to lightweight server');
-      }
+      console.log('[file-manager] NHFS detected, starting immediately...');
+      return this.startNHFS(env);
     } else {
-      console.log('[file-manager] NHFS not ready yet, starting lightweight file server (will auto-upgrade when NHFS ready)');
+      console.log('[file-manager] NHFS not ready yet, spawning build watcher...');
+      // Spawn NHFS build watcher in background, don't wait for it
+      this.watchNHFSBuild(env);
+      
+      // Return a placeholder process that will be replaced when NHFS is ready
+      return {
+        pid: process.pid,
+        process: null,
+        cleanup: async () => {}
+      };
     }
-    
-    // Fallback: Start lightweight standalone file server for fast boot
-    console.log('[file-manager] Starting lightweight file server on port 9998...');
-    
-    const processEnv = {
-      ...env,
-      BASE_DIR: '/config',
-      PORT: '9998',
-      HOSTNAME: '0.0.0.0'
-    };
+  },
 
-    // Use full path to node since PATH may not include NVM when spawned as service
+  async startNHFS(env) {
     const nodePath = '/usr/local/local/nvm/versions/node/v23.11.1/bin/node';
-    const ps = spawn(nodePath, ['/opt/gmweb-startup/standalone-server.mjs'], {
-      env: processEnv,
+    const ps = spawn('bash', ['-c', `PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config ${nodePath} /opt/nhfs/dist/server.js`], {
+      env: { ...env, HOME: '/config' },
       stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true
+      detached: true,
+      cwd: '/opt/nhfs'
     });
 
     ps.stdout?.on('data', (data) => {
@@ -96,68 +55,50 @@ export default {
 
     ps.unref();
     
-    // Spawn NHFS build watcher in background to auto-upgrade when ready
-    // This doesn't block startup - just runs in background
-    this.watchNHFSBuild();
+    await sleep(2000);
     
-    return {
-      pid: ps.pid,
-      process: ps,
-      cleanup: async () => {
-        try {
-          process.kill(-ps.pid, 'SIGTERM');
-          await sleep(2000);
-          process.kill(-ps.pid, 'SIGKILL');
-        } catch (e) {}
-      }
-    };
+    const isRunning = await this.health();
+    if (isRunning) {
+      console.log('[file-manager] ✓ NHFS started successfully on port 9998');
+      return {
+        pid: ps.pid,
+        process: ps,
+        cleanup: async () => {
+          try {
+            process.kill(-ps.pid, 'SIGTERM');
+            await sleep(1000);
+            process.kill(-ps.pid, 'SIGKILL');
+          } catch (e) {}
+        }
+      };
+    } else {
+      const err = new Error('NHFS failed to start');
+      console.error(`[file-manager] ${err.message}`);
+      throw err;
+    }
   },
 
-  // Watch for NHFS build completion and auto-upgrade in background
-  async watchNHFSBuild() {
-    const { existsSync, watch } = await import('fs');
+  // Watch for NHFS build completion and start it
+  async watchNHFSBuild(env) {
+    const { existsSync } = await import('fs');
     
-    console.log('[file-manager] Watching for NHFS build to complete...');
+    console.log('[file-manager] Watching for NHFS build to complete (max 5 min)...');
     
-    // Poll for NHFS to be ready (up to 10 minutes in background)
+    // Poll for NHFS to be ready (up to 5 minutes)
     let retries = 0;
-    const maxRetries = 600; // 10 minutes
+    const maxRetries = 300; // 5 minutes
     
     while (retries < maxRetries) {
       await sleep(1000);
       retries++;
       
       if (existsSync('/opt/nhfs/dist/server.js')) {
-        console.log(`[file-manager] NHFS build complete! (${retries}s). Upgrading from lightweight to NHFS server...`);
+        console.log(`[file-manager] NHFS build complete! (${retries}s). Starting NHFS server...`);
         
-        // Kill lightweight server and start NHFS
         try {
-          const { execSync } = await import('child_process');
-          
-          // Kill lightweight server on port 9998
-          execSync('lsof -ti:9998 | xargs -r kill -9 2>/dev/null || true');
-          await sleep(1000);
-          
-          // Start NHFS
-          const nodePath = '/usr/local/local/nvm/versions/node/v23.11.1/bin/node';
-          const nhfsPs = spawn('bash', ['-c', `PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config ${nodePath} /opt/nhfs/dist/server.js`], {
-            env: { HOME: '/config' },
-            stdio: ['ignore', 'pipe', 'pipe'],
-            detached: true,
-            cwd: '/opt/nhfs'
-          });
-
-          nhfsPs.stdout?.on('data', (data) => {
-            console.log(`[file-manager-nhfs] ${data.toString().trim()}`);
-          });
-          nhfsPs.stderr?.on('data', (data) => {
-            console.log(`[file-manager-nhfs:err] ${data.toString().trim()}`);
-          });
-
-          nhfsPs.unref();
-          console.log('[file-manager] ✓ Upgraded to NHFS successfully!');
+          await this.startNHFS(env);
         } catch (e) {
-          console.log('[file-manager] Warning: Could not upgrade to NHFS:', e.message);
+          console.error('[file-manager] Error starting NHFS:', e.message);
         }
         
         break; // Stop watching
@@ -169,14 +110,13 @@ export default {
     }
     
     if (retries >= maxRetries) {
-      console.log('[file-manager] NHFS build did not complete within 10 minutes, staying with lightweight server');
+      console.error('[file-manager] NHFS build did not complete within 5 minutes');
     }
   },
 
   async health() {
     try {
       const { execSync } = await import('child_process');
-      // Check if port 9998 is listening
       execSync('ss -tlnp 2>/dev/null | grep -q 9998', { stdio: 'pipe' });
       return true;
     } catch (e) {

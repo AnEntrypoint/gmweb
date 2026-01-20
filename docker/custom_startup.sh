@@ -181,13 +181,13 @@ mkdir -p "$AUTOSTART_DIR"
 log "Configuring XFCE autostart (with current environment variables)..."
 
 # Autostart terminal with shared tmux session
-# Uses 'bash -i -l' to ensure login shell that sources .bashrc and user profile
+# Simply attach to main session (tmux service creates it with bash -i -l)
 cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=Terminal
-Comment=Shared tmux session with /ssh
-Exec=xfce4-terminal -e "tmux new-session -A -s main bash -i -l"
+Comment=Shared tmux session
+Exec=xfce4-terminal -e "tmux attach-session -t main"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
@@ -250,10 +250,18 @@ else
 fi
 
 echo "[$(date)] Launching Chromium to: $FQDN" >> "$LOG_FILE"
-# Use --user-data-dir to isolate profile and avoid lock conflicts
-/usr/bin/chromium --new-window --no-first-run "$URL" >> "$LOG_FILE" 2>&1 &
+# Use isolated temp profile to avoid stale locks persisting from previous boots
+CHROME_PROFILE_DIR="/tmp/chromium-profile-$$"
+mkdir -p "$CHROME_PROFILE_DIR"
+/usr/bin/chromium \
+  --user-data-dir="$CHROME_PROFILE_DIR" \
+  --new-window \
+  --no-first-run \
+  --disable-session-crashed-bubble \
+  --disable-default-apps \
+  "$URL" >> "$LOG_FILE" 2>&1 &
 CHROMIUM_PID=$!
-echo "[$(date)] Chromium launched with PID $CHROMIUM_PID" >> "$LOG_FILE"
+echo "[$(date)] Chromium launched with PID $CHROMIUM_PID (profile: $CHROME_PROFILE_DIR)" >> "$LOG_FILE"
 SCRIPT_EOF
 chmod +x "${HOME}/.local/bin/chromium-autostart.sh"
 
