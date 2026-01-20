@@ -13,47 +13,91 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log('[file-manager] Starting NHFS file server with upload support...');
+    const { existsSync } = await import('fs');
     
-    try {
-      // Start pre-built NHFS on port 9998, serving /config directory
-      // NHFS features: file uploads with drag & drop, preview, file operations
-      // Uses dist/server.js from /opt/nhfs (built at container autostart in custom_startup.sh)
-      const ps = spawn('bash', ['-c', 'PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config node /opt/nhfs/dist/server.js'], {
-        env: { ...env, HOME: '/config' },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-        cwd: '/opt/nhfs'
-      });
+    // Try to start NHFS first (feature-rich file manager with uploads)
+    const nhfsReady = existsSync('/opt/nhfs/dist/server.js');
+    
+    if (nhfsReady) {
+      console.log('[file-manager] Starting NHFS file server with upload support...');
+      
+      try {
+        // Start pre-built NHFS on port 9998, serving /config directory
+        // NHFS features: file uploads with drag & drop, preview, file operations
+        // Built at container autostart in custom_startup.sh (may still be building)
+        const ps = spawn('bash', ['-c', 'PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config node /opt/nhfs/dist/server.js'], {
+          env: { ...env, HOME: '/config' },
+          stdio: ['ignore', 'pipe', 'pipe'],
+          detached: true,
+          cwd: '/opt/nhfs'
+        });
 
-      ps.unref();
-      
-      // Give it a moment to start
-      await sleep(3000);
-      
-      // Verify it started
-      const isRunning = await this.health();
-      if (!isRunning) {
-        console.log('[file-manager] Warning: Server may not have started successfully');
-      } else {
-        console.log('[file-manager] ✓ NHFS started successfully on port 9998 at /files/');
-      }
-      
-      return {
-        pid: ps.pid,
-        process: ps,
-        cleanup: async () => {
-          try {
-            process.kill(-ps.pid, 'SIGTERM');
-            await sleep(1000);
-            process.kill(-ps.pid, 'SIGKILL');
-          } catch (e) {}
+        ps.unref();
+        
+        // Give it a moment to start
+        await sleep(2000);
+        
+        // Verify it started
+        const isRunning = await this.health();
+        if (isRunning) {
+          console.log('[file-manager] ✓ NHFS started successfully on port 9998 at /files/');
+          return {
+            pid: ps.pid,
+            process: ps,
+            cleanup: async () => {
+              try {
+                process.kill(-ps.pid, 'SIGTERM');
+                await sleep(1000);
+                process.kill(-ps.pid, 'SIGKILL');
+              } catch (e) {}
+            }
+          };
+        } else {
+          console.log('[file-manager] NHFS failed to start, falling back to lightweight server');
         }
-      };
-    } catch (err) {
-      console.log('[file-manager] Error starting NHFS:', err.message);
-      return { pid: 0, process: null, cleanup: async () => {} };
+      } catch (err) {
+        console.log('[file-manager] Error starting NHFS:', err.message, '- falling back to lightweight server');
+      }
+    } else {
+      console.log('[file-manager] NHFS not ready yet, using lightweight file server (will auto-upgrade when NHFS ready)');
     }
+    
+    // Fallback: Start lightweight standalone file server
+    console.log('[file-manager] Starting lightweight file server on port 9998...');
+    
+    const processEnv = {
+      ...env,
+      BASE_DIR: '/config',
+      PORT: '9998',
+      HOSTNAME: '0.0.0.0'
+    };
+
+    const ps = spawn('node', ['/opt/gmweb-startup/standalone-server.mjs'], {
+      env: processEnv,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true
+    });
+
+    ps.stdout?.on('data', (data) => {
+      console.log(`[file-manager] ${data.toString().trim()}`);
+    });
+    ps.stderr?.on('data', (data) => {
+      console.log(`[file-manager:err] ${data.toString().trim()}`);
+    });
+
+    ps.unref();
+    
+    return {
+      pid: ps.pid,
+      process: ps,
+      cleanup: async () => {
+        try {
+          process.kill(-ps.pid, 'SIGTERM');
+          await sleep(2000);
+          process.kill(-ps.pid, 'SIGKILL');
+        } catch (e) {}
+      }
+    };
   },
 
   async health() {
