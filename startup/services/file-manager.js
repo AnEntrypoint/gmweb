@@ -46,7 +46,9 @@ export default {
     
     // Start pre-built NHFS on port 9998, serving /config directory
     // NHFS features: file uploads with drag & drop, preview, file operations
-    const ps = spawn('bash', ['-c', 'PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config node /opt/nhfs/dist/server.js'], {
+    // Use full path to node since PATH may not include NVM when spawned as service
+    const nodePath = '/usr/local/local/nvm/versions/node/v23.11.1/bin/node';
+    const ps = spawn('bash', ['-c', `PORT=9998 HOSTNAME=127.0.0.1 NHFS_BASE_DIR=/config ${nodePath} /opt/nhfs/dist/server.js`], {
       env: { ...env, HOME: '/config' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
