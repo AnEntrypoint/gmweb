@@ -8,8 +8,13 @@ LOG_DIR="$HOME_DIR/logs"
 NODE_BIN="/usr/local/local/nvm/versions/node/v23.11.1/bin/node"
 SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
 
-# Ensure log directory exists
+# Ensure log directory exists with proper permissions
 mkdir -p "$LOG_DIR"
+chmod 755 "$LOG_DIR"
+# Ensure abc user can write to logs directory
+if [ "$(id -u)" = "0" ]; then
+  chown -R abc:abc "$LOG_DIR"
+fi
 
 # Diagnostics
 BOOT_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')

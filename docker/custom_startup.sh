@@ -9,6 +9,8 @@ set -e
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 mkdir -p "$LOG_DIR"
+chmod 755 "$LOG_DIR"
+chown abc:abc "$LOG_DIR"
 
 log() {
   echo "[gmweb-startup] $@" | tee -a "$LOG_DIR/startup.log"
