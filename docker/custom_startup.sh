@@ -91,6 +91,8 @@ if [ ! -d "$NHFS_DIR" ]; then
 else
   log "Updating NHFS repository..."
   cd "$NHFS_DIR"
+  # Configure git to trust this directory (security fix for "dubious ownership")
+  git config --global --add safe.directory "$NHFS_DIR" 2>/dev/null || true
   git pull origin main > /dev/null 2>&1
   log "✓ NHFS updated"
 fi
@@ -124,25 +126,33 @@ fi
 log "Setting up Glootie-OC (OpenCode plugin)..."
 
 GLOOTIE_DIR="$HOME_DIR/.opencode/glootie-oc"
-if [ ! -d "$GLOOTIE_DIR" ]; then
-  log "Cloning Glootie-OC repository..."
-  sudo -u abc git clone https://github.com/AnEntrypoint/glootie-oc.git "$GLOOTIE_DIR" 2>&1 | head -3
-  log "✓ Glootie-OC cloned"
-  
-  if [ -d "$GLOOTIE_DIR" ]; then
-    log "Running Glootie-OC setup..."
+
+# Run Glootie setup in background so startup continues immediately
+{
+  if [ ! -d "$GLOOTIE_DIR" ]; then
+    log "Cloning Glootie-OC repository (background)..."
+    sudo -u abc git clone https://github.com/AnEntrypoint/glootie-oc.git "$GLOOTIE_DIR" 2>&1 | head -3
+    log "✓ Glootie-OC cloned"
+    
+    if [ -d "$GLOOTIE_DIR" ]; then
+      log "Running Glootie-OC setup (background)..."
+      cd "$GLOOTIE_DIR"
+      bash ./setup.sh > /dev/null 2>&1
+      log "✓ Glootie-OC setup complete"
+    fi
+  else
+    log "Updating Glootie-OC repository (background)..."
     cd "$GLOOTIE_DIR"
+    # Configure git to trust this directory (security fix for "dubious ownership")
+    sudo -u abc git config --global --add safe.directory "$GLOOTIE_DIR" 2>/dev/null || true
+    sudo -u abc git pull origin main > /dev/null 2>&1
+    log "Running Glootie-OC setup (background)..."
     bash ./setup.sh > /dev/null 2>&1
-    log "✓ Glootie-OC setup complete"
+    log "✓ Glootie-OC updated"
   fi
-else
-  log "Updating Glootie-OC repository..."
-  cd "$GLOOTIE_DIR"
-  sudo -u abc git pull origin main > /dev/null 2>&1
-  log "Running Glootie-OC setup (update)..."
-  bash ./setup.sh > /dev/null 2>&1
-  log "✓ Glootie-OC updated"
-fi
+} &
+
+log "✓ Glootie-OC setup started in background (startup continues immediately)"
 
 # ============================================================================
 # Setup XFCE autostart (first boot only)
