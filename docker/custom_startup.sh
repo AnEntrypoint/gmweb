@@ -81,41 +81,61 @@ fi
 # ============================================================================
 # Setup NHFS (Next-HTTP-File-Server) - File manager with drag & drop uploads
 # ============================================================================
-NHFS_SETUP_MARKER="$HOME_DIR/.nhfs-setup"
-if [ ! -f "$NHFS_SETUP_MARKER" ]; then
-  log "Setting up NHFS (file manager with uploads)..."
-  
-  NHFS_DIR="/opt/nhfs"
-  if [ ! -d "$NHFS_DIR" ]; then
-    log "Cloning NHFS repository..."
-    git clone https://github.com/AliSananS/NHFS.git "$NHFS_DIR" 2>&1 | grep -v "^Cloning" | head -5
-    
-    if [ -d "$NHFS_DIR" ]; then
-      log "✓ NHFS cloned successfully"
-      
-      # Install and build NHFS
-      log "Installing NHFS dependencies..."
-      cd "$NHFS_DIR"
-      npm install --legacy-peer-deps --production=false > /dev/null 2>&1
-      
-      log "Building NHFS..."
-      npm run build > /dev/null 2>&1
-      
-      log "Pruning dev dependencies..."
-      npm prune --production > /dev/null 2>&1
-      
-      log "✓ NHFS built and ready at $NHFS_DIR/dist/server.js"
-    else
-      log "ERROR: Failed to clone NHFS"
-    fi
-  else
-    log "✓ NHFS already set up at $NHFS_DIR"
-  fi
-  
-  touch "$NHFS_SETUP_MARKER"
-  chown abc:abc "$NHFS_SETUP_MARKER"
+log "Setting up NHFS (file manager with uploads)..."
+
+NHFS_DIR="/opt/nhfs"
+if [ ! -d "$NHFS_DIR" ]; then
+  log "Cloning NHFS repository..."
+  git clone https://github.com/AliSananS/NHFS.git "$NHFS_DIR" 2>&1 | head -3
+  log "✓ NHFS cloned"
 else
-  log "✓ NHFS already set up (skipping)"
+  log "Updating NHFS repository..."
+  cd "$NHFS_DIR"
+  git pull origin main > /dev/null 2>&1
+  log "✓ NHFS updated"
+fi
+
+if [ -d "$NHFS_DIR" ]; then
+  cd "$NHFS_DIR"
+  
+  log "Installing NHFS dependencies..."
+  npm install --legacy-peer-deps --production=false > /dev/null 2>&1
+  
+  log "Building NHFS..."
+  npm run build > /dev/null 2>&1
+  
+  log "Pruning dev dependencies..."
+  npm prune --production > /dev/null 2>&1
+  
+  log "✓ NHFS ready at $NHFS_DIR/dist/server.js"
+else
+  log "ERROR: NHFS setup failed"
+fi
+
+# ============================================================================
+# Setup Glootie-OC (OpenCode AI Plugin) - Install or update on boot
+# ============================================================================
+log "Setting up Glootie-OC (OpenCode plugin)..."
+
+GLOOTIE_DIR="$HOME_DIR/.opencode/glootie-oc"
+if [ ! -d "$GLOOTIE_DIR" ]; then
+  log "Cloning Glootie-OC repository..."
+  sudo -u abc git clone https://github.com/AnEntrypoint/glootie-oc.git "$GLOOTIE_DIR" 2>&1 | head -3
+  log "✓ Glootie-OC cloned"
+  
+  if [ -d "$GLOOTIE_DIR" ]; then
+    log "Running Glootie-OC setup..."
+    cd "$GLOOTIE_DIR"
+    bash ./setup.sh > /dev/null 2>&1
+    log "✓ Glootie-OC setup complete"
+  fi
+else
+  log "Updating Glootie-OC repository..."
+  cd "$GLOOTIE_DIR"
+  sudo -u abc git pull origin main > /dev/null 2>&1
+  log "Running Glootie-OC setup (update)..."
+  bash ./setup.sh > /dev/null 2>&1
+  log "✓ Glootie-OC updated"
 fi
 
 # ============================================================================
