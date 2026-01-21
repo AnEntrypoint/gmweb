@@ -103,9 +103,10 @@ export async function gitCloneOrUpdate(repoUrl, targetDir, env) {
  * @returns {ChildProcess}
  */
 export function spawnAsAbcUser(command, env) {
-  // Always wrap in bash to ensure environment is inherited correctly
-  // env.PATH already includes NVM from supervisor, but bash -c ensures it's used
-  return spawn('sudo', ['-u', 'abc', 'bash', '-c', command], {
+  // Use -E flag to preserve environment variables passed to spawn()
+  // bash -c ensures the full command + env is evaluated correctly
+  // env already has PATH with NVM from supervisor
+  return spawn('sudo', ['-u', 'abc', '-E', 'bash', '-c', command], {
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: true,
     env: { ...env }
