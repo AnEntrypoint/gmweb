@@ -91,29 +91,24 @@ export async function gitCloneOrUpdate(repoUrl, targetDir, env) {
 }
 
 /**
- * Run a shell command as abc user with proper environment
+ * THE ONE TRUE WAY to spawn processes in gmweb
+ * Services ALWAYS use this. Supervisor env is pre-configured with PATH, PASSWORD, FQDN, HOME
  * 
- * @param {string} command - shell command to run
- * @param {object} env - environment variables
- * @param {object} options - spawn options
- * @returns {Promise<{pid: number, process: ChildProcess}>}
+ * Usage:
+ *   spawn(command, args, { env }) - direct spawn with supervisor's env
+ *   spawnAsAbcUser(command, env) - spawn as abc user with supervisor's env
+ * 
+ * @param {string} command - bash command to run as abc user
+ * @param {object} env - environment from supervisor (already has PATH, PASSWORD, FQDN, HOME)
+ * @returns {ChildProcess}
  */
-export async function spawnAsAbcUser(command, env = {}, options = {}) {
-  return new Promise((resolve, reject) => {
-    const ps = spawn('sudo', ['-u', 'abc', '-E', 'bash', '-c', command], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      detached: true,
-      ...options,
-      env: { ...env }
-    });
-
-    ps.on('error', reject);
-    
-    // Resolve immediately - process runs in background
-    resolve({
-      pid: ps.pid,
-      process: ps
-    });
+export function spawnAsAbcUser(command, env) {
+  // Always wrap in bash to ensure environment is inherited correctly
+  // env.PATH already includes NVM from supervisor, but bash -c ensures it's used
+  return spawn('sudo', ['-u', 'abc', 'bash', '-c', command], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    detached: true,
+    env: { ...env }
   });
 }
 

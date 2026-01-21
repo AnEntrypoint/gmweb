@@ -309,28 +309,28 @@ export class Supervisor {
     return env;
   }
 
-  // Helper to spawn services with proper environment and error handling
-  // This ensures all services have consistent environment setup
-  spawnService(command, args, options = {}) {
-    const { Readable } = require('stream');
-    
-    // Merge provided options with defaults
+  // Core: Spawn with supervisor's pre-configured environment
+  // ALL services use this so they all get: PATH, PASSWORD, FQDN, HOME, etc.
+  spawnWithEnv(command, args, options = {}) {
+    // Merge supervisor's environment with any service-specific overrides
+    const finalEnv = {
+      ...this.env,
+      ...options.env
+    };
+
+    // Always ensure PATH has NVM first (failsafe)
+    const NVM_BIN = '/usr/local/local/nvm/versions/node/v23.11.1/bin';
+    const LOCAL_BIN = `${this.env.HOME || '/config'}/.local/bin`;
+    if (!finalEnv.PATH?.startsWith(NVM_BIN)) {
+      finalEnv.PATH = `${NVM_BIN}:${LOCAL_BIN}:${finalEnv.PATH}`;
+    }
+
     const finalOptions = {
       stdio: ['pipe', 'pipe', 'pipe'],
       detached: true,
       ...options,
-      env: {
-        ...this.env,
-        ...options.env
-      }
+      env: finalEnv
     };
-
-    // Ensure PATH is always included
-    const NVM_BIN = '/usr/local/local/nvm/versions/node/v23.11.1/bin';
-    const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
-    if (!finalOptions.env.PATH?.startsWith(NVM_BIN)) {
-      finalOptions.env.PATH = `${NVM_BIN}:${LOCAL_BIN}:${finalOptions.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
-    }
 
     return spawn(command, args, finalOptions);
   }
