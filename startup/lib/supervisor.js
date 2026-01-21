@@ -296,10 +296,8 @@ export class Supervisor {
 
     // Setup Node.js PATH - ALWAYS include NVM and local bin first
     const NVM_BIN = '/usr/local/local/nvm/versions/node/v23.11.1/bin';
-    const HOME = process.env.HOME || '/config';
-    const LOCAL_BIN = `${HOME}/.local/bin`;
+    const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
     env.PATH = `${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
-    env.HOME = HOME; // Ensure HOME is always set
 
     if (!env.PASSWORD) {
       env.PASSWORD = 'password';
