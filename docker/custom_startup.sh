@@ -196,6 +196,30 @@ rm -f "$HOME_DIR/.config/chromium/Default/First Run" 2>/dev/null || true
 log "✓ Chromium profile locks cleaned"
 
 # ============================================================================
+# Ensure XFCE session infrastructure is ready before autostart
+# This prevents xfconfd/session manager failures
+# ============================================================================
+log "Setting up XFCE session infrastructure..."
+
+# Ensure D-Bus is ready for session manager
+export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/dbus/system_bus_socket"
+
+# Wait for X server to be ready (with timeout)
+for i in {1..30}; do
+  if DISPLAY=:1.0 xset q &>/dev/null; then
+    log "✓ X server is ready"
+    break
+  fi
+  if [ $i -eq 30 ]; then
+    log "⚠ X server took too long to be ready, proceeding anyway"
+  fi
+  sleep 0.2
+done
+
+# Give session services time to initialize (critical timing fix)
+sleep 1
+
+# ============================================================================
 # Setup XFCE autostart (every boot - regenerate with current env vars)
 # ============================================================================
 AUTOSTART_DIR="$HOME_DIR/.config/autostart"

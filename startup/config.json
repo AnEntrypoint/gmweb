@@ -2,15 +2,6 @@
   "healthCheckInterval": 30000,
   "logDirectory": "/config/logs",
   "services": {
-    "proxypilot": {
-      "enabled": true,
-      "type": "critical",
-      "requiresDesktop": true
-    },
-    "gemini-cli": {
-      "enabled": true,
-      "type": "install"
-    },
     "wrangler": {
       "enabled": true,
       "type": "install"
@@ -26,10 +17,6 @@
     "chromium-ext": {
       "enabled": true,
       "type": "system"
-    },
-    "claude-cli": {
-      "enabled": true,
-      "type": "install"
     },
     "claude-marketplace": {
       "enabled": true,
