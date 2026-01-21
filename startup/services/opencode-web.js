@@ -74,10 +74,10 @@ export default {
     // OpenCode expects HTTP Basic Auth with the password set via OPENCODE_SERVER_PASSWORD
     // Pass FQDN for proper CORS/CSP configuration
     // Run as user 'abc' to ensure config goes to user's home directory
+    // Environment variables with PATH are automatically included by supervisor
     const ps = spawn('sudo', ['-u', 'abc', '-E', opencodeBinary, 'web', '--port', '9997', '--hostname', '127.0.0.1', '--print-logs'], {
       env: { 
         ...env,
-        PATH: `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`,
         HOME: homeDir,
         OPENCODE_SERVER_PASSWORD: password,
         OPENCODE_EXTERNAL_URL: `https://${fqdn}/code/`,

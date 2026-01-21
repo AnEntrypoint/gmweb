@@ -294,9 +294,10 @@ export class Supervisor {
     this.log('DEBUG', `process.env.SUBFOLDER: ${env.SUBFOLDER}`);
     this.log('DEBUG', '=== END ENVIRONMENT ===');
 
-    // Setup Node.js PATH
-    env.PATH = `/usr/local/local/nvm/versions/node/v23.11.1/bin:${env.PATH}`;
-    env.PATH = `${process.env.HOME}/.local/bin:${env.PATH}`;
+    // Setup Node.js PATH - ALWAYS include NVM and local bin first
+    const NVM_BIN = '/usr/local/local/nvm/versions/node/v23.11.1/bin';
+    const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
+    env.PATH = `${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
 
     if (!env.PASSWORD) {
       env.PASSWORD = 'password';
@@ -306,6 +307,32 @@ export class Supervisor {
     }
 
     return env;
+  }
+
+  // Helper to spawn services with proper environment and error handling
+  // This ensures all services have consistent environment setup
+  spawnService(command, args, options = {}) {
+    const { Readable } = require('stream');
+    
+    // Merge provided options with defaults
+    const finalOptions = {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      detached: true,
+      ...options,
+      env: {
+        ...this.env,
+        ...options.env
+      }
+    };
+
+    // Ensure PATH is always included
+    const NVM_BIN = '/usr/local/local/nvm/versions/node/v23.11.1/bin';
+    const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
+    if (!finalOptions.env.PATH?.startsWith(NVM_BIN)) {
+      finalOptions.env.PATH = `${NVM_BIN}:${LOCAL_BIN}:${finalOptions.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
+    }
+
+    return spawn(command, args, finalOptions);
   }
 
   setupLogDirectories() {
