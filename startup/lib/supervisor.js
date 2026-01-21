@@ -306,6 +306,41 @@ export class Supervisor {
       this.log('INFO', `✓ PASSWORD configured: ${env.PASSWORD.substring(0, 3)}***`);
     }
 
+    // Setup D-Bus session for XFCE and other desktop services
+    // xfconfd requires a valid D-Bus session bus to initialize
+    if (!env.DBUS_SESSION_BUS_ADDRESS) {
+      // Use the standard user session bus socket in /run/user/$UID
+      const uid = process.getuid ? process.getuid() : 1000;
+      env.DBUS_SESSION_BUS_ADDRESS = `unix:path=/run/user/${uid}/bus`;
+      this.log('INFO', `✓ D-Bus session configured: ${env.DBUS_SESSION_BUS_ADDRESS}`);
+    }
+
+    // Setup D-Bus system bus (needed for some services)
+    if (!env.DBUS_SYSTEM_BUS_ADDRESS) {
+      env.DBUS_SYSTEM_BUS_ADDRESS = 'unix:path=/run/dbus/system_bus_socket';
+      this.log('INFO', `✓ D-Bus system bus configured: ${env.DBUS_SYSTEM_BUS_ADDRESS}`);
+    }
+
+    // Setup X11 environment (required for XFCE desktop)
+    if (!env.DISPLAY) {
+      env.DISPLAY = ':1.0';
+      this.log('INFO', `✓ DISPLAY configured: ${env.DISPLAY}`);
+    }
+
+    // Setup X11 authority file for authentication
+    if (!env.XAUTHORITY) {
+      const home = env.HOME || '/config';
+      env.XAUTHORITY = `${home}/.Xauthority`;
+      this.log('INFO', `✓ XAUTHORITY configured: ${env.XAUTHORITY}`);
+    }
+
+    // Setup XDG runtime directory (required for D-Bus socket and other runtime files)
+    if (!env.XDG_RUNTIME_DIR) {
+      const uid = process.getuid ? process.getuid() : 1000;
+      env.XDG_RUNTIME_DIR = `/run/user/${uid}`;
+      this.log('INFO', `✓ XDG_RUNTIME_DIR configured: ${env.XDG_RUNTIME_DIR}`);
+    }
+
     return env;
   }
 

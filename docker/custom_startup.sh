@@ -196,12 +196,55 @@ rm -f "$HOME_DIR/.config/chromium/Default/First Run" 2>/dev/null || true
 log "✓ Chromium profile locks cleaned"
 
 # ============================================================================
+# Setup XDG Runtime Directory and D-Bus Session Socket
+# This is CRITICAL for XFCE (xfconfd) and other desktop services
+# ============================================================================
+log "Setting up XDG runtime directory and D-Bus session socket..."
+
+# Get the UID of the abc user (should be 1000 in LinuxServer)
+ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
+ABC_GID=$(id -g abc 2>/dev/null || echo 1000)
+RUNTIME_DIR="/run/user/$ABC_UID"
+
+# Create runtime directory if it doesn't exist
+if [ ! -d "$RUNTIME_DIR" ]; then
+  log "Creating $RUNTIME_DIR..."
+  mkdir -p "$RUNTIME_DIR"
+fi
+
+# Fix permissions on runtime directory (must be 700 for security)
+chmod 700 "$RUNTIME_DIR"
+chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
+log "✓ XDG_RUNTIME_DIR permissions fixed: $RUNTIME_DIR (700)"
+
+# Setup D-Bus session socket location
+# The actual socket creation is done by dbus-daemon, but we ensure the path is known
+export XDG_RUNTIME_DIR="$RUNTIME_DIR"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
+log "✓ D-Bus session bus address configured: $DBUS_SESSION_BUS_ADDRESS"
+
+# CRITICAL: Wait for D-Bus session socket to exist
+# If D-Bus isn't ready, xfconfd will fail to initialize
+log "Waiting for D-Bus session socket to be ready..."
+for i in {1..60}; do
+  if [ -S "$RUNTIME_DIR/bus" ] 2>/dev/null; then
+    log "✓ D-Bus session socket is ready: $RUNTIME_DIR/bus"
+    break
+  fi
+  if [ $i -eq 60 ]; then
+    log "⚠ D-Bus session socket not found after 60 seconds, proceeding anyway"
+    log "  This may cause XFCE initialization to fail"
+  fi
+  sleep 1
+done
+
+# ============================================================================
 # Ensure XFCE session infrastructure is ready before autostart
 # This prevents xfconfd/session manager failures
 # ============================================================================
 log "Setting up XFCE session infrastructure..."
 
-# Ensure D-Bus is ready for session manager
+# Ensure D-Bus system bus is available
 export DBUS_SYSTEM_BUS_ADDRESS="unix:path=/run/dbus/system_bus_socket"
 
 # Wait for X server to be ready (with timeout)
