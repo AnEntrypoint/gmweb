@@ -43,7 +43,11 @@ RUN cd /opt/gmweb-startup && \
     chmod +x /opt/gmweb-startup/install.sh && \
     chmod +x /opt/gmweb-startup/start.sh && \
     chmod +x /opt/gmweb-startup/index.js && \
-    chmod +x /opt/gmweb-startup/custom_startup.sh
+    chmod +x /opt/gmweb-startup/custom_startup.sh && \
+    # Ensure abc user can read and execute all startup files
+    chmod -R go+rx /opt/gmweb-startup && \
+    chown -R root:root /opt/gmweb-startup && \
+    chmod 755 /opt/gmweb-startup
 
 # RUN install.sh at BUILD TIME (installs all system packages and software)
 RUN bash /opt/gmweb-startup/install.sh
@@ -52,6 +56,12 @@ RUN bash /opt/gmweb-startup/install.sh
 # Copy directly to /etc/nginx/sites-available/ which is the source
 # The symlink /etc/nginx/sites-enabled/default -> sites-available/default will resolve correctly
 RUN cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
+
+# Create temporary runtime directories that services will use
+RUN mkdir -p /opt/nhfs && \
+    mkdir -p /tmp/services && \
+    chmod 777 /opt/nhfs && \
+    chmod 777 /tmp/services
 
 # Create LinuxServer custom init script (runs at container start)
 RUN mkdir -p /custom-cont-init.d && \
