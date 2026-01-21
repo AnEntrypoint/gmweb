@@ -35,8 +35,6 @@ async function main() {
         'gcloud',
         'scrot',
         'chromium-ext',
-        'claude-marketplace',
-        'claude-plugin-gm',
         'webssh2',
         'file-manager',
         'sshd',

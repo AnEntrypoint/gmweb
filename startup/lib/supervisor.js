@@ -71,35 +71,44 @@ export class Supervisor {
        this.env = await this.getEnvironment();
 
        // Resolve dependencies and sort services
-       const sorted = this.topologicalSort();
-       if (!sorted) {
-         this.log('ERROR', 'Circular dependency detected');
-         return;
-       }
-
-       // Start all services in dependency order
-       for (const service of sorted) {
-
-        // Check if service is explicitly disabled (default is enabled)
-        const serviceConfig = this.config.services?.[service.name];
-        const isEnabled = serviceConfig?.enabled !== false;
-
-        if (!isEnabled) {
-          this.log('INFO', `Skipping disabled service: ${service.name}`);
-          continue;
+        const sorted = this.topologicalSort();
+        if (!sorted) {
+          this.log('ERROR', 'Circular dependency detected');
+          return;
         }
 
-        try {
-          await this.startService(service);
-        } catch (err) {
-          this.log('ERROR', `Failed to start ${service.name}`, err);
-          if (service.type === 'critical') {
-            this.log('WARN', `Critical service failed, attempting recovery`);
-            await sleep(2000);
-            await this.startService(service);
-          }
+        // Group services into dependency chains for parallel startup
+        // Services with no dependencies can start in parallel
+        // Services with dependencies must wait for their deps to complete
+        const groups = this.groupServicesByDependency(sorted);
+        
+        // Start service groups in sequence, but start independent services in parallel
+        for (const group of groups) {
+          const startPromises = group.map(async (service) => {
+            // Check if service is explicitly disabled (default is enabled)
+            const serviceConfig = this.config.services?.[service.name];
+            const isEnabled = serviceConfig?.enabled !== false;
+
+            if (!isEnabled) {
+              this.log('INFO', `Skipping disabled service: ${service.name}`);
+              return;
+            }
+
+            try {
+              await this.startService(service);
+            } catch (err) {
+              this.log('ERROR', `Failed to start ${service.name}`, err);
+              if (service.type === 'critical') {
+                this.log('WARN', `Critical service failed, attempting recovery`);
+                await sleep(2000);
+                await this.startService(service);
+              }
+            }
+          });
+          
+          // Wait for all services in this group to complete before starting next group
+          await Promise.all(startPromises);
         }
-      }
 
       // Monitor health continuously (runs forever)
       // This runs forever and never returns - keep it running in background
@@ -222,35 +231,75 @@ export class Supervisor {
   }
 
   topologicalSort() {
-    const visited = new Set();
-    const sorted = [];
-    const visiting = new Set();
+     const visited = new Set();
+     const sorted = [];
+     const visiting = new Set();
 
-    const visit = (name) => {
-      if (visited.has(name)) return true;
-      if (visiting.has(name)) return false; // Circular
+     const visit = (name) => {
+       if (visited.has(name)) return true;
+       if (visiting.has(name)) return false; // Circular
 
-      visiting.add(name);
+       visiting.add(name);
 
-      const service = this.services.get(name);
-      if (service?.dependencies) {
-        for (const dep of service.dependencies) {
-          if (!visit(dep)) return false;
-        }
-      }
+       const service = this.services.get(name);
+       if (service?.dependencies) {
+         for (const dep of service.dependencies) {
+           if (!visit(dep)) return false;
+         }
+       }
 
-      visiting.delete(name);
-      visited.add(name);
-      sorted.push(service);
-      return true;
-    };
+       visiting.delete(name);
+       visited.add(name);
+       sorted.push(service);
+       return true;
+     };
 
-    for (const [name] of this.services) {
-      if (!visit(name)) return null;
-    }
+     for (const [name] of this.services) {
+       if (!visit(name)) return null;
+     }
 
-    return sorted;
-  }
+     return sorted;
+   }
+
+   groupServicesByDependency(sorted) {
+     // Group services into layers where each layer can run in parallel
+     // Layer N contains services that only depend on services in layers 0..N-1
+     // This respects the topological sort order while maximizing parallelism
+     const groups = [];
+     const serviceToGroup = new Map(); // Maps service name to its group index
+     
+     // Process services in topologically sorted order
+     for (const service of sorted) {
+       let groupIndex = 0;
+       
+       // Find the minimum group index we can use
+       // It must be after all our dependencies
+       if (service.dependencies && service.dependencies.length > 0) {
+         for (const dep of service.dependencies) {
+           const depGroup = serviceToGroup.get(dep);
+           if (depGroup !== undefined) {
+             groupIndex = Math.max(groupIndex, depGroup + 1);
+           }
+         }
+       }
+       
+       // Add this service to the appropriate group
+       serviceToGroup.set(service.name, groupIndex);
+       
+       if (!groups[groupIndex]) {
+         groups[groupIndex] = [];
+       }
+       groups[groupIndex].push(service);
+     }
+     
+     this.log('INFO', `Organized ${sorted.length} services into ${groups.length} parallel startup groups`);
+     groups.forEach((group, idx) => {
+       const names = group.map(s => s.name).join(', ');
+       this.log('INFO', `  Group ${idx + 1} (parallel): ${names}`);
+     });
+     
+     return groups;
+   }
 
   needsDesktop() {
     for (const [name, service] of this.services) {
