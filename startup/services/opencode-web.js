@@ -1,6 +1,7 @@
 // OpenCode Web Editor Service
 // Starts the OpenCode web interface on port 9997
-import { existsSync, execSync } from 'fs';
+import { existsSync } from 'fs';
+import { execSync } from 'child_process';
 import { spawnAsAbcUser, waitForPort } from '../lib/service-utils.js';
 
 const OPENCODE_BIN = '/usr/local/local/nvm/versions/node/v23.11.1/bin/opencode';
