@@ -63,6 +63,13 @@ RUN mkdir -p /opt/nhfs && \
     chmod 777 /opt/nhfs && \
     chmod 777 /tmp/services
 
+# Create Node.js symlink in standard location
+# OpenCode spawns LSP servers with #!/usr/bin/env node shebangs
+# Without this, OpenCode fails with: /usr/bin/env: 'node': No such file
+RUN ln -s /usr/local/local/nvm/versions/node/v23.11.1/bin/node /usr/local/bin/node && \
+    ln -s /usr/local/local/nvm/versions/node/v23.11.1/bin/npm /usr/local/bin/npm && \
+    ln -s /usr/local/local/nvm/versions/node/v23.11.1/bin/npx /usr/local/bin/npx
+
 # Create LinuxServer custom init script (runs at container start)
 RUN mkdir -p /custom-cont-init.d && \
     echo '#!/bin/bash' > /custom-cont-init.d/01-gmweb-init && \
