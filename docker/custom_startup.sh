@@ -119,20 +119,21 @@ if [ -d "$NHFS_DIR" ]; then
     fi
   fi
   
-  # Run NHFS setup in background so supervisor can start immediately
-  # This prevents the long build process from blocking other services
-  {
-    log "Installing NHFS dependencies (background)..."
-    npm install --legacy-peer-deps --production=false > /dev/null 2>&1
-    
-    log "Building NHFS (background - may take several minutes)..."
-    npm run build > /dev/null 2>&1
-    
-    log "Pruning dev dependencies (background)..."
-    npm prune --production > /dev/null 2>&1
-    
-    log "✓ NHFS ready at $NHFS_DIR/dist/server.js"
-  } &
+   # Run NHFS setup in background so supervisor can start immediately
+   # This prevents the long build process from blocking other services
+   {
+     cd "$NHFS_DIR"
+     log "Installing NHFS dependencies (background)..."
+     npm install --legacy-peer-deps --production=false > /dev/null 2>&1
+     
+     log "Building NHFS (background - may take several minutes)..."
+     npm run build > /dev/null 2>&1
+     
+     log "Pruning dev dependencies (background)..."
+     npm prune --production > /dev/null 2>&1
+     
+     log "✓ NHFS ready at $NHFS_DIR/dist/server.js"
+   } &
   
   log "✓ NHFS setup started in background (supervisor will start immediately)"
 else
