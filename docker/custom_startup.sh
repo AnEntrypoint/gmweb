@@ -238,12 +238,21 @@ X-GNOME-Autostart-enabled=true
 StartupDelay=10
 AUTOSTART_EOF
 
+# Create files launcher wrapper script
+mkdir -p "${HOME}/.local/bin"
+cat > "${HOME}/.local/bin/files-launcher.sh" << 'FILES_LAUNCHER_EOF'
+#!/bin/bash
+# Files launcher for XFCE autostart
+exec chromium http://localhost/files
+FILES_LAUNCHER_EOF
+chmod +x "${HOME}/.local/bin/files-launcher.sh"
+
 # Autostart File Manager in browser
 cat > "$AUTOSTART_DIR/file-manager.desktop" << 'AUTOSTART_EOF'
 [Desktop Entry]
 Type=Application
 Name=File Manager
-Exec=firefox http://localhost/files
+Exec=$HOME_DIR/.local/bin/files-launcher.sh
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
