@@ -53,32 +53,60 @@ export default {
 
 Example: `opencode-web` depends on `glootie-oc` to load agents.
 
-## Creating a New Service
+## Creating a New Service - DEAD SIMPLE
 
+All services automatically get: proper PATH, PASSWORD, FQDN, logging, error handling, cleanup.
+
+### Option 1: npx CLI wrapper (1 line!)
 ```javascript
-export default {
-  name: 'my-service',
-  type: 'web', // or 'system', 'install', 'critical'
-  requiresDesktop: false,
-  dependencies: [],
+// services/my-cli.js
+import { npxWrapperService } from '../lib/service-templates.js';
+export default npxWrapperService('my-cli', '@org/my-cli-package');
+```
 
+### Option 2: Web service on port (1 line!)
+```javascript
+// services/my-web.js
+import { webServiceOnPort } from '../lib/service-templates.js';
+import { spawn } from 'child_process';
+
+export default webServiceOnPort('my-web', 8000, (env) =>
+  spawn('my-server', ['--port', '8000'], { env })
+);
+```
+
+### Option 3: System daemon (1 line!)
+```javascript
+// services/my-daemon.js
+import { systemService } from '../lib/service-templates.js';
+import { spawn } from 'child_process';
+
+export default systemService('my-daemon', (env) =>
+  spawn('daemon-binary', [...args], { env })
+);
+```
+
+### Option 4: Custom service (if needed)
+```javascript
+// services/complex-service.js
+import { customService } from '../lib/service-templates.js';
+
+export default customService('complex-service', {
   async start(env) {
-    console.log('[my-service] Starting...');
-    // Your startup logic here
-    const ps = spawn('...', [...]);
-    
-    return {
-      pid: ps.pid,
-      process: ps,
-      cleanup: async () => { /* cleanup */ }
-    };
+    // All environment variables are set up automatically
+    // env.PATH includes NVM node bin first
+    // env.PASSWORD and env.FQDN are available
+    console.log('[complex-service] Starting...');
+    return { pid, process, cleanup };
   },
-
+  
   async health() {
-    // Return true if service is healthy, false otherwise
-    return checkServiceHealth();
-  }
-};
+    return checkHealth();
+  },
+  
+  dependencies: ['other-service'],
+  type: 'web'
+});
 ```
 
 ## Environment Variables
