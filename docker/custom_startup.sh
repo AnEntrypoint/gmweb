@@ -217,12 +217,21 @@ exec tmux attach-session -t main 2>/dev/null || exec bash -i -l
 TERM_SCRIPT_EOF
 chmod +x "${HOME}/.local/bin/terminal-autostart.sh"
 
+# Create terminal autostart wrapper script (so .desktop file can execute it directly)
+mkdir -p "${HOME}/.local/bin"
+cat > "${HOME}/.local/bin/terminal-launcher.sh" << 'TERM_LAUNCHER_EOF'
+#!/bin/bash
+# Terminal launcher for XFCE autostart
+exec xfce4-terminal -e /config/.local/bin/terminal-autostart.sh
+TERM_LAUNCHER_EOF
+chmod +x "${HOME}/.local/bin/terminal-launcher.sh"
+
 cat > "$AUTOSTART_DIR/xfce4-terminal.desktop" << AUTOSTART_EOF
 [Desktop Entry]
 Type=Application
 Name=Terminal
 Comment=Shared tmux session
-Exec=bash -c "xfce4-terminal -e $HOME_DIR/.local/bin/terminal-autostart.sh"
+Exec=$HOME_DIR/.local/bin/terminal-launcher.sh
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
