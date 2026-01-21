@@ -23,7 +23,7 @@ echo "[start.sh] HOME_DIR=$HOME_DIR"
 echo "[start.sh] LOG_DIR=$LOG_DIR"
 echo "[start.sh] NODE_BIN=$NODE_BIN (exists: $([ -f "$NODE_BIN" ] && echo YES || echo NO))"
 echo "[start.sh] supervisor index.js (exists: $([ -f /opt/gmweb-startup/index.js ] && echo YES || echo NO))"
-echo "[start.sh] kasmproxy.js (exists: $([ -f /opt/gmweb-startup/kasmproxy.js ] && echo YES || echo NO))"
+echo "[start.sh] nginx status (running: $(pgrep -c nginx >/dev/null && echo YES || echo NO))"
 echo "[start.sh] config.json (exists: $([ -f /opt/gmweb-startup/config.json ] && echo YES || echo NO))"
 echo "[start.sh] === STARTING SUPERVISOR ==="
 
@@ -59,17 +59,17 @@ sleep 5
 if kill -0 $SUPERVISOR_PID 2>/dev/null; then
   echo "[start.sh] ✓ Supervisor is RUNNING (PID: $SUPERVISOR_PID)"
 
-   # Give kasmproxy time to start and bind port 80
-   sleep 3
+    # Give services time to fully start
+    sleep 3
 
-   # Verify kasmproxy is listening
-   if command -v lsof &> /dev/null; then
-     if lsof -i :80 2>/dev/null | grep -q LISTEN; then
-       echo "[start.sh] ✓ kasmproxy is LISTENING on port 80"
-     else
-       echo "[start.sh] ✗ kasmproxy NOT listening on port 80 (may still be starting)"
-     fi
-   fi
+    # Verify nginx is listening on port 80
+    if command -v ss &> /dev/null; then
+      if ss -tlnp 2>/dev/null | grep -q ":80.*LISTEN"; then
+        echo "[start.sh] ✓ nginx is LISTENING on port 80"
+      else
+        echo "[start.sh] ✗ nginx NOT listening on port 80 (may still be starting)"
+      fi
+    fi
 else
   echo "[start.sh] ✗ Supervisor exited (check logs)"
   [ -f "$SUPERVISOR_LOG" ] && tail -50 "$SUPERVISOR_LOG"
