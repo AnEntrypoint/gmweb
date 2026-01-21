@@ -27,7 +27,7 @@
       "type": "web"
     },
     "sshd": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "tmux": {
