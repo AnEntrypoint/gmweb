@@ -97,7 +97,7 @@ done
 log "Setting up supervisor and startup system..."
 
 if [ ! -f /opt/gmweb-startup/start.sh ]; then
-  git clone --depth 1 --single-branch --branch main https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3
+  git clone --depth 1 --single-branch --branch temp-main https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3
   cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
   rm -rf /tmp/gmweb
 fi
