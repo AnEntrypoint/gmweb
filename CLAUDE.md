@@ -275,10 +275,39 @@ Automatically persisted by gmweb-config volume:
 **Issues Identified:**
 1. nginx location was `/desk/websocket` (singular) - didn't match `/desk/websockets` (plural) that Selkies client uses
 2. `proxy_pass http://127.0.0.1:8082;` without trailing slash sends full path `/desk/websockets` to Selkies, but Selkies expects just `/` (path stripping needed)
+3. nginx CRITICAL CONSTRAINT: Cannot use `proxy_pass` with URI part in regex locations - nginx rejects with "cannot have URI part" error
 
 **Fix:**
-1. Changed location from `location /desk/websocket` to `location ~ /desk/websockets?(/|$)` (regex to match both singular and plural with optional trailing content)
-2. Changed `proxy_pass` from `http://127.0.0.1:8082;` to `http://127.0.0.1:8082/;` (trailing slash strips the path prefix, sends just `/` to Selkies)
-3. Updated both HTTP (port 80) and HTTPS (port 443) server blocks identically
+1. Use regex location `location ~ /desk/websockets?` to match both singular and plural
+2. Use `rewrite ^/desk/websockets?(.*) $1 break;` to strip path before proxy_pass (nginx requirement)
+3. Use `proxy_pass http://127.0.0.1:8082;` (no trailing slash needed with rewrite)
+4. Updated both HTTP (port 80) and HTTPS (port 443) server blocks identically
 
 **Result:** WebSocket connections now succeed and video/audio streams properly initialize. Selkies desktop streaming now works correctly.
+
+### 8. Build Performance Optimization (Commit 06631a9)
+
+**Problem:** Docker builds took 4+ minutes every time, even with unchanged code. Massive NVM/Node installation during build blocked any changes.
+
+**Root Cause:**
+- Dockerfile installed NVM, Node.js, git, and all packages at build time
+- Heavy image (5.17GB) with redundant build artifacts
+- Cache invalidation on any config change required rebuilding everything
+
+**Solution:** Minimal Dockerfile + deferred runtime installs
+1. Build now takes ~2 seconds (under 2 seconds)
+2. Dockerfile only copies config and sets up directories
+3. All tool installations moved to custom_startup.sh
+4. Image size reduced to 4.15GB
+
+**Startup Strategy** (Phases in custom_startup.sh):
+1. **Quick init** (instant): Permissions, config paths, .bashrc
+2. **Node.js** (1st boot only): Install NVM/Node if not present (uses cache after)
+3. **Supervisor** (1st boot): Fetch gmweb repo, npm install (uses cache after)
+4. **Start supervisor** (every boot): Manager for services
+5. **Background tools** (non-blocking): System packages + optional tools install in background
+   - nginx/desktop available immediately
+   - User sees UI while tools complete
+   - If tool install fails, system keeps running
+
+**Critical caveat:** Dockerfile no longer installs anything - all tools must be in custom_startup.sh. Build assumes bare webtop base. Every container startup re-checks/installs tools (fast due to caching).
