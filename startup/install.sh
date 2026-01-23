@@ -252,6 +252,15 @@ log "NHFS will be run via npx at startup (no pre-build needed)"
 log "✓ NHFS HTTP file server ready to launch"
 
 # ============================================================================
+# 15. AGENT-BROWSER INSTALLATION
+# ============================================================================
+
+log "Installing agent-browser..."
+npm install -g agent-browser
+agent-browser install --with-deps 2>&1 | tail -5
+log "✓ agent-browser installed"
+
+# ============================================================================
 # COMPLETION
 # ============================================================================
 
