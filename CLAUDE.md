@@ -130,34 +130,66 @@ location ~ /desk/websockets? {
 
 **Note:** sshd service disabled (commit 47795d9). webssh2 provides SSH via web browser, reduces attack surface by avoiding direct SSH port exposure. All traffic through nginx HTTP/HTTPS with Basic Auth.
 
-### Selkies WebSocket Path Routing - nginx Configuration
+### Selkies WebSocket Path Routing - nginx Regex Constraint
 
-**CRITICAL GOTCHA:** Selkies WebSocket routing in nginx is fragile. Path handling must be precise.
+**CRITICAL GOTCHA:** nginx regex locations (`location ~`) cannot use `proxy_pass` with URI part (including trailing slash).
 
-**Problem Pattern:** If WebSocket connection fails with "Error: Event" in browser console, it's usually a path routing issue in nginx config.
+**Error:** `"proxy_pass" cannot have URI part in location given by regular expression`
 
-**What Works:**
-```nginx
-location ~ /desk/websockets?(/|$) {
-  proxy_pass http://127.0.0.1:8082/;  # Trailing slash is REQUIRED
-}
-```
-
-**What BREAKS:**
+**Working solution:** Use `rewrite` directive to strip path, then bare `proxy_pass`:
 ```nginx
 location ~ /desk/websockets? {
-  rewrite ^/desk/websockets?(.*) $1 break;  # BREAKS - strips ALL path
-  proxy_pass http://127.0.0.1:8082;        # No trailing slash
+  rewrite ^/desk/(.*) /$1 break;
+  proxy_pass http://127.0.0.1:8082;  # No URI part
 }
 ```
 
-**Why:**
-- nginx proxy_pass WITHOUT trailing slash: preserves full path `/desk/websockets` → sent to backend
-- nginx proxy_pass WITH trailing slash: strips location prefix, sends just `/` to backend
-- Selkies expects `/websockets` endpoint (or just `/`), NOT `/desk/websockets`
-- Rewrite rule `^/desk/websockets?(.*)` captures everything after `/desk/websocket` into `$1`, replacing with just `$1` sends EMPTY path when followed by `?` (query string boundary)
+**Why this works:**
+- `rewrite` directive modifies the URI before proxy_pass
+- `break` flag prevents further rewrite rule processing
+- `proxy_pass` without trailing slash preserves the rewritten path
+- Selkies backend receives `/websockets` endpoint as expected
 
-**Fix:** Use trailing slash in proxy_pass to enable automatic path stripping. Do NOT use rewrite rules that strip the entire path prefix.
+**Why trailing slash breaks:**
+- nginx forbids URI part in regex `proxy_pass` (including `/`)
+- nginx error: `"proxy_pass" cannot have URI part in location given by regular expression`
 
-**Both HTTP (80) and HTTPS (443) blocks must be identical.** If only one block is fixed, the other port will fail.
+**Both HTTP (80) and HTTPS (443) blocks must use identical rewrite logic.**
+
+### HTTP Basic Auth Generation at Startup
+
+**GOTCHA:** nginx loads htpasswd file at config parse time. Creating htpasswd AFTER nginx starts doesn't take effect.
+
+**Solution in custom_startup.sh:**
+1. Generate htpasswd file with PASSWORD env var (or default "test123")
+2. Call `nginx -s reload` to reload config with new credentials
+3. Allow 1 second for reload to complete
+
+**PASSWORD env var handling:**
+- `if [ -z "${PASSWORD}" ]` checks for unset variable (not just empty string)
+- Defaults to "test123" if PASSWORD not provided
+- Startup logs indicate whether default or env var was used
+
+### File Manager via gxe
+
+**Implementation:** NHFS (Next-HTTP-File-Server) runs via `PORT=9998 npx -y gxe@latest AnEntrypoint/nhfs`
+
+**Why gxe:** Direct GitHub repo execution without local build system. Simplifies startup sequence.
+
+**Working directory:** NHFS runs from `/config` (home directory for file access)
+
+**Base directory:** NHFS_BASE_DIR env var set to `/config` for file serving
+
+### Startup System Clone from temp-main
+
+**GOTCHA:** custom_startup.sh clones gmweb repo to get startup system files. Must clone from correct branch.
+
+**Why temp-main:** Development branch contains latest file-manager.js with gxe implementation. main branch has outdated build-based NHFS.
+
+**Git branch in custom_startup.sh:**
+```bash
+git clone --depth 1 --single-branch --branch temp-main https://github.com/AnEntrypoint/gmweb.git
+```
+
+**Note:** When merging temp-main to main, update custom_startup.sh to clone from main.
 
