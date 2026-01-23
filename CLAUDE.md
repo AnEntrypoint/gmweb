@@ -130,3 +130,34 @@ location ~ /desk/websockets? {
 
 **Note:** sshd service disabled (commit 47795d9). webssh2 provides SSH via web browser, reduces attack surface by avoiding direct SSH port exposure. All traffic through nginx HTTP/HTTPS with Basic Auth.
 
+### Selkies WebSocket Path Routing - nginx Configuration
+
+**CRITICAL GOTCHA:** Selkies WebSocket routing in nginx is fragile. Path handling must be precise.
+
+**Problem Pattern:** If WebSocket connection fails with "Error: Event" in browser console, it's usually a path routing issue in nginx config.
+
+**What Works:**
+```nginx
+location ~ /desk/websockets?(/|$) {
+  proxy_pass http://127.0.0.1:8082/;  # Trailing slash is REQUIRED
+}
+```
+
+**What BREAKS:**
+```nginx
+location ~ /desk/websockets? {
+  rewrite ^/desk/websockets?(.*) $1 break;  # BREAKS - strips ALL path
+  proxy_pass http://127.0.0.1:8082;        # No trailing slash
+}
+```
+
+**Why:**
+- nginx proxy_pass WITHOUT trailing slash: preserves full path `/desk/websockets` → sent to backend
+- nginx proxy_pass WITH trailing slash: strips location prefix, sends just `/` to backend
+- Selkies expects `/websockets` endpoint (or just `/`), NOT `/desk/websockets`
+- Rewrite rule `^/desk/websockets?(.*)` captures everything after `/desk/websocket` into `$1`, replacing with just `$1` sends EMPTY path when followed by `?` (query string boundary)
+
+**Fix:** Use trailing slash in proxy_pass to enable automatic path stripping. Do NOT use rewrite rules that strip the entire path prefix.
+
+**Both HTTP (80) and HTTPS (443) blocks must be identical.** If only one block is fixed, the other port will fail.
+
