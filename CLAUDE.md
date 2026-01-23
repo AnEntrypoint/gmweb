@@ -23,7 +23,7 @@ nginx comes pre-installed with LinuxServer Webtop and is configured via `/etc/ng
 - Listens on ports 80 (HTTP) and 443 (HTTPS)
 - Enforces HTTP Basic Auth globally on all routes
 - Routes `/desk/` to Selkies web UI (`/usr/share/selkies/web/`)
-- Routes `/desk/websocket` to Selkies WebSocket (`127.0.0.1:8082`)
+- Routes `/desk/websocket` and `/desk/websockets` to Selkies WebSocket (`127.0.0.1:8082/`)
 - Routes `/desk/files` to file browser with fancy indexing
 - Routes `/devmode` to development server (port 5173)
 - Routes `/ui/` and `/api/` to OpenCode web interface (port 9997)
@@ -267,3 +267,18 @@ Automatically persisted by gmweb-config volume:
 - Removed from `startup/config.json`
 
 **Rationale:** Claude Code UI was causing service bloat. The focus is on Claude Code CLI and nginx as the primary entry point. No database persistence needed.
+
+### 7. Selkies WebSocket Path Fix
+
+**Problem:** Selkies WebSocket connections were failing. Browser client attempts to connect to both `/desk/websocket` and `/desk/websockets` endpoints, but nginx routing was incomplete.
+
+**Issues Identified:**
+1. nginx location was `/desk/websocket` (singular) - didn't match `/desk/websockets` (plural) that Selkies client uses
+2. `proxy_pass http://127.0.0.1:8082;` without trailing slash sends full path `/desk/websockets` to Selkies, but Selkies expects just `/` (path stripping needed)
+
+**Fix:**
+1. Changed location from `location /desk/websocket` to `location ~ /desk/websockets?(/|$)` (regex to match both singular and plural with optional trailing content)
+2. Changed `proxy_pass` from `http://127.0.0.1:8082;` to `http://127.0.0.1:8082/;` (trailing slash strips the path prefix, sends just `/` to Selkies)
+3. Updated both HTTP (port 80) and HTTPS (port 443) server blocks identically
+
+**Result:** WebSocket connections now succeed and video/audio streams properly initialize. Selkies desktop streaming now works correctly.
