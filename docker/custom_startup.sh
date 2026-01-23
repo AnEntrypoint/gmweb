@@ -17,6 +17,15 @@ log "===== GMWEB STARTUP ====="
 log "Initializing system..."
 
 # ============================================================================
+# PHASE 0: Deploy nginx config FIRST (before nginx starts)
+# ============================================================================
+log "Deploying nginx configuration..."
+if [ -f /opt/gmweb-startup/nginx-sites-enabled-default ]; then
+  cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
+  log "✓ nginx config deployed (port 80/443)"
+fi
+
+# ============================================================================
 # PHASE 1: Quick init (permissions, config, paths) - SYNCHRONOUS
 # ============================================================================
 
