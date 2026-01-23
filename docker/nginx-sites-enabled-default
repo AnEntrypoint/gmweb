@@ -57,7 +57,8 @@ server {
     proxy_pass http://127.0.0.1:5173;
   }
 
-  location ~ /desk/websockets?(/|$) {
+  location ~ /desk/websockets? {
+    rewrite ^/desk/websockets?(.*) $1 break;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
@@ -70,7 +71,7 @@ server {
     proxy_connect_timeout 3600s;
     proxy_buffering off;
     client_max_body_size 10M;
-    proxy_pass http://127.0.0.1:8082/;
+    proxy_pass http://127.0.0.1:8082;
   }
 
   location /desk/files {
@@ -260,7 +261,8 @@ server {
     proxy_pass http://127.0.0.1:5173;
   }
 
-  location ~ /desk/websockets?(/|$) {
+  location ~ /desk/websockets? {
+    rewrite ^/desk/websockets?(.*) $1 break;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
@@ -273,7 +275,7 @@ server {
     proxy_connect_timeout 3600s;
     proxy_buffering off;
     client_max_body_size 10M;
-    proxy_pass http://127.0.0.1:8082/;
+    proxy_pass http://127.0.0.1:8082;
   }
 
   location /desk/files {
