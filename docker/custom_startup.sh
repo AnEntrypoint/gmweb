@@ -25,6 +25,20 @@ if [ -f /opt/gmweb-startup/nginx-sites-enabled-default ]; then
   log "✓ nginx config deployed (port 80/443)"
 fi
 
+log "Creating HTTP Basic Auth credentials..."
+if [ -z "${PASSWORD}" ]; then
+  PASSWORD="test123"
+  log "  Using default password (set PASSWORD env var to override)"
+else
+  log "  Using PASSWORD env var"
+fi
+echo "abc:$(openssl passwd -apr1 "$PASSWORD")" > /etc/nginx/.htpasswd
+chmod 644 /etc/nginx/.htpasswd
+sleep 1
+nginx -s reload 2>/dev/null || true
+log "✓ HTTP Basic Auth configured (user: abc)"
+export PASSWORD
+
 # ============================================================================
 # PHASE 1: Quick init (permissions, config, paths) - SYNCHRONOUS
 # ============================================================================
@@ -54,28 +68,37 @@ log "✓ Phase 1 complete: System initialized"
 log "Installing Node.js (required for supervisor)..."
 
 NVM_DIR=/usr/local/local/nvm
-if [ ! -d "$NVM_DIR" ]; then
+NODE_BIN="$NVM_DIR/versions/node/v23.11.1/bin/node"
+if [ ! -f "$NODE_BIN" ]; then
   mkdir -p "$NVM_DIR"
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | grep -E "nvm is already|Created|Installed"
-  bash -c ". $NVM_DIR/nvm.sh && nvm install 23.11.1 && nvm use 23.11.1 && nvm alias default 23.11.1" 2>&1 | tail -5
+  export NVM_DIR
+  log "Downloading and installing nvm..."
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
+  log "✓ nvm installed"
 
-  # Create symlinks
-  for bin in node npm npx; do
-    ln -sf $NVM_DIR/versions/node/v23.11.1/bin/$bin /usr/local/bin/$bin
-  done
+  export NVM_DIR="/usr/local/local/nvm"
+  . "$NVM_DIR/nvm.sh"
+  log "Installing Node.js 23.11.1..."
+  nvm install 23.11.1 2>&1 | tail -5
+  nvm use 23.11.1 2>&1 | tail -2
+  nvm alias default 23.11.1 2>&1 | tail -2
   log "✓ Node.js installed"
 else
   log "✓ Node.js already installed"
 fi
+
+for bin in node npm npx; do
+  ln -sf $NVM_DIR/versions/node/v23.11.1/bin/$bin /usr/local/bin/$bin
+done
 
 # ============================================================================
 # PHASE 3: Setup supervisor (gmweb startup system) - SYNCHRONOUS
 # ============================================================================
 log "Setting up supervisor and startup system..."
 
-if [ ! -d /opt/gmweb-startup/startup ]; then
+if [ ! -f /opt/gmweb-startup/start.sh ]; then
   git clone --depth 1 --single-branch --branch main https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3
-  cp -r /tmp/gmweb/startup /opt/gmweb-startup/
+  cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
   rm -rf /tmp/gmweb
 fi
 
