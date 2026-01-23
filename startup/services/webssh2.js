@@ -29,7 +29,8 @@ export default {
     // -T xterm-256color ensures color terminal type
     // tmux new-session -A -s main bash: attach to 'main' session or create with bash shell
     // 'bash -i -l' ensures login shell that sources .bashrc and user profile
-    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'tmux', 'new-session', '-A', '-s', 'main', 'bash', '-i', '-l'], {
+    const tmuxCmd = 'tmux -f /opt/gmweb-startup/tmux.conf new-session -A -s main -c /config bash -i -l';
+    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-c', tmuxCmd], {
       env: { ...env, TERM: 'xterm-256color' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true

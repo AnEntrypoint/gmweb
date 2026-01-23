@@ -28,12 +28,12 @@ sudo apt --fix-broken install -y 2>/dev/null || true
 sudo dpkg --configure -a 2>/dev/null || true
 sudo apt update
 
-# Install packages (including scrot for screenshots)
+# Install packages (including scrot for screenshots, xclip for tmux clipboard)
 sudo apt-get install -y --no-install-recommends \
   curl bash git build-essential ca-certificates jq wget \
   software-properties-common apt-transport-https gnupg openssh-server \
   openssh-client tmux lsof chromium chromium-sandbox xfce4-terminal xfce4 dbus-x11 \
-  scrot
+  scrot xclip
 
 sudo rm -rf /var/lib/apt/lists/*
 log "✓ System packages installed"

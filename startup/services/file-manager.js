@@ -18,8 +18,8 @@ export default {
   },
 
   async startNHFS(env) {
-    const ps = spawn('bash', ['-c', 'PORT=9998 npx -y gxe@latest AnEntrypoint/nhfs'], {
-      env: { ...env, HOME: '/config', NHFS_BASE_DIR: '/config' },
+    const ps = spawn('bash', ['-c', 'PORT=9998 BASEPATH=/files npx -y gxe@latest AnEntrypoint/nhfs'], {
+      env: { ...env, HOME: '/config', BASE_DIR: '/config' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
       cwd: '/config'
