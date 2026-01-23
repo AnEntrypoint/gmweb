@@ -149,26 +149,6 @@ nginx handles HTTP/HTTPS with Basic Auth before any other services run. This ens
 
 **Result:** Eliminated 2-minute startup timeout.
 
-### 1. Port Forwarding (05e09ed)
-
-**Bug:** Used `parseInt(process.env.CUSTOM_PORT)` for upstream routing → forwarded to port 6901 instead of 3000.
-
-**Root Cause:** CUSTOM_PORT (6901) is external configuration. Internal Webtop UI always listens on port 3000.
-
-**Fix:** Hardcoded ports based on path:
-- `/data/*` and `/ws/*` → port 8082 (Selkies)
-- All other routes → port 3000 (Webtop)
-
-**Result:** 401 Unauthorized errors resolved.
-
-### 2. Supervisor Health Check (30677ec)
-
-**Bug:** Health check looked for disabled service, never detected enabled one.
-
-**Fix:** Pass correct service name to health check.
-
-**Result:** Eliminated 2-minute startup timeout.
-
 ### 3. Init Script Blocking s6-rc Service Startup (Fixed)
 
 **Problem:** The `start.sh` script had an infinite loop `while true; sleep 60` that blocked s6-rc from starting other services.
@@ -249,6 +229,18 @@ Automatically persisted by gmweb-config volume:
 - Plugin cache and MCP server configuration
 - Settings and preferences (settings.json)
 - Session plans and todos
+
+## Services Configuration
+
+### sshd Service (Disabled)
+
+**Status:** Disabled in favor of webssh2 (commit 47795d9)
+
+**Rationale:**
+- webssh2 provides SSH access via web browser without requiring direct SSH port exposure
+- Simpler security model - all traffic through nginx HTTP/HTTPS with Basic Auth
+- Reduces attack surface by not exposing SSH port directly
+- webssh2 service is enabled and provides equivalent SSH functionality through the web interface
 
 ## Services Removed
 
