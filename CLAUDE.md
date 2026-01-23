@@ -193,3 +193,53 @@ git clone --depth 1 --single-branch --branch temp-main https://github.com/AnEntr
 
 **Note:** When merging temp-main to main, update custom_startup.sh to clone from main.
 
+### NHFS basePath Support for Subfolder Deployment
+
+**GOTCHA:** When serving NHFS at a subpath (e.g., `/files/`), all asset requests default to root path.
+
+**Before fix:** NHFS hardcoded paths like `href="/style.css"` and `fetch('/api/list/...')` failed at `/files/` because browser requested `/style.css` instead of `/files/style.css`.
+
+**After fix:** Pass `BASEPATH=/files` environment variable to NHFS:
+- Server injects `window.BASEPATH='/files'` into HTML response
+- Client-side app reads window.BASEPATH and prepends it to all API calls
+- Assets are fetched from `/files/style.css`, API from `/files/api/...`
+
+**Implementation:**
+- `server.js`: Read BASEPATH from env, inject into HTML response
+- `app.js`: Add `api()` helper method that prepends basePath to all fetch URLs
+- `file-manager.js`: Pass `BASEPATH=/files` when launching NHFS via gxe
+
+**Critical:** nginx proxy at `/files/` routes to bare `http://127.0.0.1:9998/` (no URI suffix) so NHFS receives `/files/...` paths from browser.
+
+### Tmux Clipboard Support in webssh2
+
+**GOTCHA:** Clipboard doesn't work in tmux sessions launched via ttyd without explicit xclip configuration.
+
+**Before fix:** Tmux copy mode (vi bindings) didn't integrate with system clipboard. Copy in terminal stayed in tmux buffer only.
+
+**After fix:**
+1. Created `/opt/gmweb-startup/tmux.conf` with xclip bindings:
+   ```
+   bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel "xclip -i -selection clipboard"
+   bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "xclip -i -selection clipboard"
+   set-option -g mouse on
+   ```
+2. Installed `xclip` system package for clipboard integration
+3. webssh2.js loads custom config: `tmux -f /opt/gmweb-startup/tmux.conf new-session ...`
+
+**Result:** Vi mode copy (y, Enter) pipes to system clipboard via xclip. Mouse selection also available.
+
+**Caveat:** xclip requires X11 connection. In headless environments, clipboard may not work. The `2>/dev/null || true` prevents errors on systems without xclip.
+
+### Agent-Browser Pre-Installation
+
+**Implementation:** Auto-install agent-browser during background installation phase.
+
+**Installation steps:**
+1. `npm install -g agent-browser` - Global npm package
+2. `agent-browser install --with-deps` - Download browser drivers (Chromium, Firefox, etc.)
+
+**Location:** Runs in `install.sh` section 15 (background installs). Executes during startup while UI is already available.
+
+**Caveat:** First boot will pause while agent-browser downloads drivers (~500MB+). Subsequent boots skip this as cache exists. Check logs for installation progress: `tail -f /config/logs/startup.log`.
+
