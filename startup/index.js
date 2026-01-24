@@ -37,7 +37,6 @@ async function main() {
         'chromium-ext',
         'webssh2',
         'file-manager',
-        'sshd',
         'tmux',
         'opencode',
         'opencode-web',

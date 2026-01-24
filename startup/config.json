@@ -26,10 +26,6 @@
       "enabled": true,
       "type": "web"
     },
-    "sshd": {
-      "enabled": false,
-      "type": "system"
-    },
     "tmux": {
       "enabled": true,
       "type": "system"
