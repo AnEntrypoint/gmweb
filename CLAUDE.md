@@ -126,9 +126,9 @@ location ~ /desk/websockets? {
 
 **Caveat:** Cannot determine if new code actually executed without boot timestamp verification.
 
-### sshd Disabled in Favor of webssh2
+### SSH via webssh2 (Direct sshd Removed)
 
-**Note:** sshd service disabled (commit 47795d9). webssh2 provides SSH via web browser, reduces attack surface by avoiding direct SSH port exposure. All traffic through nginx HTTP/HTTPS with Basic Auth.
+**Note:** sshd service completely removed from startup. webssh2 provides SSH via web browser, reduces attack surface by avoiding direct SSH port exposure. All traffic through nginx HTTP/HTTPS with Basic Auth.
 
 ### Selkies WebSocket Path Routing - nginx Regex Constraint
 

@@ -5,7 +5,7 @@ This directory contains all startup services for gmweb. Services are started in 
 ## Service Types
 
 - **install**: One-time installation services (create wrappers, install packages)
-- **system**: System services (tmux, sshd, etc.)
+- **system**: System services (tmux, scrot, etc.)
 - **web**: Web services (opencode-web, file-manager, etc.)
 - **critical**: Critical services that block startup if they fail
 
@@ -13,7 +13,7 @@ This directory contains all startup services for gmweb. Services are started in 
 
 ### Core Infrastructure
 - **tmux**: Shared terminal session at port 9999 (via ttyd)
-- **sshd**: SSH daemon for remote access
+- **webssh2**: Web-based SSH client via browser
 - **scrot**: Screenshot utility for testing
 
 ### OpenCode Editor
@@ -31,9 +31,8 @@ This directory contains all startup services for gmweb. Services are started in 
 
 ### Utilities
 - **file-manager**: NHFS web file browser at http://localhost:3001
-- **webssh2**: Web-based SSH client
 - **playwriter**: Playwriter MCP relay for browser automation
-- **chromium-ext**: Enables Chromium extensions
+- **chromium-ext**: Enables Chromium extensions (disabled by default)
 
 ### Installation Services
 - **gcloud**: Google Cloud SDK installer
