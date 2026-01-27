@@ -115,6 +115,35 @@ cd /opt/gmweb-startup && \
 log "✓ Supervisor system ready"
 
 # ============================================================================
+# PHASE 3.5: Pre-install critical binaries (before supervisor starts)
+# ============================================================================
+log "Installing critical binaries (webssh2 requires ttyd)..."
+
+ARCH=$(uname -m)
+TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
+TTYD_URL="https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}"
+
+TTYD_RETRY=3
+while [ $TTYD_RETRY -gt 0 ]; do
+  if timeout 60 curl -fL --max-redirs 5 -o /tmp/ttyd "$TTYD_URL" 2>/dev/null && [ -f /tmp/ttyd ] && [ -s /tmp/ttyd ]; then
+    sudo mv /tmp/ttyd /usr/bin/ttyd
+    sudo chmod +x /usr/bin/ttyd
+    log "✓ ttyd installed"
+    break
+  else
+    TTYD_RETRY=$((TTYD_RETRY - 1))
+    if [ $TTYD_RETRY -gt 0 ]; then
+      log "ttyd download attempt failed, retrying ($TTYD_RETRY left)..."
+      sleep 3
+    fi
+  fi
+done
+
+if [ ! -f /usr/bin/ttyd ]; then
+  log "WARNING: ttyd download failed - webssh2 will be unavailable"
+fi
+
+# ============================================================================
 # PHASE 4: Start supervisor as abc user (manages additional services)
 # ============================================================================
 log "Starting supervisor..."
