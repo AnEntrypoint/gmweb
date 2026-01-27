@@ -38,6 +38,10 @@
       "enabled": true,
       "type": "web"
     },
+    "aion-ui": {
+      "enabled": true,
+      "type": "web"
+    },
     "glootie-oc": {
       "enabled": true,
       "type": "install"
