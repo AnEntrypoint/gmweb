@@ -311,17 +311,13 @@ export class Supervisor {
   }
 
   async waitForDesktop() {
-    this.log('INFO', 'Waiting for Kasm desktop to be ready...');
-    const desktopReadyBin = '/usr/bin/desktop_ready';
+    this.log('INFO', 'Waiting for Webtop desktop to be ready...');
 
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 60; i++) {
       try {
-        if (existsSync(desktopReadyBin)) {
-          const result = spawnSync('bash', ['-c', desktopReadyBin], { timeout: 5000 });
-          if (result.status === 0) {
-            this.log('INFO', 'Desktop ready');
-            return;
-          }
+        if (existsSync('/tmp/.X11-unix/1')) {
+          this.log('INFO', 'Desktop ready');
+          return;
         }
       } catch (err) {
         // Continue waiting
@@ -330,7 +326,7 @@ export class Supervisor {
       await sleep(1000);
     }
 
-    this.log('WARN', 'Desktop ready timeout after 2 minutes, continuing anyway');
+    this.log('WARN', 'Desktop ready timeout after 60 seconds, continuing anyway');
   }
 
   async getEnvironment() {
