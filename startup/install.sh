@@ -252,10 +252,16 @@ log "NHFS will be run via npx at startup (no pre-build needed)"
 log "✓ NHFS HTTP file server ready to launch"
 
 # ============================================================================
-# 15. AGENT-BROWSER INSTALLATION
+# 15. INSTALL NPM PACKAGES FOR GLOBAL USE
 # ============================================================================
 
-log "Installing agent-browser..."
+log "Installing global npm packages..."
+
+# Install better-sqlite3 globally for AionUI credentials setup
+npm install -g better-sqlite3 2>&1 | tail -3
+log "✓ better-sqlite3 installed"
+
+# Install agent-browser
 npm install -g agent-browser
 agent-browser install --with-deps 2>&1 | tail -5
 log "✓ agent-browser installed"
