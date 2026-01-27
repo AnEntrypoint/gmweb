@@ -35,7 +35,7 @@
       "type": "install"
     },
     "opencode-web": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "aion-ui": {

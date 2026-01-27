@@ -230,12 +230,28 @@ TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
 
 TTYD_URL="https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}"
 log "Downloading ttyd from: $TTYD_URL"
-if curl -fL -o /tmp/ttyd "$TTYD_URL" 2>/dev/null; then
+
+TTYD_RETRY=3
+TTYD_DOWNLOADED=0
+while [ $TTYD_RETRY -gt 0 ] && [ $TTYD_DOWNLOADED -eq 0 ]; do
+  if timeout 60 curl -fL --max-redirs 5 -o /tmp/ttyd "$TTYD_URL" 2>/dev/null && [ -f /tmp/ttyd ] && [ -s /tmp/ttyd ]; then
+    TTYD_DOWNLOADED=1
+  else
+    TTYD_RETRY=$((TTYD_RETRY - 1))
+    if [ $TTYD_RETRY -gt 0 ]; then
+      log "ttyd download attempt failed, retrying ($TTYD_RETRY left)..."
+      sleep 5
+    fi
+  fi
+done
+
+if [ $TTYD_DOWNLOADED -eq 1 ]; then
   sudo mv /tmp/ttyd /usr/bin/ttyd
   sudo chmod +x /usr/bin/ttyd
   log "✓ ttyd installed"
 else
-  log "WARNING: ttyd download failed - web terminal will be unavailable"
+  log "WARNING: ttyd download failed after retries - webssh2 will be unavailable"
+  rm -f /tmp/ttyd
 fi
 
 # ============================================================================
