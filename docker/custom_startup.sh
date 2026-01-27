@@ -91,6 +91,9 @@ for bin in node npm npx; do
   ln -sf $NVM_DIR/versions/node/v23.11.1/bin/$bin /usr/local/bin/$bin
 done
 
+chmod 777 $NVM_DIR/versions/node/v23.11.1/bin
+chmod 777 $NVM_DIR/versions/node/v23.11.1/lib/node_modules
+
 # ============================================================================
 # PHASE 3: Setup supervisor (gmweb startup system) - SYNCHRONOUS
 # ============================================================================
