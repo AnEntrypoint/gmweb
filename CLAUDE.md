@@ -243,3 +243,38 @@ git clone --depth 1 --single-branch --branch temp-main https://github.com/AnEntr
 
 **Caveat:** First boot will pause while agent-browser downloads drivers (~500MB+). Subsequent boots skip this as cache exists. Check logs for installation progress: `tail -f /config/logs/startup.log`.
 
+### AionUI Password Credentials from Environment
+
+**GOTCHA:** AionUI uses better-sqlite3 and bcrypt modules to set login credentials from `$PASSWORD` env var at startup.
+
+**Requirements:**
+1. `better-sqlite3` must be installed globally: `npm install -g better-sqlite3`
+2. `bcrypt` must be available in npm: `npm install bcrypt` (in /config/node_modules)
+3. Password hashing uses bcrypt with cost factor 12, then converts `$2b$` prefix to `$2a$` for AionUI compatibility
+4. Credentials set after 8000ms delay to allow AionUI process initialization
+
+**Location:** `startup/services/aion-ui.js` - `setCredentialsFromEnv()` function called 8 seconds after process start
+
+**Environment variables:**
+- `PASSWORD` - Primary password env var (fallback)
+- `AIONUI_PASSWORD` - Explicit AionUI password (takes precedence)
+- `AIONUI_USERNAME` - Custom username (default: "admin")
+
+**Database path:** `/config/.config/AionUi/aionui/aionui.db` - Must exist before credentials update (AionUI creates on first run)
+
+**Module paths (CRITICAL):**
+- `better-sqlite3` at `/config/.npm-global/lib/node_modules/better-sqlite3`
+- `bcrypt` at `/config/node_modules/bcrypt`
+
+If paths are wrong, credentials setup fails silently - login falls back to AionUI-generated random password.
+
+### Webtop Desktop Detection - Replaced Kasm Detection
+
+**GOTCHA:** Old supervisor code waited for `/usr/bin/desktop_ready` (Kasm-specific). Webtop uses different initialization path.
+
+**Fix:** Changed `waitForDesktop()` in `supervisor.js` to check for X11 socket: `/tmp/.X11-unix/1`
+
+**Timeout:** 60 seconds (was 120 for Kasm). If X11 socket doesn't appear, continues anyway with warning.
+
+**Why X11 socket:** Webtop (based on LinuxServer) uses Xvfb for X11 display server. Socket appears once Xvfb starts. More reliable than polling `/usr/bin/desktop_ready` which doesn't exist in Webtop.
+
