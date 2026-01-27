@@ -3,15 +3,15 @@
   "logDirectory": "/config/logs",
   "services": {
     "wrangler": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "gcloud": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "scrot": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "chromium-ext": {
@@ -39,15 +39,15 @@
       "type": "web"
     },
     "aion-ui": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "glootie-oc": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "playwriter": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     }
   }
