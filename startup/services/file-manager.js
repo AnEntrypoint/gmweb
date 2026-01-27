@@ -18,49 +18,80 @@ export default {
   },
 
   async startNHFS(env) {
-    const ps = spawn('bash', ['-c', 'PORT=9998 BASEPATH=/files npx -y gxe@latest AnEntrypoint/nhfs'], {
-      env: { ...env, HOME: '/config', BASE_DIR: '/config' },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
-      cwd: '/config'
-    });
+    return new Promise((resolve, reject) => {
+      const { execSync } = require('child_process');
 
-    ps.stdout?.on('data', (data) => {
-      console.log(`[file-manager] ${data.toString().trim()}`);
-    });
-    ps.stderr?.on('data', (data) => {
-      console.log(`[file-manager:err] ${data.toString().trim()}`);
-    });
+      try {
+        execSync('git config --global --add safe.directory "*"', { stdio: 'pipe' });
+      } catch (e) {}
 
-    ps.unref();
+      const childEnv = { ...env, HOME: '/config', BASE_DIR: '/config', PORT: '9998', BASEPATH: '/files' };
 
-    await sleep(3000);
+      const ps = spawn('npx', ['-y', 'gxe@latest', 'AnEntrypoint/nhfs'], {
+        env: childEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: false,
+        cwd: '/config'
+      });
 
-    const isRunning = await this.health();
-    if (isRunning) {
-      console.log('[file-manager] ✓ NHFS started successfully on port 9998');
-      return {
-        pid: ps.pid,
-        process: ps,
-        cleanup: async () => {
-          try {
-            process.kill(-ps.pid, 'SIGTERM');
-            await sleep(1000);
-            process.kill(-ps.pid, 'SIGKILL');
-          } catch (e) {}
+      let startCheckCount = 0;
+      let startCheckInterval = null;
+
+      const checkIfStarted = async () => {
+        startCheckCount++;
+        try {
+          const { execSync } = await import('child_process');
+          execSync('ss -tuln 2>/dev/null | grep -q :9998 || netstat -tuln 2>/dev/null | grep -q :9998', { stdio: 'pipe' });
+          clearInterval(startCheckInterval);
+          console.log('[file-manager] ✓ NHFS responding on port 9998');
+          resolve({
+            pid: ps.pid,
+            process: ps,
+            cleanup: async () => {
+              try {
+                ps.kill('SIGTERM');
+                await sleep(1000);
+                ps.kill('SIGKILL');
+              } catch (e) {}
+            }
+          });
+        } catch (e) {
+          if (startCheckCount > 120) {
+            clearInterval(startCheckInterval);
+            ps.kill('SIGKILL');
+            reject(new Error('NHFS failed to start after 120s'));
+          }
         }
       };
-    } else {
-      const err = new Error('NHFS failed to start');
-      console.error(`[file-manager] ${err.message}`);
-      throw err;
-    }
+
+      ps.stdout?.on('data', (data) => {
+        console.log(`[file-manager] ${data.toString().trim()}`);
+      });
+
+      ps.stderr?.on('data', (data) => {
+        console.log(`[file-manager:err] ${data.toString().trim()}`);
+      });
+
+      ps.on('error', (err) => {
+        clearInterval(startCheckInterval);
+        reject(new Error(`Failed to spawn NHFS: ${err.message}`));
+      });
+
+      ps.on('exit', (code) => {
+        clearInterval(startCheckInterval);
+        if (code !== 0) {
+          reject(new Error(`NHFS exited with code ${code}`));
+        }
+      });
+
+      startCheckInterval = setInterval(checkIfStarted, 1000);
+    });
   },
 
   async health() {
     try {
       const { execSync } = await import('child_process');
-      execSync('ss -tlnp 2>/dev/null | grep -q 9998', { stdio: 'pipe' });
+      execSync('ss -tuln 2>/dev/null | grep -q :9998 || netstat -tuln 2>/dev/null | grep -q :9998', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;

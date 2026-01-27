@@ -23,7 +23,7 @@
       "type": "web"
     },
     "file-manager": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "tmux": {
