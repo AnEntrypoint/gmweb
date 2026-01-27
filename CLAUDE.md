@@ -278,3 +278,83 @@ If paths are wrong, credentials setup fails silently - login falls back to AionU
 
 **Why X11 socket:** Webtop (based on LinuxServer) uses Xvfb for X11 display server. Socket appears once Xvfb starts. More reliable than polling `/usr/bin/desktop_ready` which doesn't exist in Webtop.
 
+### ttyd Binary Installation Timing
+
+**CRITICAL TIMING:** ttyd binary must be installed in PHASE 3.5 (before supervisor starts), not during background installations.
+
+**Problem:** If ttyd only installed during PHASE 5 (background installs), webssh2 service checks `/usr/bin/ttyd` and returns unavailable because supervisor starts immediately after PHASE 4.
+
+**Solution:** Added explicit installation in `custom_startup.sh` PHASE 3.5:
+```bash
+ARCH=$(uname -m)
+TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
+TTYD_URL="https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}"
+TTYD_RETRY=3
+while [ $TTYD_RETRY -gt 0 ]; do
+  if timeout 60 curl -fL --max-redirs 5 -o /tmp/ttyd "$TTYD_URL" 2>/dev/null && [ -f /tmp/ttyd ] && [ -s /tmp/ttyd ]; then
+    sudo mv /tmp/ttyd /usr/bin/ttyd
+    sudo chmod +x /usr/bin/ttyd
+    break
+  fi
+done
+```
+
+**Includes:** 3 retry attempts, 60-second timeout per attempt, --max-redirs 5 for GitHub redirects.
+
+### NVM Bin Directory Write Permissions
+
+**CRITICAL PERMISSION:** NVM bin directories must have explicit write permissions for abc user to create npm wrapper scripts.
+
+**Problem:** When supervisor tries to create npm wrappers (e.g., `opencode` command), writes fail with EACCES because NVM bin dir is owned by dockremap:dockremap with 755 (not writable by abc).
+
+**Error:** `EACCES: permission denied, open '/usr/local/local/nvm/versions/node/vX.X.X/bin/opencode'`
+
+**Solution:** Add to `custom_startup.sh` after NVM installation:
+```bash
+chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/bin
+chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
+```
+
+**Why:** Supervisor runs as abc:abc user. Must have write access to create symlink wrappers for installed packages.
+
+### Supervisor Service Startup Organization
+
+**ARCHITECTURE:** Supervisor organizes services into dependency-based groups, starts groups sequentially, services within each group start in parallel.
+
+**Critical constraint:** `await Promise.all(startPromises)` waits for ALL services in a group to complete before proceeding to next group.
+
+**Problem:** If ANY service in a group hangs indefinitely (e.g., gcloud tries to download 1GB SDK), entire Promise.all() never resolves, supervisor blocks forever.
+
+**Solution:** Disable non-essential services that have hang potential:
+- wrangler (unnecessary if not using it)
+- gcloud (large SDK download, prone to hanging)
+- scrot (screenshot tool)
+- aion-ui (requires bcrypt modules)
+- glootie-oc (unknown service)
+- playwriter (not needed)
+
+**Keep enabled:** webssh2, file-manager, tmux, opencode (essential services).
+
+**Configuration:** `/opt/gmweb-startup/config.json` - Each service has `"enabled": true/false` flag.
+
+### Service Configuration Location
+
+**Path:** Service configuration at `/opt/gmweb-startup/config.json` (NOT `/config/startup/config.json` or `/startup/config.json`).
+
+**Why location matters:** `custom_startup.sh` clones gmweb repo into `/opt/gmweb-startup/` directory, which becomes the base for supervisor initialization.
+
+**Content:** JSON object with services map, each service has `enabled` (boolean) and `type` (install/system/web).
+
+### Supervisor Service Timeout Requirements
+
+**GOTCHA:** Services that start quickly (<10s) don't block startup. Services with large downloads or long initialization timeout as failures.
+
+**Example hang case:** gcloud service tries `curl -sSL https://sdk.cloud.google.com` and pipes to bash, which attempts full SDK installation (~1GB download). If network slow or unavailable, hangs indefinitely.
+
+**Mitigation:** For large-download services, either:
+1. Disable them entirely (preferred for startup reliability)
+2. Add explicit timeout wrappers
+3. Implement health checks that consider timeouts
+
+**Current approach:** Disable services that aren't critical path (gcloud, aion-ui, etc).
+
