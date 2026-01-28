@@ -186,6 +186,8 @@ location ~ /desk/websockets? {
 
 **Supervisor requires sudo for htpasswd:** Supervisor runs as `abc` user (not root). Writing to `/etc/nginx/.htpasswd` and running `nginx -s reload` both require root permissions. Use `sudo sh -c 'printf ... > /etc/nginx/.htpasswd'` and `sudo nginx -s reload` in ensureNginxAuth().
 
+**apr1 hash shell expansion:** apr1 hashes contain `$` characters (e.g., `$apr1$SALT$HASH`). When passed to shell via `sh -c`, these get interpreted as variables, truncating the hash. Must escape with `hash.replace(/\$/g, '\\$')` before shell execution.
+
 **Persistent volume handling:** /config volume persists across container restarts. The supervisor ALWAYS regenerates htpasswd on every boot, overwriting any cached values from previous deployments.
 
 ### File Manager via gxe
