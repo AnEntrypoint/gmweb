@@ -67,6 +67,34 @@
 
 **Why:** LinuxServer's s6 init system waits for custom init to complete. Blocking prevents desktop environment from launching.
 
+### D-Bus and XDG Runtime Directory Setup (XFCE Initialization)
+
+**CRITICAL:** XFCE (xfconfd, panel, window manager) requires proper D-Bus session socket and XDG runtime directory initialization before supervisor starts.
+
+**What happens if missing:**
+- xfconfd fails to initialize
+- Window manager doesn't start
+- Panel service crashes
+- XFCE session completely broken despite desktop process running
+
+**Implementation (custom_startup.sh before supervisor start):**
+1. Get abc user UID/GID (typically 1000:1000 in LinuxServer)
+2. Create `/run/user/$UID` directory with 700 permissions
+3. Set `export XDG_RUNTIME_DIR="/run/user/$UID"`
+4. Set `export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"`
+5. Wait up to 60 seconds for D-Bus session socket at `$XDG_RUNTIME_DIR/bus` to appear
+6. Pass both exports to supervisor via `-E` flag so services inherit them
+
+**Supervisor also sets these in getEnvironment():** Defensive fallback for any services spawned by supervisor that don't get the exported variables. supervisor.js sets them if not already present.
+
+**Critical timing:** Must happen BEFORE supervisor starts, because:
+- s6 starts D-Bus daemon in parallel with custom init
+- D-Bus socket appears in /run/user/UID after D-Bus daemon starts
+- If supervisor starts before socket is ready, xfconfd initialization fails
+- Waiting 60 seconds ensures socket is available when XFCE services need it
+
+**Do NOT remove:** This is essential for any XFCE desktop environment to function. Even if startup appears to work without it, desktop services will crash or hang under load.
+
 ## Critical Technical Caveats
 
 ### Port Forwarding Caveat
@@ -121,9 +149,9 @@ location ~ /desk/websockets? {
 1. Quick init: Permissions, paths, config, htpasswd generation (instant)
 2. Node.js: Install if not present (1st boot), cache thereafter
 3. Supervisor: Force-clean and re-clone from git EVERY boot, fresh npm install
-4. Pre-install critical binaries: ttyd, tmux, better-sqlite3, bcrypt
+4. D-Bus and XDG setup: Ensure /run/user/UID ready, wait for D-Bus socket
 5. Start supervisor: Service manager (every boot)
-6. Background installs: System packages + tools (non-blocking)
+6. Background installs: ttyd, better-sqlite3, bcrypt, system packages + tools (non-blocking)
 
 ### Node.js Path Resolution - Dynamic Only
 
@@ -219,26 +247,6 @@ location ~ /desk/websockets? {
 
 **Critical:** nginx proxy at `/files/` routes to bare `http://127.0.0.1:9998/` (no URI suffix) so NHFS receives `/files/...` paths from browser.
 
-### Tmux Clipboard Support in webssh2
-
-**GOTCHA:** Clipboard doesn't work in tmux sessions launched via ttyd without explicit xclip configuration.
-
-**Before fix:** Tmux copy mode (vi bindings) didn't integrate with system clipboard. Copy in terminal stayed in tmux buffer only.
-
-**After fix:**
-1. Created `/opt/gmweb-startup/tmux.conf` with xclip bindings:
-   ```
-   bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel "xclip -i -selection clipboard"
-   bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "xclip -i -selection clipboard"
-   set-option -g mouse on
-   ```
-2. Installed `xclip` system package for clipboard integration
-3. webssh2.js loads custom config: `tmux -f /opt/gmweb-startup/tmux.conf new-session ...`
-
-**Result:** Vi mode copy (y, Enter) pipes to system clipboard via xclip. Mouse selection also available.
-
-**Caveat:** xclip requires X11 connection. In headless environments, clipboard may not work. The `2>/dev/null || true` prevents errors on systems without xclip.
-
 ### Agent-Browser Pre-Installation
 
 **Implementation:** Auto-install agent-browser during background installation phase.
@@ -302,17 +310,17 @@ If paths are wrong, credentials setup fails silently - login falls back to AionU
 
 ### Supervisor Startup Before Blocking Installs
 
-**CRITICAL TIMING:** Supervisor must start BEFORE ttyd/tmux/npm install, not after.
+**CRITICAL TIMING:** Supervisor must start BEFORE ttyd/npm package installs, not after.
 
-**Problem:** If ttyd download, tmux install, and npm installs happen BEFORE supervisor starts, long-running ops (180s+ with retries) block supervisor startup. Container orchestration (Coolify) times out during init phase before supervisor even starts, preventing any services from running.
+**Problem:** If ttyd download, better-sqlite3, bcrypt, and npm installs happen BEFORE supervisor starts, long-running ops (180s+ with retries) block supervisor startup. Container orchestration (Coolify) times out during init phase before supervisor even starts, preventing any services from running.
 
-**Solution:** Moved all blocking installs (tmux, ttyd download, better-sqlite3, bcrypt) into background process that runs AFTER supervisor startup:
+**Solution:** Moved all blocking installs (ttyd download, better-sqlite3, bcrypt, npm packages) into background process that runs AFTER supervisor startup:
 - Supervisor starts immediately after git clone (under 30s)
 - All package installs happen in background in parallel with supervisor
 - If installs fail, supervisor is already running and services can retry via health checks
 - Coolify no longer times out during init
 
-**Order:** git clone → npm install → supervisor start → [background: tmux install, ttyd download, npm installs]
+**Order:** git clone → npm install → supervisor start → [background: ttyd download, better-sqlite3, bcrypt, npm installs]
 
 ### NVM Bin Directory Write Permissions
 
@@ -448,12 +456,11 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 **Enabled:**
 - webssh2: Web terminal via ttyd, port 9999, proxied to `/ssh/`
 - file-manager: NHFS file browser, port 9998, proxied to `/files/`
-- tmux: Terminal multiplexer for webssh2
 - opencode: Code editor tool
 - aion-ui: Main AI UI, port 25808, proxied to `/`
 
 **Disabled:**
-- wrangler, gcloud, scrot, chromium-ext, playwriter, glootie-oc
+- wrangler, gcloud, scrot, chromium-ext, playwriter, glootie-oc, tmux (removed - ttyd spawns bash directly)
 
 **Configuration:** `/opt/gmweb-startup/config.json` (refreshed from git every boot)
 
