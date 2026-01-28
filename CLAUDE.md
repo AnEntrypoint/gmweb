@@ -82,12 +82,26 @@ location ~ /desk/websockets? {
 
 ### Service Startup Order
 
-1. **nginx** - Starts automatically by LinuxServer s6 supervision system
-2. **Desktop services** (xorg, xfce, selkies) - Started by s6
+1. **custom_startup.sh init hook** - Runs very early (LinuxServer init phase)
+   - Initializes D-Bus session daemon (socket at `/run/user/1000/bus`)
+   - Exports `DBUS_SESSION_BUS_ADDRESS` for child processes
+   - Sets up nginx, permissions, Node.js
+2. **s6-rc services** - After init hook completes
+   - nginx (HTTP/HTTPS with Basic Auth)
+   - Desktop environment (xorg, xfce via s6 - NOT managed by supervisor)
+   - Selkies (port 8082)
 3. **gmweb supervisor** - Started via `/custom-cont-init.d/01-gmweb-init`
-4. **Additional services** - Started by gmweb supervisor
+   - Web services: webssh2, file-manager, opencode, aion-ui
+4. **Background installs** - Started after supervisor (non-blocking)
+   - ttyd, npm packages
 
-**Critical:** nginx handles HTTP/HTTPS with Basic Auth before any other services. All endpoints protected.
+**Critical:** D-Bus must be ready before s6 starts XFCE. nginx handles HTTP/HTTPS with Basic Auth before any application services.
+
+### XFCE Desktop is Built-in to Webtop
+
+**Note:** XFCE desktop environment (xfce4-session, xfwm4, xfce4-panel, xfdesktop) is part of the LinuxServer Webtop base image and started by s6-rc, NOT by gmweb supervisor.
+
+**Implication:** Do NOT add XFCE to supervisor config or try to manage it. It's already running via s6. The only role of gmweb is to ensure D-Bus is initialized before XFCE starts, and to provide the close_range shim for older kernels.
 
 ### Init Script Must Exit
 
@@ -330,16 +344,16 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 4. XFCE process spawning falls back to alternative methods when close_range fails
 
 **Implementation:**
-1. `docker/shim_close_range.c`: Minimal shim that stubs close_range syscall
-2. `Dockerfile`: Compile shim and set `LD_PRELOAD` in /etc/environment system-wide
-3. `custom_startup.sh` (startup):
-   - Export `LD_PRELOAD=/usr/local/lib/libshim_close_range.so` early
-   - Add `LD_PRELOAD` to abc user's `.profile` for session inheritance
-   - Kill existing broken XFCE session
-   - Restart XFCE with `dbus-launch --sh-syntax` for clean D-Bus setup
-   - Sleep 2s for session to stabilize
+1. `docker/shim_close_range.c`: C code that stubs `close_range()` syscall (returns -1 with errno=38)
+2. `Dockerfile`: Compile shim to `libshim_close_range.so` and set `LD_PRELOAD=/usr/local/lib/libshim_close_range.so` in `/etc/environment` for all processes
+3. `custom_startup.sh` (very early, before s6-rc starts services):
+   - Export `LD_PRELOAD=/usr/local/lib/libshim_close_range.so` immediately (redundant with Dockerfile but explicit)
+   - Initialize D-Bus: start `dbus-daemon --session` for abc user
+   - Create `/run/user/1000/bus` socket and export `DBUS_SESSION_BUS_ADDRESS`
+   - D-Bus is ready before s6-rc starts XFCE (s6-rc inherits env vars)
+   - Add `LD_PRELOAD` to abc user's `.profile` for login shell inheritance
 
-**Why dbus-launch:** Ensures XFCE session has valid D-Bus communication channel. The `--sh-syntax` flag outputs shell commands to properly initialize D-Bus environment variables in the session.
+**Timing is critical:** D-Bus initialization must happen before s6-rc starts any services. LinuxServer Webtop's s6 runs custom_startup.sh as init hook, which executes before s6 starts XFCE. This ensures D-Bus socket is ready when xfce4-session initializes.
 
 ### Supervisor Service Startup Organization
 
