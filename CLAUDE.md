@@ -184,6 +184,8 @@ location ~ /desk/websockets? {
 
 **Password with special characters:** PASSWORD like `Test123?!` contains bash special chars. Use `-stdin` flag to pass password via pipe/stdin, avoiding shell escaping issues.
 
+**Supervisor requires sudo for htpasswd:** Supervisor runs as `abc` user (not root). Writing to `/etc/nginx/.htpasswd` and running `nginx -s reload` both require root permissions. Use `sudo sh -c 'printf ... > /etc/nginx/.htpasswd'` and `sudo nginx -s reload` in ensureNginxAuth().
+
 **Persistent volume handling:** /config volume persists across container restarts. The supervisor ALWAYS regenerates htpasswd on every boot, overwriting any cached values from previous deployments.
 
 ### File Manager via gxe
