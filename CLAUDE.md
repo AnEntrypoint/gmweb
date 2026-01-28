@@ -480,6 +480,30 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Log index:** `LOG_INDEX.txt` documents log structure
 
+### File Manager (NHFS) Health Check Bug
+
+**GOTCHA:** NHFS service health check uses `execSync()` with pipes but doesn't pass `shell: true` option.
+
+**Error:** `GnuTLS recv error (-9): Error decoding the received TLS packet` during git clone in health check
+
+**Root cause:** `execSync('command | grep pattern')` without `shell: true` tries to execute the pipe as literal argument, not shell syntax. Causes TLS errors and service restart loops.
+
+**Fix needed:** Add `{shell: true, stdio: 'pipe'}` to execSync options in file-manager service health check.
+
+**Impact:** Service repeatedly fails health checks, hits max restart attempts (5), then stops trying. File manager becomes unavailable.
+
+### webssh2 (ttyd) Binary Availability Timing
+
+**GOTCHA:** ttyd binary installation happens in background after supervisor starts, but service tries to start immediately.
+
+**Symptom:** Initial service start fails with "ttyd binary not found", then recovers after binary installs (visible in later health checks).
+
+**Root cause:** Background installation process completes after supervisor organizes services, but supervisor has already started webssh2.
+
+**Current behavior:** Service gracefully handles missing binary (returns null PID), then recovers later. Not critical but causes initial 404 on `/ssh/` endpoint.
+
+**Improvement:** Pre-install ttyd in custom_startup.sh before supervisor starts, or defer webssh2 service start until binary verified.
+
 ### GitHub Actions Docker Build - Infrastructure Issue
 
 **Note:** Recent builds may fail at "Build and push Docker image" step (multi-platform docker/build-push-action) without code issues.
