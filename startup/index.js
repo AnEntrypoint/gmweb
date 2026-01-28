@@ -39,7 +39,6 @@ async function main() {
         'file-manager',
         'tmux',
         'opencode',
-        'opencode-web',
         'aion-ui',
         'playwriter',
         'glootie-oc'

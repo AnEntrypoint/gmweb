@@ -6,7 +6,7 @@ This directory contains all startup services for gmweb. Services are started in 
 
 - **install**: One-time installation services (create wrappers, install packages)
 - **system**: System services (tmux, scrot, etc.)
-- **web**: Web services (opencode-web, file-manager, etc.)
+- **web**: Web services (file-manager, webssh2, etc.)
 - **critical**: Critical services that block startup if they fail
 
 ## Key Services
@@ -16,11 +16,8 @@ This directory contains all startup services for gmweb. Services are started in 
 - **webssh2**: Web-based SSH client via browser
 - **scrot**: Screenshot utility for testing
 
-### OpenCode Editor
-- **opencode**: Creates npx wrapper for opencode-ai binary
-- **opencode-web**: Web interface at http://localhost:9997
-  - Depends on: `glootie-oc`
-  - Accessible via: `/code` endpoint with nginx reverse proxy
+### OpenCode CLI
+- **opencode**: Creates npx wrapper for opencode-ai binary (CLI only)
 
 ### Development Tools
 - **glootie-oc**: OpenCode plugin with dev agents (gm, code-search, web-search)
@@ -50,7 +47,7 @@ export default {
 }
 ```
 
-Example: `opencode-web` depends on `glootie-oc` to load agents.
+Example: services can specify dependencies to control startup order.
 
 ## Creating a New Service - DEAD SIMPLE
 

@@ -9,10 +9,9 @@
 - Webtop web UI listens on port 3000 internally (CUSTOM_PORT=6901 is external config only)
 - nginx listens on ports 80/443 (HTTP/HTTPS with HTTP Basic Auth reverse proxy, pre-installed in LinuxServer)
 - Selkies WebSocket streaming on port 8082
-- OpenCode web editor on port 9997 (configured via supervisor service)
 - Traefik/Coolify routes external domain to container:80
 
-**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth. Root `/` proxies to AionUI on port 25808. `/desk/` serves Selkies desktop. `/ssh/` serves webssh2 terminal. `/files/` serves NHFS file manager. `/code/` serves OpenCode editor.
+**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth. Root `/` proxies to AionUI on port 25808. `/desk/` serves Selkies desktop. `/ssh/` serves webssh2 terminal. `/files/` serves NHFS file manager.
 
 ### nginx Implementation
 
@@ -23,8 +22,6 @@
 - Routes `/desk/` to Selkies web UI at `/usr/share/selkies/web/`
 - Routes `/desk/files` to file browser
 - Routes `/devmode` to development server (port 5173)
-- Routes `/ui/` and `/api/` to OpenCode (port 9997)
-- Routes `/ws/` to WebSocket proxy for real-time services
 - Routes `/` (catch-all) to AionUI at `127.0.0.1:25808`
 
 **Why static nginx config:** nginx pre-installed, no additional process management needed, supports HTTP/1.1 upgrades and WebSocket proxying, HTTPS via Traefik/Let's Encrypt.
