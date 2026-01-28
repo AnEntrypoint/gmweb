@@ -1,10 +1,9 @@
-// Tmux session management service
-// Ensures tmux starts with login shell so .bashrc/.profile are sourced for correct PATH
-import { spawn } from 'child_process';
-import { promisify } from 'util';
+import { spawn, execSync } from 'child_process';
+import { writeFileSync, existsSync } from 'fs';
 
-const sleep = promisify(setTimeout);
 const WEBTOP_USER = process.env.SUDO_USER || 'abc';
+const HOME_DIR = '/config';
+const TMUX_CONF = `${HOME_DIR}/.tmux.conf`;
 
 export default {
   name: 'tmux',
@@ -13,41 +12,39 @@ export default {
   dependencies: [],
 
   async start(env) {
-    // Always use /config as home directory for tmux session
-    // env.HOME might not be set correctly when supervisor runs
-    const homeDir = '/config';
-    const tmuxConfPath = `${homeDir}/.tmux.conf`;
-    
-    console.log('[tmux] Setting up tmux configuration and session...');
-    
-    // Create tmux config to ensure login shell and correct environment
-    const tmuxConfig = `# Auto-generated tmux config for gmweb
-set-option -g default-shell /bin/bash
-set-option -g default-command "bash -i -l"
-set-option -g update-environment "DISPLAY WINDOWID XAUTHORITY"
-set-option -g mouse on
-set-option -g history-limit 50000
-`;
-    
-    const ps = spawn('bash', ['-c', `
-      # Write tmux config
-      cat > ${tmuxConfPath} << 'EOF'
-${tmuxConfig}
-EOF
-      chown ${WEBTOP_USER}:${WEBTOP_USER} ${tmuxConfPath}
-      
-      # Kill any existing main session
-      sudo -u ${WEBTOP_USER} tmux kill-session -t main 2>/dev/null || true
-      sleep 1
-      
-      # Create new session with login shell
-      sudo -u ${WEBTOP_USER} tmux new-session -d -s main -x 120 -y 30 -c ${homeDir} "bash -i -l"
-      sleep 1
-      sudo -u ${WEBTOP_USER} tmux new-window -t main -n sshd
-      
-      echo "[tmux] Session created successfully"
-    `], {
-      env: { ...env },
+    console.log('[tmux] Starting tmux session...');
+
+    try {
+      execSync('which tmux', { stdio: 'pipe' });
+    } catch (e) {
+      console.log('[tmux] tmux binary not found, skipping');
+      return { pid: 0, process: null, cleanup: async () => {} };
+    }
+
+    try {
+      writeFileSync(TMUX_CONF, [
+        'set-option -g default-shell /bin/bash',
+        'set-option -g default-command "bash -i -l"',
+        'set-option -g update-environment "DISPLAY WINDOWID XAUTHORITY"',
+        'set-option -g mouse on',
+        'set-option -g history-limit 50000',
+        'bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel "xclip -i -selection clipboard 2>/dev/null || true"',
+        'bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "xclip -i -selection clipboard 2>/dev/null || true"',
+        ''
+      ].join('\n'));
+    } catch (e) {
+      console.log(`[tmux] Config write failed: ${e.message}`);
+    }
+
+    const ps = spawn('bash', ['-c', [
+      `tmux kill-session -t main 2>/dev/null || true`,
+      `sleep 1`,
+      `tmux -f ${TMUX_CONF} new-session -d -s main -x 120 -y 30 -c ${HOME_DIR} "bash -i -l"`,
+      `sleep 1`,
+      `tmux new-window -t main -n sshd`,
+      `echo "[tmux] Session created"`,
+    ].join('\n')], {
+      env: { ...env, HOME: HOME_DIR },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
@@ -57,17 +54,15 @@ EOF
       pid: ps.pid,
       process: ps,
       cleanup: async () => {
-        try {
-          process.kill(-ps.pid, 'SIGKILL');
-        } catch (e) {}
+        try { process.kill(-ps.pid, 'SIGKILL'); } catch (e) {}
       }
     };
   },
 
   async health() {
     try {
-      const { execSync } = await import('child_process');
-      execSync(`sudo -u ${WEBTOP_USER} tmux list-sessions | grep -q main`, { stdio: 'pipe' });
+      execSync('which tmux', { stdio: 'pipe' });
+      execSync('tmux list-sessions 2>&1 | grep -q main', { stdio: 'pipe' });
       return true;
     } catch (e) {
       return false;

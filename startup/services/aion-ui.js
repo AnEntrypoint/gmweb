@@ -3,119 +3,83 @@ import { execSync } from 'child_process';
 import { createRequire } from 'module';
 import { existsSync, mkdirSync, chmodSync } from 'fs';
 import { join } from 'path';
-import { createWriteStream } from 'fs';
-import http from 'http';
-import https from 'https';
 import os from 'os';
 
 const PORT = 25808;
 const AIONUI_DIR = '/opt/AionUi';
 const AIONUI_BINARY = join(AIONUI_DIR, 'AionUi');
+const DEB_PATH = '/tmp/aionui-latest.deb';
 let installationInProgress = false;
 let installationComplete = false;
 
-function getDebArch() {
-  const arch = os.arch();
-  return arch === 'x64' ? 'amd64' : 'arm64';
+function getDebArch() { return os.arch() === 'x64' ? 'amd64' : 'arm64'; }
+
+function getLatestDebUrl() {
+  try {
+    const raw = execSync('curl -sfL "https://api.github.com/repos/iOfficeAI/AionUi/releases/latest"', { timeout: 30000 }).toString();
+    const asset = (JSON.parse(raw).assets || []).find(a => a.name.endsWith(`linux-${getDebArch()}.deb`));
+    if (asset) return asset.browser_download_url;
+  } catch (e) { console.log(`[aion-ui-install] API lookup failed: ${e.message}`); }
+  return `https://github.com/iOfficeAI/AionUi/releases/latest/download/AionUi-latest-linux-${getDebArch()}.deb`;
 }
 
-function followRedirects(url) {
-  return new Promise((resolve, reject) => {
-    const proto = url.startsWith('https') ? https : http;
-    proto.get(url, (res) => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        resolve(followRedirects(res.headers.location));
-      } else {
-        resolve(res);
-      }
-    }).on('error', reject);
-  });
+function extractDeb() {
+  try {
+    execSync(`mkdir -p ${AIONUI_DIR} && dpkg-deb -x ${DEB_PATH} ${AIONUI_DIR}`);
+    const nestedDir = join(AIONUI_DIR, 'opt/AionUi');
+    if (!existsSync(join(nestedDir, 'AionUi'))) return false;
+    execSync(`cp -a ${nestedDir}/* ${AIONUI_DIR}/`);
+    chmodSync(AIONUI_BINARY, '755');
+    execSync(`chown -R abc:abc ${AIONUI_DIR}`);
+    return true;
+  } catch (e) {
+    console.log(`[aion-ui-install] Extraction failed: ${e.message}`);
+    return false;
+  }
 }
 
-async function getLatestDebUrl() {
-  const debArch = getDebArch();
-  const apiUrl = 'https://api.github.com/repos/iOfficeAI/AionUi/releases/latest';
-  const res = await fetch(apiUrl);
-  const data = await res.json();
-  const suffix = `linux-${debArch}.deb`;
-  const asset = (data.assets || []).find(a => a.name.endsWith(suffix));
-  if (asset) return asset.browser_download_url;
-  return `https://github.com/iOfficeAI/AionUi/releases/latest/download/AionUi-latest-${suffix}`;
+function installElectronDeps() {
+  try { execSync('dpkg -s libgbm1 2>/dev/null', { stdio: 'pipe' }); } catch (e) {
+    try {
+      execSync(
+        'apt-get update -qq && apt-get install -y --no-install-recommends ' +
+        'libgbm1 libgtk-3-0 libnss3 libxss1 libasound2 libatk-bridge2.0-0 ' +
+        'libdrm2 libxcomposite1 libxdamage1 libxrandr2 libpango-1.0-0 libcairo2 ' +
+        'libcups2 libdbus-1-3 libexpat1 libfontconfig1 libx11-6 libx11-xcb1 ' +
+        'libxcb1 libxext6 libxfixes3 libxi6 libxrender1 libxtst6 2>/dev/null',
+        { stdio: 'pipe', timeout: 120000 }
+      );
+    } catch (e2) { console.log(`[aion-ui-install] Electron deps failed: ${e2.message}`); }
+  }
+}
+
+function markComplete() {
+  installationComplete = true;
+  installationInProgress = false;
+  installElectronDeps();
 }
 
 async function downloadAndInstallAionUI() {
   if (installationComplete) return true;
   if (installationInProgress) return false;
   installationInProgress = true;
-
   try {
     mkdirSync(AIONUI_DIR, { recursive: true });
-
-    if (existsSync(AIONUI_BINARY)) {
-      installationComplete = true;
-      installationInProgress = false;
-      return true;
+    if (existsSync(AIONUI_BINARY)) { markComplete(); return true; }
+    if (existsSync(DEB_PATH) && extractDeb()) { markComplete(); return true; }
+    const url = getLatestDebUrl();
+    console.log(`[aion-ui-install] Downloading: ${url}`);
+    for (let i = 1; i <= 3; i++) {
+      try {
+        execSync(`curl -fL --max-redirs 10 --retry 3 --retry-delay 5 -o ${DEB_PATH} "${url}"`, { stdio: 'pipe', timeout: 600000 });
+        if (existsSync(DEB_PATH) && extractDeb()) { markComplete(); return true; }
+      } catch (e) {
+        console.log(`[aion-ui-install] Attempt ${i}/3 failed: ${e.message}`);
+        if (i < 3) await new Promise(r => setTimeout(r, 5000));
+      }
     }
-
-    const downloadUrl = await getLatestDebUrl();
-    console.log(`[aion-ui-install] Downloading from ${downloadUrl}`);
-    const debPath = '/tmp/aionui-latest.deb';
-
-    return await new Promise((resolve) => {
-      const file = createWriteStream(debPath);
-      let done = false;
-
-      const finish = (result) => {
-        if (done) return;
-        done = true;
-        installationInProgress = !result;
-        if (result) installationComplete = true;
-        resolve(result);
-      };
-
-      followRedirects(downloadUrl).then((response) => {
-        if (response.statusCode !== 200) {
-          console.log(`[aion-ui-install] HTTP ${response.statusCode}`);
-          file.destroy();
-          finish(false);
-          return;
-        }
-        response.pipe(file);
-        file.on('finish', () => {
-          file.close();
-          try {
-            execSync(`mkdir -p ${AIONUI_DIR}`);
-            execSync(`dpkg-deb -x ${debPath} ${AIONUI_DIR}`);
-            const binaryPath = join(AIONUI_DIR, 'opt/AionUi/AionUi');
-            if (existsSync(binaryPath)) {
-              execSync(`cp ${binaryPath} ${AIONUI_BINARY}`);
-              chmodSync(AIONUI_BINARY, '755');
-              execSync(`chown -R abc:abc ${AIONUI_DIR}`);
-              console.log('[aion-ui-install] Installation complete');
-              finish(true);
-            } else {
-              console.log('[aion-ui-install] Binary not found in DEB');
-              finish(false);
-            }
-          } catch (e) {
-            console.log(`[aion-ui-install] Extraction failed: ${e.message}`);
-            finish(false);
-          }
-        });
-      }).catch((e) => {
-        console.log(`[aion-ui-install] Download error: ${e.message}`);
-        file.destroy();
-        finish(false);
-      });
-
-      setTimeout(() => {
-        if (!done) {
-          console.log('[aion-ui-install] Download timeout');
-          file.destroy();
-          finish(false);
-        }
-      }, 120000);
-    });
+    installationInProgress = false;
+    return false;
   } catch (e) {
     console.log(`[aion-ui-install] Error: ${e.message}`);
     installationInProgress = false;
@@ -124,29 +88,20 @@ async function downloadAndInstallAionUI() {
 }
 
 async function setCredentialsFromEnv() {
-  const targetPassword = process.env.AIONUI_PASSWORD || process.env.PASSWORD;
-  const targetUsername = process.env.AIONUI_USERNAME || 'admin';
-  if (!targetPassword) {
-    console.log('[aion-ui] WARNING: PASSWORD env var not set');
-    return;
-  }
-
+  const pw = process.env.AIONUI_PASSWORD || process.env.PASSWORD;
+  const user = process.env.AIONUI_USERNAME || 'admin';
+  if (!pw) return;
   try {
     const require = createRequire(import.meta.url);
     const Database = require('/config/.npm-global/lib/node_modules/better-sqlite3');
     const bcrypt = require('/config/node_modules/bcrypt');
-    const dbPath = '/config/.config/AionUi/aionui/aionui.db';
-    const db = new Database(dbPath);
-    const newHash = bcrypt.hashSync(targetPassword, 12).replace('$2b$', '$2a$');
-    const stmt = db.prepare(
-      'UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE id = ?'
-    );
-    const result = stmt.run(targetUsername, newHash, Date.now(), 'system_default_user');
+    const db = new Database('/config/.config/AionUi/aionui/aionui.db');
+    const hash = bcrypt.hashSync(pw, 12).replace('$2b$', '$2a$');
+    const r = db.prepare('UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE id = ?')
+      .run(user, hash, Date.now(), 'system_default_user');
     db.close();
-    if (result.changes > 0) console.log(`[aion-ui] Credentials set: ${targetUsername}`);
-  } catch (e) {
-    console.log(`[aion-ui] Credentials setup: ${e.message}`);
-  }
+    if (r.changes > 0) console.log(`[aion-ui] Credentials set: ${user}`);
+  } catch (e) { console.log(`[aion-ui] Credentials: ${e.message}`); }
 }
 
 export default {
@@ -157,76 +112,30 @@ export default {
 
   async start(env) {
     console.log(`[aion-ui] Starting on port ${PORT}`);
-
-    downloadAndInstallAionUI().catch((e) => {
-      console.log(`[aion-ui-install] Background install failed: ${e.message}`);
-    });
-
-    try {
-      execSync('rm -rf /config/.config/AionUi/Singleton* 2>/dev/null || true');
-    } catch (e) {}
-
-    try {
-      execSync('pkill -f AionUi || true');
-      await new Promise(r => setTimeout(r, 500));
-    } catch (e) {}
-
-    const serviceEnv = {
-      ...env,
-      DISPLAY: ':1',
-      AIONUI_PORT: String(PORT),
-      AIONUI_ALLOWED_ORIGINS: '*'
-    };
-
-    const ps = spawnAsAbcUser(
-      `/opt/AionUi/AionUi --no-sandbox --webui --remote --port ${PORT}`,
-      serviceEnv,
-      '/config'
-    );
-
-    ps.stdout?.on('data', (data) => {
-      const msg = data.toString().trim();
-      if (msg && !msg.includes('Deprecation')) console.log(`[aion-ui] ${msg}`);
-    });
-    ps.stderr?.on('data', (data) => {
-      const msg = data.toString().trim();
-      if (msg && !msg.includes('Deprecation') && !msg.includes('GPU process'))
-        console.log(`[aion-ui:err] ${msg}`);
-    });
-
+    if (existsSync(AIONUI_BINARY)) { markComplete(); }
+    else { downloadAndInstallAionUI().catch(e => console.log(`[aion-ui-install] ${e.message}`)); }
+    try { execSync('rm -rf /config/.config/AionUi/Singleton* 2>/dev/null || true'); } catch (e) {}
+    try { execSync('pkill -f AionUi || true'); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
+    const serviceEnv = { ...env, DISPLAY: ':1', AIONUI_PORT: String(PORT), AIONUI_ALLOWED_ORIGINS: '*' };
+    const ps = spawnAsAbcUser(`/opt/AionUi/AionUi --no-sandbox --webui --remote --port ${PORT}`, serviceEnv);
+    ps.stdout?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation')) console.log(`[aion-ui] ${m}`); });
+    ps.stderr?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation') && !m.includes('GPU process')) console.log(`[aion-ui:err] ${m}`); });
     ps.unref();
     setTimeout(() => setCredentialsFromEnv(), 8000);
-
     return {
-      pid: ps.pid,
-      process: ps,
+      pid: ps.pid, process: ps,
       cleanup: async () => {
-        try {
-          process.kill(-ps.pid, 'SIGTERM');
-          await new Promise(r => setTimeout(r, 2000));
-          process.kill(-ps.pid, 'SIGKILL');
-        } catch (e) {}
+        try { process.kill(-ps.pid, 'SIGTERM'); await new Promise(r => setTimeout(r, 2000)); process.kill(-ps.pid, 'SIGKILL'); } catch (e) {}
       }
     };
   },
 
   async health() {
-    const startTime = Date.now();
-    const timeout = 60000;
-
-    while (Date.now() - startTime < timeout) {
-      if (!existsSync(AIONUI_BINARY)) {
-        if (installationInProgress || !installationComplete) {
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
-        }
-        return false;
-      }
-
-      const portReady = await waitForPort(PORT, 5000);
-      if (portReady) return true;
+    if (!existsSync(AIONUI_BINARY)) {
+      if (installationInProgress) return true;
+      downloadAndInstallAionUI().catch(() => {});
+      return true;
     }
-
-    return false;
+    return waitForPort(PORT, 10000);
   }
 };

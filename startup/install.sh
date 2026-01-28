@@ -33,7 +33,9 @@ sudo apt-get install -y --no-install-recommends \
   curl bash git build-essential ca-certificates jq wget \
   software-properties-common apt-transport-https gnupg openssh-server \
   openssh-client tmux lsof chromium chromium-sandbox xfce4-terminal xfce4 dbus-x11 \
-  scrot xclip
+  scrot xclip \
+  libgbm1 libgtk-3-0 libnss3 libxss1 libasound2 libatk-bridge2.0-0 \
+  libdrm2 libxcomposite1 libxdamage1 libxrandr2
 
 sudo rm -rf /var/lib/apt/lists/*
 log "✓ System packages installed"
@@ -273,14 +275,16 @@ log "✓ NHFS HTTP file server ready to launch"
 
 log "Installing global npm packages..."
 
-# Install better-sqlite3 globally for AionUI credentials setup
 npm install -g better-sqlite3 2>&1 | tail -3
-log "✓ better-sqlite3 installed"
+log "better-sqlite3 installed"
 
-# Install agent-browser
-npm install -g agent-browser
+mkdir -p /config/node_modules
+cd /config && npm install bcrypt 2>&1 | tail -3
+log "bcrypt installed"
+
+npm install -g agent-browser 2>&1 | tail -3
 agent-browser install --with-deps 2>&1 | tail -5
-log "✓ agent-browser installed"
+log "agent-browser installed"
 
 # ============================================================================
 # COMPLETION

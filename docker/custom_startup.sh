@@ -123,7 +123,16 @@ log "✓ Supervisor system ready"
 # ============================================================================
 # PHASE 3.5: Pre-install critical binaries (before supervisor starts)
 # ============================================================================
-log "Installing critical binaries (webssh2 requires ttyd)..."
+log "Installing critical binaries (ttyd, tmux)..."
+
+if ! command -v tmux &>/dev/null; then
+  log "Installing tmux..."
+  apt-get update -qq 2>/dev/null
+  apt-get install -y --no-install-recommends tmux xclip 2>&1 | tail -3
+  log "tmux installed"
+else
+  log "tmux already installed"
+fi
 
 ARCH=$(uname -m)
 TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
