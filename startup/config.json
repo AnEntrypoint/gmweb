@@ -23,7 +23,7 @@
       "type": "web"
     },
     "file-manager": {
-      "enabled": false,
+      "enabled": true,
       "type": "web"
     },
     "tmux": {
@@ -31,7 +31,7 @@
       "type": "system"
     },
     "opencode": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "aion-ui": {
