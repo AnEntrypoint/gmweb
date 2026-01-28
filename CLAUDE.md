@@ -300,28 +300,19 @@ If paths are wrong, credentials setup fails silently - login falls back to AionU
 
 **Why X11 socket:** Webtop (based on LinuxServer) uses Xvfb for X11 display server. Socket appears once Xvfb starts. More reliable than polling `/usr/bin/desktop_ready` which doesn't exist in Webtop.
 
-### ttyd Binary Installation Timing
+### Supervisor Startup Before Blocking Installs
 
-**CRITICAL TIMING:** ttyd binary must be installed in PHASE 3.5 (before supervisor starts), not during background installations.
+**CRITICAL TIMING:** Supervisor must start BEFORE ttyd/tmux/npm install, not after.
 
-**Problem:** If ttyd only installed during PHASE 5 (background installs), webssh2 service checks `/usr/bin/ttyd` and returns unavailable because supervisor starts immediately after PHASE 4.
+**Problem:** If ttyd download, tmux install, and npm installs happen BEFORE supervisor starts, long-running ops (180s+ with retries) block supervisor startup. Container orchestration (Coolify) times out during init phase before supervisor even starts, preventing any services from running.
 
-**Solution:** Added explicit installation in `custom_startup.sh` PHASE 3.5:
-```bash
-ARCH=$(uname -m)
-TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
-TTYD_URL="https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}"
-TTYD_RETRY=3
-while [ $TTYD_RETRY -gt 0 ]; do
-  if timeout 60 curl -fL --max-redirs 5 -o /tmp/ttyd "$TTYD_URL" 2>/dev/null && [ -f /tmp/ttyd ] && [ -s /tmp/ttyd ]; then
-    sudo mv /tmp/ttyd /usr/bin/ttyd
-    sudo chmod +x /usr/bin/ttyd
-    break
-  fi
-done
-```
+**Solution:** Moved all blocking installs (tmux, ttyd download, better-sqlite3, bcrypt) into background process that runs AFTER supervisor startup:
+- Supervisor starts immediately after git clone (under 30s)
+- All package installs happen in background in parallel with supervisor
+- If installs fail, supervisor is already running and services can retry via health checks
+- Coolify no longer times out during init
 
-**Includes:** 3 retry attempts, 60-second timeout per attempt, --max-redirs 5 for GitHub redirects.
+**Order:** git clone → npm install → supervisor start → [background: tmux install, ttyd download, npm installs]
 
 ### NVM Bin Directory Write Permissions
 
