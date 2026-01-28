@@ -1,5 +1,5 @@
 import { spawn, execSync } from 'child_process';
-import { existsSync, writeFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { promisify } from 'util';
 import path from 'path';
 import { SupervisorLogger } from './supervisor-logger.js';
@@ -155,8 +155,8 @@ export class Supervisor {
     const pw = this.env.PASSWORD || 'password';
     try {
       const hash = execSync('openssl passwd -apr1 -stdin', { input: pw, encoding: 'utf8' }).trim();
-      writeFileSync('/etc/nginx/.htpasswd', `abc:${hash}\n`, { mode: 0o644 });
-      execSync('nginx -s reload', { timeout: 10000, stdio: 'pipe' });
+      execSync(`sudo sh -c 'printf "abc:%s\\n" "${hash}" > /etc/nginx/.htpasswd'`, { timeout: 10000, stdio: 'pipe' });
+      execSync('sudo nginx -s reload', { timeout: 10000, stdio: 'pipe' });
       this.logger.log('INFO', 'nginx auth configured');
     } catch (err) { this.logger.log('WARN', `nginx auth: ${err.message}`); }
   }
