@@ -413,35 +413,6 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Startup behavior:** AionUI downloads and installs in background. Binary at `/opt/AionUi/AionUi`. First boot downloads ~100MB .deb. Subsequent boots skip download if binary exists.
 
-### Supervisor Logging - Duplicate Prevention
-
-**GOTCHA:** supervisor.js was logging every message twice - once via `console.log()` (to stdout) and again to file via `appendFileSync()`. When stdout is piped to a log file by the shell (`>> supervisor.log 2>&1`), each message appears twice.
-
-**Before fix:** 277k lines in supervisor.log in ~6 hours (massive growth, restart loops caused by opencode-acp)
-
-**After fix:** Removed `console.log(formattedMsg)` from the `log()` and `logServiceOutput()` methods. Now only writes to files, not stdout. Shell pipe captures nothing, no duplicates.
-
-**Result:** ~70 lines in first 15 seconds (healthy rate), no duplicate entries.
-
-### Service Restart Loops - opencode-acp Issue
-
-**GOTCHA:** opencode-acp service had indefinite restart loop - health check would timeout (60s), service would fail, restart with 5s backoff, timeout again.
-
-**Root cause:** Health check used simple port listening test. opencode-acp's port 25809 never became reliably available, causing ~60s timeout every health check.
-
-**Log growth impact:** Each cycle = 4-6 log lines + restart attempt. With health checks every 30s, this added ~1000+ lines/hour to supervisor.log (277k lines over 6+ hours).
-
-**Fix:** Disabled opencode service entirely in config.json. Not critical path. Removed restart loop.
-
-**Result:** 0 restart attempts, stable log growth.
-
-### webssh2 Port Binding - Now Fixed
-
-**Note:** webssh2 service (ttyd on port 9999) was initially disabled due to port binding issues. After investigation and testing, determined that port binding is reliable when supervisor manages lifecycle properly.
-
-**Current status:** webssh2 is ENABLED and working. Service provides `/ssh/` endpoint for web terminal access.
-
-**Access:** http://localhost/ssh/ (HTTP Basic Auth required, abc:PASSWORD)
 
 ### Log Rotation System
 
