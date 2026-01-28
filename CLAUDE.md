@@ -103,6 +103,8 @@
 
 **Do NOT remove:** This is essential for any XFCE desktop environment to function. Even if startup appears to work without it, desktop services will crash or hang under load.
 
+**Visibility is critical:** supervisor.js must log each environment variable as it's configured. This logging provides visibility into what environment was applied to services. Without logging, silent failures are undetectable. These log messages appear in supervisor.log for debugging.
+
 ## Critical Technical Caveats
 
 ### Port Forwarding Caveat
