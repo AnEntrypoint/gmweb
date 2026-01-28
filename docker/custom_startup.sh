@@ -125,19 +125,22 @@ for attempt in {1..10}; do
   fi
 
   if [ $attempt -le 5 ]; then
-    log "D-Bus socket not found (attempt $attempt/10), starting dbus-daemon for session..."
+    log "D-Bus socket not found (attempt $attempt/10), starting dbus-daemon for session (Oracle kernel shim)..."
     sudo -u abc DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
       dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --nofork --print-address 2>/dev/null &
+    DBUS_DAEMON_PID=$!
   fi
 
   sleep 1
 done
 
 if [ $DBUS_STARTED -eq 1 ]; then
-  log "D-Bus session initialized successfully"
+  log "D-Bus session initialized successfully (Oracle kernel compatible)"
 else
   log "WARNING: D-Bus session socket not ready, XFCE may not function properly"
 fi
+
+unset DBUS_DAEMON_PID
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then

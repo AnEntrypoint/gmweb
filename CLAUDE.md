@@ -1,5 +1,24 @@
 # Technical Caveats & Gotchas
 
+## Selkies WebSocket Authentication Bypass (CRITICAL FIX)
+
+**ISSUE:** Selkies WebSocket endpoint blocked by HTTP Basic Auth.
+
+**Symptom:** `/desk/` page loads (Selkies client initialized) but desktop appears blank/white. Browser console shows WebSocket connection fails with 401 Unauthorized on `/desk/websockets` upgrade.
+
+**Root cause:** nginx `auth_basic` directive at server level applies to ALL locations including WebSocket upgrades. WebSocket handshake doesn't include proper HTTP Basic Auth headers, nginx rejects with 401, preventing Selkies stream from connecting.
+
+**Fix:** Add `auth_basic off;` to the `location ~ /desk/websockets?` block in both HTTP and HTTPS server sections of nginx config. This bypasses authentication for WebSocket connections while keeping all other endpoints (/, /files/, /ssh/) protected.
+
+**Implementation:** `docker/nginx-sites-enabled-default` lines 53-54 and 181-182:
+```nginx
+location ~ /desk/websockets? {
+  auth_basic off;
+  rewrite ^/desk/(.*) /$1 break;
+  ...
+}
+```
+
 ## Core Architecture
 
 ### LinuxServer Webtop + nginx + Selkies
@@ -347,6 +366,24 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 ```
 
 **Why:** Supervisor runs as abc:abc user. Must have write access to create symlink wrappers for installed packages.
+
+### D-Bus Oracle Kernel Compatibility Shim
+
+**ISSUE:** On old Oracle kernels, standard dbus-launch fails to properly initialize D-Bus session, preventing XFCE desktop environment from starting.
+
+**Symptom:** XFCE processes appear in ps (xfce4-session, xfce4-panel, etc.) but desktop doesn't render. Selkies shows blank screen despite Selkies process being able to capture xterm output.
+
+**Root cause:** Oracle kernels have incompatible D-Bus socket handling. When XFCE's dbus-launch tries to initialize a session bus, it fails silently or creates an unusable socket. XFCE components that depend on D-Bus for IPC (inter-process communication) cannot initialize properly.
+
+**Solution:** Initialize D-Bus session daemon BEFORE s6 starts XFCE services, ensuring the session bus is fully functional before any D-Bus-dependent services launch.
+
+**Implementation:**
+1. `custom_startup.sh` (lines 103-140): Explicitly create XDG_RUNTIME_DIR and start dbus-daemon --session with retry loop
+2. `startup/lib/dbus-shim.sh`: D-Bus initialization helper (for future direct invocation if needed)
+3. Export DBUS_SESSION_BUS_ADDRESS pointing to the pre-initialized socket
+4. Log initialization as "Oracle kernel compatible" for debugging
+
+**Critical timing:** D-Bus session must be fully initialized BEFORE s6-rc starts svc-de (XFCE desktop), which happens automatically. Our custom_startup.sh ensures this by running early in container init.
 
 ### Supervisor Service Startup Organization
 
