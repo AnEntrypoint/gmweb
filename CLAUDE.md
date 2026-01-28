@@ -276,6 +276,14 @@ git clone --depth 1 --single-branch --branch temp-main https://github.com/AnEntr
 
 If paths are wrong, credentials setup fails silently - login falls back to AionUI-generated random password.
 
+### precacheNpmPackage Must Be Non-Blocking
+
+**CRITICAL GOTCHA:** `precacheNpmPackage` previously used `execSync` which blocks the entire Node.js event loop for up to 120 seconds. Since all services in a group start via `Promise.all`, a single `execSync` call in any service's `start()` freezes all other services from starting.
+
+**Before fix:** opencode service called `precacheNpmPackage('opencode-ai', env)` with `execSync`, blocking aion-ui from starting for 120 seconds.
+
+**After fix:** Changed to async `spawn()` with `detached: true` and `unref()`. The precache runs in background without blocking the event loop.
+
 ### AionUI Download Race Condition Prevention
 
 **GOTCHA:** Health check runs every 30s and re-triggers `downloadAndInstallAionUI()` if binary missing. If previous download attempt failed (3 retries exhausted), the `installationFailed` flag prevents re-triggering, avoiding concurrent curl processes that overwrite each other's partial downloads.
