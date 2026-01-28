@@ -1,6 +1,7 @@
 // Simple service templates - dead simple to add new services
 // Every service automatically gets: proper PATH, PASSWORD, FQDN, error handling, logging
 import { existsSync } from 'fs';
+import { dirname } from 'path';
 import { createNpxWrapper, precacheNpmPackage } from './service-utils.js';
 
 /**
@@ -11,7 +12,7 @@ import { createNpxWrapper, precacheNpmPackage } from './service-utils.js';
  * export default npxWrapperService('my-cli', '@org/my-cli-package');
  */
 export function npxWrapperService(name, packageName) {
-  const binPath = `/usr/local/local/nvm/versions/node/v23.11.1/bin/${name}`;
+  const binPath = `${dirname(process.execPath)}/${name}`;
   
   return {
     name,

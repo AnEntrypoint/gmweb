@@ -1,6 +1,7 @@
 // Shared utilities for services to reduce boilerplate and duplication
 import { spawn, execSync } from 'child_process';
 import { existsSync, writeFileSync, chmodSync } from 'fs';
+import { dirname } from 'path';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
@@ -17,7 +18,7 @@ export function createNpxWrapper(binPath, packageName) {
   try {
     const wrapperContent = `#!/bin/bash
 # ${packageName} wrapper - uses npx to avoid global install issues
-exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y ${packageName} "$@"
+exec ${dirname(process.execPath)}/npx -y ${packageName} "$@"
 `;
     writeFileSync(binPath, wrapperContent);
     chmodSync(binPath, '755');
@@ -39,7 +40,7 @@ exec /usr/local/local/nvm/versions/node/v23.11.1/bin/npx -y ${packageName} "$@"
  */
 export function precacheNpmPackage(packageName, env, timeout = 120000) {
   try {
-    const NPX_PATH = '/usr/local/local/nvm/versions/node/v23.11.1/bin/npx';
+    const NPX_PATH = `${dirname(process.execPath)}/npx`;
     execSync(`${NPX_PATH} -y ${packageName} --help`, {
       stdio: 'pipe',
       timeout,

@@ -5,7 +5,7 @@
 set -o pipefail
 HOME_DIR="${HOME:-/config}"
 LOG_DIR="$HOME_DIR/logs"
-NODE_BIN="/usr/local/local/nvm/versions/node/v23.11.1/bin/node"
+NODE_BIN="$(which node 2>/dev/null || echo /usr/local/bin/node)"
 SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
 
 # Ensure log directory exists with proper permissions

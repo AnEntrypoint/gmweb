@@ -23,7 +23,7 @@
       "type": "web"
     },
     "file-manager": {
-      "enabled": false,
+      "enabled": true,
       "type": "web"
     },
     "tmux": {
@@ -39,7 +39,7 @@
       "type": "web"
     },
     "aion-ui": {
-      "enabled": false,
+      "enabled": true,
       "type": "web"
     },
     "glootie-oc": {

@@ -53,9 +53,9 @@ export PASSWORD
 BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
 if [ ! -f "$BASHRC_MARKER" ]; then
   cat >> "$HOME_DIR/.bashrc" << 'EOF'
-export PATH="/usr/local/local/nvm/versions/node/v23.11.1/bin:/usr/local/bin:$PATH"
 export NVM_DIR="/usr/local/local/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+export PATH="$(dirname "$(which node 2>/dev/null || echo /usr/local/bin/node)"):/usr/local/bin:$PATH"
 EOF
   touch "$BASHRC_MARKER"
 fi
@@ -68,31 +68,34 @@ log "✓ Phase 1 complete: System initialized"
 log "Installing Node.js (required for supervisor)..."
 
 NVM_DIR=/usr/local/local/nvm
-NODE_BIN="$NVM_DIR/versions/node/v23.11.1/bin/node"
-if [ ! -f "$NODE_BIN" ]; then
+export NVM_DIR
+
+if ! command -v node &>/dev/null; then
   mkdir -p "$NVM_DIR"
-  export NVM_DIR
   log "Downloading and installing nvm..."
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
   log "✓ nvm installed"
 
-  export NVM_DIR="/usr/local/local/nvm"
   . "$NVM_DIR/nvm.sh"
-  log "Installing Node.js 23.11.1..."
-  nvm install 23.11.1 2>&1 | tail -5
-  nvm use 23.11.1 2>&1 | tail -2
-  nvm alias default 23.11.1 2>&1 | tail -2
+  log "Installing Node.js LTS..."
+  nvm install --lts 2>&1 | tail -5
+  nvm use default 2>&1 | tail -2
   log "✓ Node.js installed"
 else
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
   log "✓ Node.js already installed"
 fi
 
+NODE_VERSION=$(node -v)
+NODE_BIN_DIR="$NVM_DIR/versions/node/$NODE_VERSION/bin"
+log "Node.js version: $NODE_VERSION (bin: $NODE_BIN_DIR)"
+
 for bin in node npm npx; do
-  ln -sf $NVM_DIR/versions/node/v23.11.1/bin/$bin /usr/local/bin/$bin
+  ln -sf "$NODE_BIN_DIR/$bin" /usr/local/bin/$bin
 done
 
-chmod 777 $NVM_DIR/versions/node/v23.11.1/bin
-chmod 777 $NVM_DIR/versions/node/v23.11.1/lib/node_modules
+chmod 777 "$NODE_BIN_DIR"
+chmod 777 "$NVM_DIR/versions/node/$NODE_VERSION/lib/node_modules"
 
 # ============================================================================
 # PHASE 3: Setup supervisor (gmweb startup system) - SYNCHRONOUS

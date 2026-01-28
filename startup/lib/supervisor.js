@@ -4,7 +4,8 @@
 import { spawnSync, spawn, execSync } from 'child_process';
 import { existsSync, appendFileSync, mkdirSync, writeFileSync } from 'fs';
 import { promisify } from 'util';
-import { join } from 'path';
+import path from 'path';
+const { join } = path;
 
 const sleep = promisify(setTimeout);
 
@@ -340,7 +341,7 @@ export class Supervisor {
     this.log('DEBUG', '=== END ENVIRONMENT ===');
 
     // Setup Node.js PATH - ALWAYS include NVM and local bin first
-    const NVM_BIN = '/usr/local/local/nvm/versions/node/v23.11.1/bin';
+    const NVM_BIN = path.dirname(process.execPath);
     const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
     env.PATH = `${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
 
@@ -399,7 +400,7 @@ export class Supervisor {
     };
 
     // Always ensure PATH has NVM first (failsafe)
-    const NVM_BIN = '/usr/local/local/nvm/versions/node/v23.11.1/bin';
+    const NVM_BIN = path.dirname(process.execPath);
     const LOCAL_BIN = `${this.env.HOME || '/config'}/.local/bin`;
     if (!finalEnv.PATH?.startsWith(NVM_BIN)) {
       finalEnv.PATH = `${NVM_BIN}:${LOCAL_BIN}:${finalEnv.PATH}`;

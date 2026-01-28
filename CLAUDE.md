@@ -12,7 +12,7 @@
 - OpenCode web editor on port 9997 (configured via supervisor service)
 - Traefik/Coolify routes external domain to container:80
 
-**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth. Port 80 routes to Webtop:3000 for main interface and Selkies:8082 for desktop streaming. All other web services routed by path prefix.
+**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth. Root `/` proxies to AionUI on port 25808. `/desk/` serves Selkies desktop. `/ssh/` serves webssh2 terminal. `/files/` serves NHFS file manager. `/code/` serves OpenCode editor.
 
 ### nginx Implementation
 
@@ -25,6 +25,7 @@
 - Routes `/devmode` to development server (port 5173)
 - Routes `/ui/` and `/api/` to OpenCode (port 9997)
 - Routes `/ws/` to WebSocket proxy for real-time services
+- Routes `/` (catch-all) to AionUI at `127.0.0.1:25808`
 
 **Why static nginx config:** nginx pre-installed, no additional process management needed, supports HTTP/1.1 upgrades and WebSocket proxying, HTTPS via Traefik/Let's Encrypt.
 
@@ -117,6 +118,16 @@ location ~ /desk/websockets? {
    - nginx/desktop ready immediately
    - Tools install while UI available
    - Tool failures don't crash system
+
+### Node.js Path Resolution - Dynamic Only
+
+**CRITICAL:** Never hardcode Node.js version paths (e.g., `/nvm/versions/node/v23.11.1/bin`).
+
+**In JS files:** Use `process.execPath` for node binary, `dirname(process.execPath)` for bin directory containing node/npm/npx.
+
+**In shell scripts:** Use `$(which node)`, `$(node -v)`, and `$NVM_DIR/versions/node/$(node -v)/bin` for dynamic resolution.
+
+**Why:** NVM installs whatever version is current. Hardcoded version strings break when Node updates or when NVM installs a different version than expected.
 
 ### Persistent Volume Log Caching
 
@@ -329,11 +340,10 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 - wrangler (unnecessary if not using it)
 - gcloud (large SDK download, prone to hanging)
 - scrot (screenshot tool)
-- aion-ui (requires bcrypt modules)
 - glootie-oc (unknown service)
 - playwriter (not needed)
 
-**Keep enabled:** webssh2, file-manager, tmux, opencode (essential services).
+**Keep enabled:** webssh2, file-manager, tmux, opencode, aion-ui (essential services).
 
 **Configuration:** `/opt/gmweb-startup/config.json` - Each service has `"enabled": true/false` flag.
 
@@ -356,5 +366,15 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 2. Add explicit timeout wrappers
 3. Implement health checks that consider timeouts
 
-**Current approach:** Disable services that aren't critical path (gcloud, aion-ui, etc).
+**Current approach:** Disable services that aren't critical path (gcloud, glootie-oc, etc).
+
+### AionUI Architecture Detection
+
+**GOTCHA:** AionUI .deb download URL must match host architecture (amd64 vs arm64).
+
+**Implementation:** `aion-ui.js` uses GitHub API to find latest release, then selects asset matching `os.arch()` mapped to deb arch (`x64` -> `amd64`, else `arm64`).
+
+**Port:** AionUI listens on port 25808. nginx proxies `/` catch-all to this port.
+
+**Startup behavior:** AionUI downloads and installs in background. Binary at `/opt/AionUi/AionUi`. First boot downloads ~100MB .deb. Subsequent boots skip download if binary exists.
 
