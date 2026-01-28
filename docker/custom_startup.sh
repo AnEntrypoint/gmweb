@@ -137,22 +137,11 @@ cd /opt/gmweb-startup && \
 nginx -s reload 2>/dev/null || true
 log "Supervisor ready (fresh from git)"
 
-log "Starting supervisor..."
-if [ -f /opt/gmweb-startup/start.sh ]; then
-  sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
-  SUPERVISOR_PID=$!
-  sleep 2
-  kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"
-else
-  log "ERROR: start.sh not found"
-  exit 1
-fi
+ARCH=$(uname -m)
+TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
+TTYD_URL="https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}"
 
-{
-  ARCH=$(uname -m)
-  TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
-  TTYD_URL="https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}"
-
+if [ ! -f /usr/bin/ttyd ]; then
   TTYD_RETRY=3
   while [ $TTYD_RETRY -gt 0 ]; do
     if timeout 60 curl -fL --max-redirs 5 -o /tmp/ttyd "$TTYD_URL" 2>/dev/null && [ -f /tmp/ttyd ] && [ -s /tmp/ttyd ]; then
@@ -166,7 +155,20 @@ fi
     fi
   done
   [ ! -f /usr/bin/ttyd ] && log "WARNING: ttyd failed"
+fi
 
+log "Starting supervisor..."
+if [ -f /opt/gmweb-startup/start.sh ]; then
+  sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
+  SUPERVISOR_PID=$!
+  sleep 2
+  kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"
+else
+  log "ERROR: start.sh not found"
+  exit 1
+fi
+
+{
   npm install -g better-sqlite3 2>&1 | tail -3
   mkdir -p /config/node_modules
   cd /config && npm install bcrypt 2>&1 | tail -3
