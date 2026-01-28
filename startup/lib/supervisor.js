@@ -168,13 +168,30 @@ export class Supervisor {
     const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
     env.PATH = `${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
     if (!env.PASSWORD) { env.PASSWORD = 'password'; }
+
+    const uid = process.getuid?.() || 1000;
+
     if (!env.DBUS_SESSION_BUS_ADDRESS) {
-      env.DBUS_SESSION_BUS_ADDRESS = `unix:path=/run/user/${process.getuid?.() || 1000}/bus`;
+      env.DBUS_SESSION_BUS_ADDRESS = `unix:path=/run/user/${uid}/bus`;
+      this.logger.log('INFO', `D-Bus session configured: ${env.DBUS_SESSION_BUS_ADDRESS}`);
     }
-    if (!env.DBUS_SYSTEM_BUS_ADDRESS) env.DBUS_SYSTEM_BUS_ADDRESS = 'unix:path=/run/dbus/system_bus_socket';
-    if (!env.DISPLAY) env.DISPLAY = ':1.0';
-    if (!env.XAUTHORITY) env.XAUTHORITY = `${env.HOME || '/config'}/.Xauthority`;
-    if (!env.XDG_RUNTIME_DIR) env.XDG_RUNTIME_DIR = `/run/user/${process.getuid?.() || 1000}`;
+    if (!env.DBUS_SYSTEM_BUS_ADDRESS) {
+      env.DBUS_SYSTEM_BUS_ADDRESS = 'unix:path=/run/dbus/system_bus_socket';
+      this.logger.log('INFO', `D-Bus system bus configured: ${env.DBUS_SYSTEM_BUS_ADDRESS}`);
+    }
+    if (!env.DISPLAY) {
+      env.DISPLAY = ':1.0';
+      this.logger.log('INFO', `DISPLAY configured: ${env.DISPLAY}`);
+    }
+    if (!env.XAUTHORITY) {
+      env.XAUTHORITY = `${env.HOME || '/config'}/.Xauthority`;
+      this.logger.log('INFO', `XAUTHORITY configured: ${env.XAUTHORITY}`);
+    }
+    if (!env.XDG_RUNTIME_DIR) {
+      env.XDG_RUNTIME_DIR = `/run/user/${uid}`;
+      this.logger.log('INFO', `XDG_RUNTIME_DIR configured: ${env.XDG_RUNTIME_DIR}`);
+    }
+
     return env;
   }
 
