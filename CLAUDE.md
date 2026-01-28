@@ -276,18 +276,6 @@ location ~ /desk/websockets? {
 
 **Critical:** nginx proxy at `/files/` routes to bare `http://127.0.0.1:9998/` (no URI suffix) so NHFS receives `/files/...` paths from browser.
 
-### Agent-Browser Pre-Installation
-
-**Implementation:** Auto-install agent-browser during background installation phase.
-
-**Installation steps:**
-1. `npm install -g agent-browser` - Global npm package
-2. `agent-browser install --with-deps` - Download browser drivers (Chromium, Firefox, etc.)
-
-**Location:** Runs in `install.sh` section 15 (background installs). Executes during startup while UI is already available.
-
-**Caveat:** First boot will pause while agent-browser downloads drivers (~500MB+). Subsequent boots skip this as cache exists. Check logs for installation progress: `tail -f /config/logs/startup.log`.
-
 ### AionUI Password Credentials from Environment
 
 **GOTCHA:** AionUI uses better-sqlite3 and bcrypt modules to set login credentials from `$PASSWORD` env var at startup.
@@ -314,18 +302,6 @@ location ~ /desk/websockets? {
 - `bcrypt` at `/config/node_modules/bcrypt`
 
 If paths are wrong, credentials setup fails silently - login falls back to AionUI-generated random password.
-
-### precacheNpmPackage Must Be Non-Blocking
-
-**CRITICAL GOTCHA:** `precacheNpmPackage` previously used `execSync` which blocks the entire Node.js event loop for up to 120 seconds. Since all services in a group start via `Promise.all`, a single `execSync` call in any service's `start()` freezes all other services from starting.
-
-**Before fix:** opencode service called `precacheNpmPackage('opencode-ai', env)` with `execSync`, blocking aion-ui from starting for 120 seconds.
-
-**After fix:** Changed to async `spawn()` with `detached: true` and `unref()`. The precache runs in background without blocking the event loop.
-
-### AionUI Download Race Condition Prevention
-
-**GOTCHA:** Health check runs every 30s and re-triggers `downloadAndInstallAionUI()` if binary missing. If previous download attempt failed (3 retries exhausted), the `installationFailed` flag prevents re-triggering, avoiding concurrent curl processes that overwrite each other's partial downloads.
 
 ### Webtop Desktop Detection - Replaced Kasm Detection
 
@@ -437,29 +413,6 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 - `startup/lib/supervisor-logger.js` - SupervisorLogger class (file-based logging, rotation)
 - `startup/lib/dependency-sort.js` - Topological sort and dependency grouping
 
-### Supervisor Service Timeout Requirements
-
-**GOTCHA:** Services that start quickly (<10s) don't block startup. Services with large downloads or long initialization timeout as failures.
-
-**Example hang case:** gcloud service tries `curl -sSL https://sdk.cloud.google.com` and pipes to bash, which attempts full SDK installation (~1GB download). If network slow or unavailable, hangs indefinitely.
-
-**Mitigation:** For large-download services, either:
-1. Disable them entirely (preferred for startup reliability)
-2. Add explicit timeout wrappers
-3. Implement health checks that consider timeouts
-
-**Current approach:** Disable services that aren't critical path (gcloud, glootie-oc, etc).
-
-### AionUI Architecture Detection
-
-**GOTCHA:** AionUI .deb download URL must match host architecture (amd64 vs arm64).
-
-**Implementation:** `aion-ui.js` uses GitHub API to find latest release, then selects asset matching `os.arch()` mapped to deb arch (`x64` -> `amd64`, else `arm64`).
-
-**Port:** AionUI listens on port 25808. nginx proxies `/` catch-all to this port.
-
-**Startup behavior:** AionUI downloads and installs in background. Binary at `/opt/AionUi/AionUi`. First boot downloads ~100MB .deb. Subsequent boots skip download if binary exists.
-
 
 ### Log Rotation System
 
@@ -516,30 +469,6 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 - `*.archive-{timestamp}`: Rotated log files
 
 **Log index:** `LOG_INDEX.txt` documents log structure
-
-### File Manager (NHFS) Health Check Bug
-
-**GOTCHA:** NHFS service health check uses `execSync()` with pipes but doesn't pass `shell: true` option.
-
-**Error:** `GnuTLS recv error (-9): Error decoding the received TLS packet` during git clone in health check
-
-**Root cause:** `execSync('command | grep pattern')` without `shell: true` tries to execute the pipe as literal argument, not shell syntax. Causes TLS errors and service restart loops.
-
-**Fix needed:** Add `{shell: true, stdio: 'pipe'}` to execSync options in file-manager service health check.
-
-**Impact:** Service repeatedly fails health checks, hits max restart attempts (5), then stops trying. File manager becomes unavailable.
-
-### webssh2 (ttyd) Binary Availability Timing
-
-**GOTCHA:** ttyd binary installation happens in background after supervisor starts, but service tries to start immediately.
-
-**Symptom:** Initial service start fails with "ttyd binary not found", then recovers after binary installs (visible in later health checks).
-
-**Root cause:** Background installation process completes after supervisor organizes services, but supervisor has already started webssh2.
-
-**Current behavior:** Service gracefully handles missing binary (returns null PID), then recovers later. Not critical but causes initial 404 on `/ssh/` endpoint.
-
-**Improvement:** Pre-install ttyd in custom_startup.sh before supervisor starts, or defer webssh2 service start until binary verified.
 
 ### GitHub Actions Docker Build - Infrastructure Issue
 
