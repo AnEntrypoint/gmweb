@@ -50,6 +50,7 @@ server {
   }
 
   location ~ /desk/websockets? {
+    auth_basic off;
     rewrite ^/desk/(.*) /$1 break;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -178,6 +179,7 @@ server {
   }
 
   location ~ /desk/websockets? {
+    auth_basic off;
     rewrite ^/desk/(.*) /$1 break;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
