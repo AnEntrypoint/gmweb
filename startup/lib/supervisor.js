@@ -304,7 +304,7 @@ export class Supervisor {
 
   needsDesktop() {
     for (const [name, service] of this.services) {
-      if (this.config.services[name]?.enabled && service.requiresDesktop) {
+      if (this.config.services?.[name]?.enabled !== false && service.requiresDesktop) {
         return true;
       }
     }
@@ -316,7 +316,7 @@ export class Supervisor {
 
     for (let i = 0; i < 60; i++) {
       try {
-        if (existsSync('/tmp/.X11-unix/1')) {
+        if (existsSync('/tmp/.X11-unix/X1')) {
           this.log('INFO', 'Desktop ready');
           return;
         }

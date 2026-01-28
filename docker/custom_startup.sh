@@ -86,8 +86,11 @@ else
   log "✓ Node.js already installed"
 fi
 
-NODE_VERSION=$(node -v)
-NODE_BIN_DIR="$NVM_DIR/versions/node/$NODE_VERSION/bin"
+. "$NVM_DIR/nvm.sh"
+export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:$PATH"
+
+NODE_VERSION=$(node -v | tr -d 'v')
+NODE_BIN_DIR="$NVM_DIR/versions/node/v$NODE_VERSION/bin"
 log "Node.js version: $NODE_VERSION (bin: $NODE_BIN_DIR)"
 
 for bin in node npm npx; do
@@ -95,7 +98,7 @@ for bin in node npm npx; do
 done
 
 chmod 777 "$NODE_BIN_DIR"
-chmod 777 "$NVM_DIR/versions/node/$NODE_VERSION/lib/node_modules"
+chmod 777 "$NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules"
 
 # ============================================================================
 # PHASE 3: Setup supervisor (gmweb startup system) - SYNCHRONOUS
