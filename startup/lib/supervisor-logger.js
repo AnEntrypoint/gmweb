@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, statSync, renameSync } from 'fs';
+import { appendFileSync, mkdirSync, statSync, renameSync, copyFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
 
@@ -29,7 +29,19 @@ export class SupervisorLogger {
       appendFileSync(logPath, line, 'utf8');
       try {
         if (statSync(logPath).size > 100 * 1024 * 1024) {
-          renameSync(logPath, `${logPath}.${Date.now()}`);
+          const rotatedPath = `${logPath}.${Date.now()}`;
+          try {
+            // Try fast rename first (works on same filesystem)
+            renameSync(logPath, rotatedPath);
+          } catch (err) {
+            // If EXDEV (cross-device link), use copy+truncate (works across filesystems)
+            if (err.code === 'EXDEV') {
+              copyFileSync(logPath, rotatedPath);
+              writeFileSync(logPath, '');
+            } else {
+              throw err;
+            }
+          }
         }
       } catch (e) {}
     } catch (e) {}
