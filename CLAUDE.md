@@ -1,23 +1,32 @@
 # Technical Caveats & Gotchas
 
-## Selkies WebSocket Authentication Bypass (CRITICAL FIX)
+## Selkies Authentication - Disable nginx HTTP Basic Auth
 
-**ISSUE:** Selkies WebSocket endpoint blocked by HTTP Basic Auth.
+**CRITICAL:** Selkies has built-in authentication. nginx HTTP Basic Auth wrapper must be disabled for entire `/desk` location.
 
-**Symptom:** `/desk/` page loads (Selkies client initialized) but desktop appears blank/white. Browser console shows WebSocket connection fails with 401 Unauthorized on `/desk/websockets` upgrade.
+**Issue:** nginx `auth_basic` at server level blocks access to `/desk/` before Selkies can handle auth internally. User sees 401 error instead of Selkies login page.
 
-**Root cause:** nginx `auth_basic` directive at server level applies to ALL locations including WebSocket upgrades. WebSocket handshake doesn't include proper HTTP Basic Auth headers, nginx rejects with 401, preventing Selkies stream from connecting.
+**Root cause:** When nginx `auth_basic` is enabled globally, it applies to ALL locations including `/desk/`. WebSocket and static file requests get 401 before reaching Selkies on port 8082.
 
-**Fix:** Add `auth_basic off;` to the `location ~ /desk/websockets?` block in both HTTP and HTTPS server sections of nginx config. This bypasses authentication for WebSocket connections while keeping all other endpoints (/, /files/, /ssh/) protected.
+**Solution:** Disable `auth_basic` for `/desk` location entirely. Selkies will handle authentication with its own login mechanism.
 
-**Implementation:** `docker/nginx-sites-enabled-default` lines 53-54 and 181-182:
+**Implementation:** `docker/nginx-sites-enabled-default`:
 ```nginx
+location /desk {
+  auth_basic off;
+  alias /usr/share/selkies/web/;
+  index index.html index.htm;
+  try_files $uri $uri/ =404;
+}
+
 location ~ /desk/websockets? {
   auth_basic off;
   rewrite ^/desk/(.*) /$1 break;
-  ...
+  proxy_pass http://127.0.0.1:8082;
 }
 ```
+
+**Credentials:** Access https://domain/desk/ → Selkies login page → username: `abc`, password: from `$PASSWORD` environment variable
 
 ## Core Architecture
 
