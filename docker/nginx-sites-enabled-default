@@ -27,7 +27,8 @@ server {
     add_header Cache-Control "public, max-age=31536000, immutable";
   }
 
-  location /desk/ {
+  location /desk {
+    auth_basic off;
     alias /usr/share/selkies/web/;
     index index.html index.htm;
     try_files $uri $uri/ =404;
@@ -163,7 +164,8 @@ server {
     add_header Cache-Control "public, max-age=31536000, immutable";
   }
 
-  location /desk/ {
+  location /desk {
+    auth_basic off;
     alias /usr/share/selkies/web/;
     index index.html index.htm;
     try_files $uri $uri/ =404;
