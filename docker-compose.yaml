@@ -24,6 +24,7 @@ services:
       - SUBFOLDER=/desk/
     volumes:
       - gmweb-config:/config
+      - gmweb-local:/usr/local
     shm_size: "1gb"
     restart: unless-stopped
     labels:
