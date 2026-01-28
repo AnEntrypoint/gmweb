@@ -65,13 +65,21 @@ export default {
   },
 
   async health() {
-    // Check if port 9999 is listening
-    try {
-      const { execSync } = await import('child_process');
-      execSync('lsof -i :9999 | grep -q LISTEN', { stdio: 'pipe' });
-      return true;
-    } catch (e) {
-      return false;
+    // Check if port 9999 is listening with retries for ttyd startup
+    const { execSync } = await import('child_process');
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        execSync('lsof -i :9999 2>/dev/null | grep -q LISTEN', {
+          stdio: 'pipe',
+          shell: true,
+          timeout: 2000
+        });
+        return true;
+      } catch (e) {
+        if (attempt < 2) await sleep(500);
+      }
     }
+    return false;
   }
 };
