@@ -188,18 +188,6 @@ location ~ /desk/websockets? {
 
 **Base directory:** NHFS_BASE_DIR env var set to `/config` for file serving
 
-### Startup System Clone from temp-main
-
-**GOTCHA:** custom_startup.sh clones gmweb repo to get startup system files. Must clone from correct branch.
-
-**Why temp-main:** Development branch contains latest file-manager.js with gxe implementation. main branch has outdated build-based NHFS.
-
-**Git branch in custom_startup.sh:**
-```bash
-git clone --depth 1 --single-branch --branch temp-main https://github.com/AnEntrypoint/gmweb.git
-```
-
-**Note:** When merging temp-main to main, update custom_startup.sh to clone from main.
 
 ### NHFS basePath Support for Subfolder Deployment
 
