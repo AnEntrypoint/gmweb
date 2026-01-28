@@ -375,3 +375,68 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Startup behavior:** AionUI downloads and installs in background. Binary at `/opt/AionUi/AionUi`. First boot downloads ~100MB .deb. Subsequent boots skip download if binary exists.
 
+### Supervisor Logging - Duplicate Prevention
+
+**GOTCHA:** supervisor.js was logging every message twice - once via `console.log()` (to stdout) and again to file via `appendFileSync()`. When stdout is piped to a log file by the shell (`>> supervisor.log 2>&1`), each message appears twice.
+
+**Before fix:** 277k lines in supervisor.log in ~6 hours (massive growth, restart loops caused by opencode-acp)
+
+**After fix:** Removed `console.log(formattedMsg)` from the `log()` and `logServiceOutput()` methods. Now only writes to files, not stdout. Shell pipe captures nothing, no duplicates.
+
+**Result:** ~70 lines in first 15 seconds (healthy rate), no duplicate entries.
+
+### Service Restart Loops - opencode-acp Issue
+
+**GOTCHA:** opencode-acp service had indefinite restart loop - health check would timeout (60s), service would fail, restart with 5s backoff, timeout again.
+
+**Root cause:** Health check used simple port listening test. opencode-acp's port 25809 never became reliably available, causing ~60s timeout every health check.
+
+**Log growth impact:** Each cycle = 4-6 log lines + restart attempt. With health checks every 30s, this added ~1000+ lines/hour to supervisor.log (277k lines over 6+ hours).
+
+**Fix:** Disabled opencode service entirely in config.json. Not critical path. Removed restart loop.
+
+**Result:** 0 restart attempts, stable log growth.
+
+### webssh2 Port Binding Conflict
+
+**GOTCHA:** webssh2 service attempts to bind ttyd to port 9999. In environments where port 9999 already in use or has permission issues, service fails: `lws_socket_bind: ERROR on binding fd 12 to port 9999 (-1 98)`.
+
+**Fix:** Disabled webssh2 service in config.json. Can be re-enabled if needed, but conflicts prevent reliable startup.
+
+**Alternative:** Could make port configurable or use ephemeral port selection.
+
+### Log Rotation System
+
+**Implementation:** Added 100MB threshold in supervisor.js `log()` method. When supervisor.log exceeds 100MB, rotated to `supervisor.log.{timestamp}` and new file started.
+
+**Location:** `/config/gmweb/startup/lib/supervisor.js` lines 460-475
+
+**Prevents:** Unbounded log growth. Old logs archived with timestamp for recovery if needed.
+
+### Current Service Configuration
+
+**Enabled (production):**
+- tmux: System terminal multiplexer
+- aion-ui: Main AI UI application on port 25808
+
+**Disabled (startup reliability):**
+- opencode-acp: Restart loop issue (configurable, disabled by default)
+- webssh2: Port binding conflict (can be enabled if port made configurable)
+- file-manager: Not needed for core functionality
+- wrangler, gcloud, scrot, playwriter, glootie-oc: Non-essential tools
+
+**Configuration:** `/opt/gmweb-startup/config.json` services map
+
+### Supervisor Log Files
+
+**Location:** `/config/logs/`
+
+**Files:**
+- `supervisor.log`: Main supervisor + all service logs, rotated at 100MB
+- `startup.log`: Initial startup output (deprecated, use supervisor.log)
+- `services/*.log`: Per-service detailed logs
+- `services/*.err`: Per-service error logs only
+- `*.archive-{timestamp}`: Rotated log files
+
+**Log index:** `LOG_INDEX.txt` documents log structure
+

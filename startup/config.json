@@ -19,11 +19,11 @@
       "type": "system"
     },
     "webssh2": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "file-manager": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "tmux": {
@@ -31,7 +31,7 @@
       "type": "system"
     },
     "opencode": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "aion-ui": {

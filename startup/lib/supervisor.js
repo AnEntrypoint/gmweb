@@ -463,30 +463,30 @@ Tips:
     const prefix = serviceName ? `[${serviceName}]` : '[supervisor]';
     const formattedMsg = `[${timestamp}] [${level.padEnd(5)}] ${prefix} ${message}`;
 
-    console.log(formattedMsg);
-
-    // Persist to main supervisor log
     try {
+      const fs = require('fs');
       const logPath = join(this.config.logDirectory, 'supervisor.log');
-      appendFileSync(logPath, formattedMsg + '\n');
-    } catch (e) {
-      // Silence log file errors
-    }
 
-    // Also log to service-specific file if serviceName provided
+      appendFileSync(logPath, formattedMsg + '\n', 'utf8');
+
+      const stat = fs.statSync(logPath);
+      if (stat.size > 100 * 1024 * 1024) {
+        const backup = `${logPath}.${Date.now()}`;
+        fs.renameSync(logPath, backup);
+      }
+    } catch (e) {}
+
     if (serviceName) {
       try {
+        const fs = require('fs');
         const serviceLogPath = join(this.config.logDirectory, 'services', `${serviceName}.log`);
-        appendFileSync(serviceLogPath, formattedMsg + '\n');
+        appendFileSync(serviceLogPath, formattedMsg + '\n', 'utf8');
 
-        // Log errors to separate .err file for easy filtering
         if (level === 'ERROR' || level === 'WARN') {
           const serviceErrPath = join(this.config.logDirectory, 'services', `${serviceName}.err`);
-          appendFileSync(serviceErrPath, formattedMsg + '\n');
+          appendFileSync(serviceErrPath, formattedMsg + '\n', 'utf8');
         }
-      } catch (e) {
-        // Silence
-      }
+      } catch (e) {}
     }
   }
 
@@ -502,19 +502,13 @@ Tips:
 
       try {
         const serviceLogPath = join(this.config.logDirectory, 'services', `${serviceName}.log`);
-        appendFileSync(serviceLogPath, formattedMsg + '\n');
+        appendFileSync(serviceLogPath, formattedMsg + '\n', 'utf8');
 
-        // Also log stderr to .err file
         if (stream === 'stderr') {
           const serviceErrPath = join(this.config.logDirectory, 'services', `${serviceName}.err`);
-          appendFileSync(serviceErrPath, formattedMsg + '\n');
+          appendFileSync(serviceErrPath, formattedMsg + '\n', 'utf8');
         }
-      } catch (e) {
-        // Silence
-      }
-
-      // Also print to console with service prefix
-      console.log(`[${serviceName}:${prefix.toLowerCase()}] ${line}`);
+      } catch (e) {}
     }
   }
 
