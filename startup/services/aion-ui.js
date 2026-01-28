@@ -145,6 +145,26 @@ export default {
 
   async start(env) {
     console.log(`[aion-ui] Starting on port ${PORT}`);
+
+    // Wait for background installations to complete (marker file created by custom_startup.sh)
+    // This ensures AionUI has access to all CLI tools (opencode, npm packages, etc.)
+    let installations_complete = false;
+    for (let i = 0; i < 180; i++) {  // Wait up to 3 minutes
+      if (existsSync('/tmp/gmweb-installs-complete')) {
+        console.log('[aion-ui] Background installations detected');
+        installations_complete = true;
+        break;
+      }
+      if (i === 0 || i === 60 || i === 120) {
+        console.log(`[aion-ui] Waiting for installations... (attempt ${i}/180)`);
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    if (!installations_complete) {
+      console.log('[aion-ui] Timeout waiting for installations, starting anyway');
+    }
+
     if (existsSync(AIONUI_BINARY)) { markComplete(); }
     else { downloadAndInstallAionUI().catch(e => console.log(`[aion-ui-install] ${e.message}`)); }
     try { execSync('rm -rf /config/.config/AionUi/Singleton* 2>/dev/null || true'); } catch (e) {}
