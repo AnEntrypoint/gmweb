@@ -27,6 +27,21 @@ chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
 
+# Configure temp directory on same filesystem as config to avoid EXDEV errors
+# (cross-device link errors when rename() is called across filesystems)
+SAFE_TMPDIR="$HOME_DIR/.tmp"
+mkdir -p "$SAFE_TMPDIR"
+chmod 700 "$SAFE_TMPDIR"
+chown abc:abc "$SAFE_TMPDIR"
+export TMPDIR="$SAFE_TMPDIR"
+export TMP="$SAFE_TMPDIR"
+export TEMP="$SAFE_TMPDIR"
+log "Configured temp directory: $TMPDIR (prevents cross-filesystem rename errors)"
+
+# Clean up old temp files (older than 7 days) to prevent unbounded growth
+find "$SAFE_TMPDIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
+find "$SAFE_TMPDIR" -maxdepth 1 -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
+
 rm -f "$RUNTIME_DIR/bus"
 pkill -u abc dbus-daemon 2>/dev/null || true
 
@@ -78,6 +93,16 @@ fi
 
 grep -q 'LD_PRELOAD=/usr/local/lib/libshim_close_range.so' "$HOME_DIR/.profile" || \
   echo 'export LD_PRELOAD=/usr/local/lib/libshim_close_range.so' >> "$HOME_DIR/.profile"
+
+# Add temp directory configuration to profile (prevents EXDEV errors in Claude plugin installation)
+grep -q 'export TMPDIR=' "$HOME_DIR/.profile" || {
+  cat >> "$HOME_DIR/.profile" << 'TMPDIR_EOF'
+export TMPDIR="${HOME}/.tmp"
+export TMP="${HOME}/.tmp"
+export TEMP="${HOME}/.tmp"
+mkdir -p "${TMPDIR}" 2>/dev/null || true
+TMPDIR_EOF
+}
 
 log "Phase 1 complete"
 
