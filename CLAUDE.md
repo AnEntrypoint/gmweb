@@ -473,3 +473,19 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Log index:** `LOG_INDEX.txt` documents log structure
 
+### GitHub Actions Docker Build - Infrastructure Issue
+
+**Note:** Recent builds may fail at "Build and push Docker image" step (multi-platform docker/build-push-action) without code issues.
+
+**Typical failure:** Run completes amd64 build successfully, hangs or times out on arm64 cross-compilation, fails to push to Docker Hub.
+
+**Root causes (infrastructure, not code):**
+1. Docker Hub credentials/token expired or rate-limited
+2. arm64 cross-compilation timeout (buildx via QEMU is slow)
+3. Network timeout during Docker image push
+4. Docker Hub service unavailability
+
+**Verification:** If previous build on same code succeeded, current failure is infrastructure-related. Code and Dockerfile are valid.
+
+**Workaround:** Re-run workflow manually via GitHub UI. If repeated failures, check Docker Hub account status and rate limits.
+
