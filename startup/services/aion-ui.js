@@ -2,15 +2,18 @@ import { spawnAsAbcUser, waitForPort } from '../lib/service-utils.js';
 import { execSync } from 'child_process';
 import { createRequire } from 'module';
 import { existsSync, mkdirSync, chmodSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import os from 'os';
 
 const PORT = 25808;
 const AIONUI_DIR = '/opt/AionUi';
 const AIONUI_BINARY = join(AIONUI_DIR, 'AionUi');
 const DEB_PATH = '/tmp/aionui-latest.deb';
+const NODE_BIN_DIR = dirname(process.execPath);
+const GLOBAL_MODULES = join(NODE_BIN_DIR, '..', 'lib', 'node_modules');
 let installationInProgress = false;
 let installationComplete = false;
+let installationFailed = false;
 
 function getDebArch() { return os.arch() === 'x64' ? 'amd64' : 'arm64'; }
 
@@ -61,7 +64,7 @@ function markComplete() {
 
 async function downloadAndInstallAionUI() {
   if (installationComplete) return true;
-  if (installationInProgress) return false;
+  if (installationInProgress || installationFailed) return false;
   installationInProgress = true;
   try {
     mkdirSync(AIONUI_DIR, { recursive: true });
@@ -79,10 +82,13 @@ async function downloadAndInstallAionUI() {
       }
     }
     installationInProgress = false;
+    installationFailed = true;
+    console.log(`[aion-ui-install] All download attempts exhausted`);
     return false;
   } catch (e) {
     console.log(`[aion-ui-install] Error: ${e.message}`);
     installationInProgress = false;
+    installationFailed = true;
     return false;
   }
 }
@@ -93,7 +99,7 @@ async function setCredentialsFromEnv() {
   if (!pw) return;
   try {
     const require = createRequire(import.meta.url);
-    const Database = require('/config/.npm-global/lib/node_modules/better-sqlite3');
+    const Database = require(join(GLOBAL_MODULES, 'better-sqlite3'));
     const bcrypt = require('/config/node_modules/bcrypt');
     const db = new Database('/config/.config/AionUi/aionui/aionui.db');
     const hash = bcrypt.hashSync(pw, 12).replace('$2b$', '$2a$');
@@ -132,7 +138,7 @@ export default {
 
   async health() {
     if (!existsSync(AIONUI_BINARY)) {
-      if (installationInProgress) return true;
+      if (installationInProgress || installationFailed) return true;
       downloadAndInstallAionUI().catch(() => {});
       return true;
     }

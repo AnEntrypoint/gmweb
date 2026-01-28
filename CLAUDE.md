@@ -271,10 +271,14 @@ git clone --depth 1 --single-branch --branch temp-main https://github.com/AnEntr
 **Database path:** `/config/.config/AionUi/aionui/aionui.db` - Must exist before credentials update (AionUI creates on first run)
 
 **Module paths (CRITICAL):**
-- `better-sqlite3` at `/config/.npm-global/lib/node_modules/better-sqlite3`
+- `better-sqlite3` resolved dynamically via `GLOBAL_MODULES` = `join(dirname(process.execPath), '..', 'lib', 'node_modules')` — never hardcode NVM version paths
 - `bcrypt` at `/config/node_modules/bcrypt`
 
 If paths are wrong, credentials setup fails silently - login falls back to AionUI-generated random password.
+
+### AionUI Download Race Condition Prevention
+
+**GOTCHA:** Health check runs every 30s and re-triggers `downloadAndInstallAionUI()` if binary missing. If previous download attempt failed (3 retries exhausted), the `installationFailed` flag prevents re-triggering, avoiding concurrent curl processes that overwrite each other's partial downloads.
 
 ### Webtop Desktop Detection - Replaced Kasm Detection
 
