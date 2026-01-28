@@ -11,7 +11,7 @@
 - Selkies WebSocket streaming on port 8082
 - Traefik/Coolify routes external domain to container:80
 
-**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth. Root `/` proxies to AionUI on port 25808. `/desk/` serves Selkies desktop. `/ssh/` serves webssh2 terminal. `/files/` serves NHFS file manager.
+**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth. Root `/` proxies to AionUI on port 25808. `/desk/` serves Selkies desktop. (webssh2 and file-manager disabled for startup reliability - see Service Configuration below)
 
 ### nginx Implementation
 
@@ -20,9 +20,9 @@
 - Configuration: Static template at `docker/nginx-sites-enabled-default`
 - Routes `/desk/websockets?` to Selkies WebSocket at `127.0.0.1:8082`
 - Routes `/desk/` to Selkies web UI at `/usr/share/selkies/web/`
-- Routes `/desk/files` to file browser
 - Routes `/devmode` to development server (port 5173)
 - Routes `/` (catch-all) to AionUI at `127.0.0.1:25808`
+- (Note: webssh2 and file-manager routes disabled - services disabled for startup reliability)
 
 **Why static nginx config:** nginx pre-installed, no additional process management needed, supports HTTP/1.1 upgrades and WebSocket proxying, HTTPS via Traefik/Let's Encrypt.
 
