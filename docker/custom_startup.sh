@@ -16,6 +16,28 @@ log() {
 BOOT_ID="$(date '+%s')-$$"
 log "===== GMWEB STARTUP (boot: $BOOT_ID) ====="
 
+ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
+ABC_GID=$(id -g abc 2>/dev/null || echo 1000)
+RUNTIME_DIR="/run/user/$ABC_UID"
+
+mkdir -p "$RUNTIME_DIR"
+chmod 700 "$RUNTIME_DIR"
+chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
+
+export XDG_RUNTIME_DIR="$RUNTIME_DIR"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
+
+sudo -u abc DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+  dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --nofork --print-address 2>/dev/null &
+DBUS_DAEMON_PID=$!
+
+sleep 1
+if kill -0 $DBUS_DAEMON_PID 2>/dev/null; then
+  log "D-Bus session started (PID: $DBUS_DAEMON_PID)"
+else
+  log "WARNING: D-Bus session failed to start"
+fi
+
 cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
 
 if [ -z "${PASSWORD}" ]; then
@@ -44,28 +66,10 @@ EOF
   touch "$BASHRC_MARKER"
 fi
 
-log "Phase 1 complete"
-
 grep -q 'LD_PRELOAD=/usr/local/lib/libshim_close_range.so' "$HOME_DIR/.profile" || \
   echo 'export LD_PRELOAD=/usr/local/lib/libshim_close_range.so' >> "$HOME_DIR/.profile"
 
-log "Restarting XFCE session with proper D-Bus and LD_PRELOAD..."
-pkill -u abc xfce4-session 2>/dev/null || true
-sleep 1
-
-eval "$(sudo -u abc -H dbus-launch --sh-syntax)"
-export DBUS_SESSION_BUS_ADDRESS
-export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
-
-sudo -u abc -H bash -c '
-  export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
-  export DISPLAY=:1
-  export DBUS_SESSION_BUS_ADDRESS="'$DBUS_SESSION_BUS_ADDRESS'"
-  xfce4-session &
-' 2>/dev/null &
-
-sleep 3
-log "XFCE session restarted with D-Bus and LD_PRELOAD"
+log "Phase 1 complete"
 
 NVM_DIR=/usr/local/local/nvm
 export NVM_DIR
