@@ -1,10 +1,9 @@
-import { spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { spawn, execSync } from 'child_process';
+import { existsSync, writeFileSync } from 'fs';
 import { promisify } from 'util';
 import path from 'path';
 import { SupervisorLogger } from './supervisor-logger.js';
 import { topologicalSort, groupByDependency } from './dependency-sort.js';
-
 const sleep = promisify(setTimeout);
 
 export class Supervisor {
@@ -41,6 +40,7 @@ export class Supervisor {
     try {
       if (this.needsDesktop()) await this.waitForDesktop();
       this.env = await this.getEnvironment();
+      await this.ensureNginxAuth();
       const sorted = topologicalSort(this.services);
       if (!sorted) { this.logger.log('ERROR', 'Circular dependency'); return; }
       const groups = groupByDependency(sorted, this.logger);
@@ -149,6 +149,16 @@ export class Supervisor {
       await sleep(1000);
     }
     this.logger.log('WARN', 'Desktop timeout after 60s, continuing');
+  }
+
+  async ensureNginxAuth() {
+    const pw = this.env.PASSWORD || 'password';
+    try {
+      const hash = execSync('openssl passwd -apr1 -stdin', { input: pw, encoding: 'utf8' }).trim();
+      writeFileSync('/etc/nginx/.htpasswd', `abc:${hash}\n`, { mode: 0o644 });
+      execSync('nginx -s reload', { timeout: 10000, stdio: 'pipe' });
+      this.logger.log('INFO', 'nginx auth configured');
+    } catch (err) { this.logger.log('WARN', `nginx auth: ${err.message}`); }
   }
 
   async getEnvironment() {

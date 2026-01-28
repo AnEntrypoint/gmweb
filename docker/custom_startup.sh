@@ -22,7 +22,7 @@ if [ -z "${PASSWORD}" ]; then
 else
   log "Using PASSWORD from env"
 fi
-echo "abc:$(openssl passwd -apr1 "$PASSWORD")" > /etc/nginx/.htpasswd
+printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; printf 'abc:%s\n' "$hash" > /etc/nginx/.htpasswd; }
 chmod 644 /etc/nginx/.htpasswd
 sleep 1
 nginx -s reload 2>/dev/null || true
