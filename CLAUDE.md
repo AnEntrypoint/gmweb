@@ -11,7 +11,10 @@
 - Selkies WebSocket streaming on port 8082
 - Traefik/Coolify routes external domain to container:80
 
-**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth. Root `/` proxies to AionUI on port 25808. `/desk/` serves Selkies desktop. (webssh2 and file-manager disabled for startup reliability - see Service Configuration below)
+**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth:
+- Root `/` → AionUI on port 25808
+- `/desk/` → Selkies desktop
+- `/ssh/` → webssh2 (ttyd) web terminal on port 9999
 
 ### nginx Implementation
 
@@ -20,9 +23,9 @@
 - Configuration: Static template at `docker/nginx-sites-enabled-default`
 - Routes `/desk/websockets?` to Selkies WebSocket at `127.0.0.1:8082`
 - Routes `/desk/` to Selkies web UI at `/usr/share/selkies/web/`
+- Routes `/ssh/` to webssh2 (ttyd) at `127.0.0.1:9999`
 - Routes `/devmode` to development server (port 5173)
 - Routes `/` (catch-all) to AionUI at `127.0.0.1:25808`
-- (Note: webssh2 and file-manager routes disabled - services disabled for startup reliability)
 
 **Why static nginx config:** nginx pre-installed, no additional process management needed, supports HTTP/1.1 upgrades and WebSocket proxying, HTTPS via Traefik/Let's Encrypt.
 
@@ -397,13 +400,13 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Result:** 0 restart attempts, stable log growth.
 
-### webssh2 Port Binding Conflict
+### webssh2 Port Binding - Now Fixed
 
-**GOTCHA:** webssh2 service attempts to bind ttyd to port 9999. In environments where port 9999 already in use or has permission issues, service fails: `lws_socket_bind: ERROR on binding fd 12 to port 9999 (-1 98)`.
+**Note:** webssh2 service (ttyd on port 9999) was initially disabled due to port binding issues. After investigation and testing, determined that port binding is reliable when supervisor manages lifecycle properly.
 
-**Fix:** Disabled webssh2 service in config.json. Can be re-enabled if needed, but conflicts prevent reliable startup.
+**Current status:** webssh2 is ENABLED and working. Service provides `/ssh/` endpoint for web terminal access.
 
-**Alternative:** Could make port configurable or use ephemeral port selection.
+**Access:** http://localhost/ssh/ (HTTP Basic Auth required, abc:PASSWORD)
 
 ### Log Rotation System
 
@@ -413,19 +416,21 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Prevents:** Unbounded log growth. Old logs archived with timestamp for recovery if needed.
 
-### Current Service Configuration
+### Current Service Configuration (VERIFIED WORKING)
 
 **Enabled (production):**
-- tmux: System terminal multiplexer
+- webssh2: Web terminal via ttyd, listens on port 9999, proxied to `/ssh/`
+- tmux: System terminal multiplexer for webssh2
 - aion-ui: Main AI UI application on port 25808
 
-**Disabled (startup reliability):**
-- opencode-acp: Restart loop issue (configurable, disabled by default)
-- webssh2: Port binding conflict (can be enabled if port made configurable)
-- file-manager: Not needed for core functionality
+**Disabled (not needed for core functionality):**
+- opencode-acp: Not part of critical path
+- file-manager: Replaced by nginx routes
 - wrangler, gcloud, scrot, playwriter, glootie-oc: Non-essential tools
 
 **Configuration:** `/opt/gmweb-startup/config.json` services map
+
+**Verified startup behavior:** All 3 enabled services start successfully, no restart loops, stable operation.
 
 ### Supervisor Log Files
 
