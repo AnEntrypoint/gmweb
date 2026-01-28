@@ -27,15 +27,25 @@ chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
 
+rm -f "$RUNTIME_DIR/bus"
+pkill -u abc dbus-daemon 2>/dev/null || true
+
 sudo -u abc DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
-  dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --nofork --print-address 2>/dev/null &
+  dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --print-address 2>/dev/null &
 DBUS_DAEMON_PID=$!
 
-sleep 1
-if kill -0 $DBUS_DAEMON_PID 2>/dev/null; then
-  log "D-Bus session started (PID: $DBUS_DAEMON_PID)"
+for i in {1..10}; do
+  if [ -S "$RUNTIME_DIR/bus" ]; then
+    log "D-Bus session socket ready (attempt $i/10)"
+    break
+  fi
+  sleep 0.5
+done
+
+if [ -S "$RUNTIME_DIR/bus" ]; then
+  log "D-Bus session initialized"
 else
-  log "WARNING: D-Bus session failed to start"
+  log "WARNING: D-Bus socket not ready"
 fi
 
 cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
