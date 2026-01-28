@@ -53,15 +53,18 @@ log "Restarting XFCE session with proper D-Bus and LD_PRELOAD..."
 pkill -u abc xfce4-session 2>/dev/null || true
 sleep 1
 
+eval "$(sudo -u abc -H dbus-launch --sh-syntax)"
+export DBUS_SESSION_BUS_ADDRESS
+export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
+
 sudo -u abc -H bash -c '
   export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
   export DISPLAY=:1
-  eval $(dbus-launch --sh-syntax)
-  export DBUS_SESSION_BUS_ADDRESS
+  export DBUS_SESSION_BUS_ADDRESS="'$DBUS_SESSION_BUS_ADDRESS'"
   xfce4-session &
 ' 2>/dev/null &
 
-sleep 2
+sleep 3
 log "XFCE session restarted with D-Bus and LD_PRELOAD"
 
 NVM_DIR=/usr/local/local/nvm
