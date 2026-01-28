@@ -520,3 +520,21 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Workaround:** Re-run workflow manually via GitHub UI. If repeated failures, check Docker Hub account status and rate limits.
 
+### HTTP Basic Auth htpasswd Synchronization Race Condition
+
+**GOTCHA:** custom_startup.sh generates htpasswd BEFORE s6-rc starts services, but nginx may not be ready to reload the config. supervisor.js later calls ensureNginxAuth() AFTER desktop is ready.
+
+**Problem:** If PASSWORD env var changes between initial generation and supervisor startup, the htpasswd hash from custom_startup.sh (older password) becomes stale. Users cannot authenticate even though supervisor logged "nginx auth configured".
+
+**Root cause:** custom_startup.sh runs very early (before nginx fully starts), generates htpasswd from PASSWORD, then tries `nginx -s reload` which silently fails because nginx isn't listening yet. Later when supervisor calls ensureNginxAuth(), it regenerates with the same (now stale) password. If PASSWORD changes mid-boot or was wrong initially, htpasswd stays stale.
+
+**Symptom:** HTTP 401 Authorization Required on all endpoints despite correct password attempt. Supervisor logs show "nginx auth configured" but authentication fails.
+
+**Debug:** Check htpasswd vs current PASSWORD hash - if they don't match, regenerate manually:
+```bash
+docker exec <container> sudo sh -c 'echo -n "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; printf "abc:%s\n" "$hash" > /etc/nginx/.htpasswd; }'
+docker exec <container> sudo nginx -s reload
+```
+
+**Permanent fix:** supervisor.js ensureNginxAuth() should be called AFTER verifying nginx is actually listening, or add retry logic with timeout for nginx reload.
+
