@@ -4,6 +4,7 @@ import { createRequire } from 'module';
 import { existsSync, mkdirSync, chmodSync } from 'fs';
 import { join } from 'path';
 import { createWriteStream } from 'fs';
+import http from 'http';
 import https from 'https';
 import os from 'os';
 
@@ -20,7 +21,7 @@ function getDebArch() {
 
 function followRedirects(url) {
   return new Promise((resolve, reject) => {
-    const proto = url.startsWith('https') ? https : require('http');
+    const proto = url.startsWith('https') ? https : http;
     proto.get(url, (res) => {
       if (res.statusCode === 301 || res.statusCode === 302) {
         resolve(followRedirects(res.headers.location));

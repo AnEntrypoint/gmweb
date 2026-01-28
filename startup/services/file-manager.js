@@ -1,7 +1,4 @@
-// NHFS (Next-HTTP-File-Server) - File manager with drag & drop uploads
-// GitHub: https://github.com/AnEntrypoint/nhfs
-// Uses gxe to run NHFS directly from GitHub repository
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
@@ -19,8 +16,6 @@ export default {
 
   async startNHFS(env) {
     return new Promise((resolve, reject) => {
-      const { execSync } = require('child_process');
-
       try {
         execSync('git config --global --add safe.directory "*"', { stdio: 'pipe' });
       } catch (e) {}
@@ -40,7 +35,6 @@ export default {
       const checkIfStarted = async () => {
         startCheckCount++;
         try {
-          const { execSync } = await import('child_process');
           execSync('ss -tuln 2>/dev/null | grep -q :9998 || netstat -tuln 2>/dev/null | grep -q :9998', { stdio: 'pipe' });
           clearInterval(startCheckInterval);
           console.log('[file-manager] ✓ NHFS responding on port 9998');
@@ -90,7 +84,6 @@ export default {
 
   async health() {
     try {
-      const { execSync } = await import('child_process');
       execSync('ss -tuln 2>/dev/null | grep -q :9998 || netstat -tuln 2>/dev/null | grep -q :9998', { stdio: 'pipe' });
       return true;
     } catch (e) {
