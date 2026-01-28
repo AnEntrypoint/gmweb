@@ -100,6 +100,33 @@ cd /opt/gmweb-startup && \
 nginx -s reload 2>/dev/null || true
 log "Supervisor ready (fresh from git)"
 
+ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
+ABC_GID=$(id -g abc 2>/dev/null || echo 1000)
+RUNTIME_DIR="/run/user/$ABC_UID"
+
+if [ ! -d "$RUNTIME_DIR" ]; then
+  log "Creating $RUNTIME_DIR..."
+  mkdir -p "$RUNTIME_DIR"
+fi
+
+chmod 700 "$RUNTIME_DIR"
+chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
+log "XDG_RUNTIME_DIR ready: $RUNTIME_DIR"
+
+export XDG_RUNTIME_DIR="$RUNTIME_DIR"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
+
+for i in {1..60}; do
+  if [ -S "$RUNTIME_DIR/bus" ] 2>/dev/null; then
+    log "D-Bus session socket ready"
+    break
+  fi
+  if [ $i -eq 60 ]; then
+    log "WARNING: D-Bus session socket not found after 60s, continuing"
+  fi
+  sleep 1
+done
+
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
   sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
