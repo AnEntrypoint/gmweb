@@ -28,6 +28,18 @@ location ~ /desk/websockets? {
 
 **Credentials:** Access https://domain/desk/ → Selkies login page → username: `abc`, password: from `$PASSWORD` environment variable
 
+## Startup Sequencing - ttyd Download Before Supervisor
+
+**ISSUE:** supervisor.log showed massive repetitions of "ttyd binary not found" error (38+ instances).
+
+**Root Cause:** custom_startup.sh started supervisor before ttyd was downloaded in background process. webssh2 service would try to start immediately and fail repeatedly until ttyd became available.
+
+**Solution:** Move ttyd download to BEFORE supervisor starts, so ttyd binary is guaranteed available when webssh2 initializes.
+
+**Implementation:** In `custom_startup.sh`, download and install ttyd (lines ~140-160) before starting supervisor (line ~165). Check if ttyd already exists to skip redundant downloads on subsequent boots.
+
+**Result:** webssh2 starts cleanly, no repeated "binary not found" errors, cleaner logs.
+
 ## webssh2 Health Check - Shell Command Caveat
 
 **ISSUE:** webssh2 (ttyd-based web terminal) health check was failing immediately after startup, causing continuous restart loops and connection disconnections.
