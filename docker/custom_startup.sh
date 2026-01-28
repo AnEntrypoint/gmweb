@@ -158,6 +158,14 @@ if [ ! -f /usr/bin/ttyd ]; then
   log "WARNING: ttyd download failed - webssh2 will be unavailable"
 fi
 
+log "Installing better-sqlite3 and bcrypt (required for AionUI credentials)..."
+npm install -g better-sqlite3 2>&1 | tail -3
+log "✓ better-sqlite3 installed globally"
+mkdir -p /config/node_modules
+cd /config && npm install bcrypt 2>&1 | tail -3
+chown -R abc:abc /config/node_modules
+log "✓ bcrypt installed in /config/node_modules"
+
 # ============================================================================
 # PHASE 4: Start supervisor as abc user (manages additional services)
 # ============================================================================
