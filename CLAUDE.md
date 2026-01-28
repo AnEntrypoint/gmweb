@@ -95,44 +95,7 @@ location ~ /desk/websockets? {
 
 **Why:** LinuxServer's s6 init system waits for custom init to complete. Blocking prevents desktop environment from launching.
 
-### D-Bus and XDG Runtime Directory Setup (XFCE Initialization)
-
-**CRITICAL:** XFCE (xfconfd, panel, window manager) requires proper D-Bus session socket and XDG runtime directory initialization before supervisor starts.
-
-**What happens if missing:**
-- xfconfd fails to initialize
-- Window manager doesn't start
-- Panel service crashes
-- XFCE session completely broken despite desktop process running
-
-**Implementation (custom_startup.sh before supervisor start):**
-1. Get abc user UID/GID (typically 1000:1000 in LinuxServer)
-2. Create `/run/user/$UID` directory with 700 permissions
-3. Set `export XDG_RUNTIME_DIR="/run/user/$UID"`
-4. Set `export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"`
-5. **Explicitly start dbus-daemon for session** (retries up to 10 times):
-   - `sudo -u abc dbus-daemon --session --address=unix:path=$XDG_RUNTIME_DIR/bus`
-   - Container environment doesn't reliably create socket via `dbus-launch`
-   - Must explicitly start daemon to ensure `/run/user/$UID/bus` socket creation
-6. Pass both exports to supervisor via `-E` flag so services inherit them
-
-**Supervisor also sets these in getEnvironment():** Defensive fallback for any services spawned by supervisor that don't get the exported variables. supervisor.js sets them if not already present.
-
-**Critical timing:** Must happen BEFORE supervisor starts, because:
-- XFCE session manager needs D-Bus socket to initialize
-- Socket must be created before xfconfd starts
-- If supervisor starts before socket is ready, xfconfd initialization fails
-
-**Container environment caveat:**
-- `dbus-launch` alone does NOT create session socket in container environments
-- Must explicitly start `dbus-daemon --session` with address parameter
-- Old approach (just waiting for socket) fails in containers
-- New approach: Start daemon explicitly and verify socket creation
-
-**Do NOT remove:** This is essential for any XFCE desktop environment to function. Even if startup appears to work without it, desktop services will crash or hang under load.
-
-**Visibility is critical:** supervisor.js must log each environment variable as it's configured. This logging provides visibility into what environment was applied to services. Without logging, silent failures are undetectable. These log messages appear in supervisor.log for debugging.
-
+#
 ## Critical Technical Caveats
 
 ### Port Forwarding Caveat
@@ -352,29 +315,31 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Why:** Supervisor runs as abc:abc user. Must have write access to create symlink wrappers for installed packages.
 
-### D-Bus Oracle Kernel Compatibility Shim
+### close_range Syscall Shim for Oracle/Older Kernels
 
-**ISSUE:** On older Oracle kernels, standard dbus-launch fails to properly initialize D-Bus session, preventing XFCE desktop environment from starting.
+**ISSUE:** On older Oracle kernels, the `close_range()` syscall doesn't exist or behaves incompatibly. XFCE session manager fails to spawn child processes with error "Failed to close file descriptor for child process (Operation not permitted)".
 
-**Symptom (Older Kernels):** XFCE session manager spawns but components (xfwm4, xfce4-panel, thunar, etc.) fail with "Failed to close file descriptor for child process (Operation not permitted)". Selkies desktop works (can run xterm), but XFCE desktop manager components don't start.
+**Symptom:** XFCE session manager starts but components (xfwm4, xfce4-panel, xfdesktop, thunar, xfsettingsd, etc.) fail to launch. Selkies can capture X display (xterm works), but XFCE desktop manager is missing.
 
-**Status:**
-- **Newer Oracle kernels:** D-Bus shim fixes the issue. XFCE desktop manager launches successfully.
-- **Older Oracle kernels:** D-Bus shim initializes socket (✓), but kernel still has deeper incompatibilities preventing XFCE process spawning. Socket ready but processes can't close file descriptors properly.
+**Root cause:** Older Oracle kernels lack `close_range()` syscall or have kernel restrictions preventing its execution. When XFCE's process spawning code tries to close file descriptor ranges on child processes, the syscall fails with EPERM (Operation not permitted).
 
-**Root cause:** Older Oracle kernels have incompatible D-Bus socket handling AND process capability restrictions. When XFCE's dbus-launch tries to initialize session bus, it fails. Additionally, even with D-Bus initialized, file descriptor management syscalls fail due to kernel-level restrictions.
-
-**D-Bus Shim Solution:** Initialize D-Bus session daemon BEFORE s6 starts XFCE services, ensuring the session bus is functional (fixes D-Bus socket issue on ALL kernels).
+**Solution:**
+1. Create C shim that intercepts `close_range()` calls and returns error (errno=38)
+2. Compile as shared library: `libshim_close_range.so`
+3. Use `LD_PRELOAD` to inject shim into all processes (system-wide and per-session)
+4. XFCE process spawning falls back to alternative methods when close_range fails
 
 **Implementation:**
-1. `custom_startup.sh` (lines 103-140): Explicitly create XDG_RUNTIME_DIR and start dbus-daemon --session with retry loop
-2. `startup/lib/dbus-shim.sh`: D-Bus initialization helper
-3. Export DBUS_SESSION_BUS_ADDRESS pointing to the pre-initialized socket
-4. Log initialization as "Oracle kernel compatible" for debugging
+1. `docker/shim_close_range.c`: Minimal shim that stubs close_range syscall
+2. `Dockerfile`: Compile shim and set `LD_PRELOAD` in /etc/environment system-wide
+3. `custom_startup.sh` (startup):
+   - Export `LD_PRELOAD=/usr/local/lib/libshim_close_range.so` early
+   - Add `LD_PRELOAD` to abc user's `.profile` for session inheritance
+   - Kill existing broken XFCE session
+   - Restart XFCE with `dbus-launch --sh-syntax` for clean D-Bus setup
+   - Sleep 2s for session to stabilize
 
-**Critical timing:** D-Bus session must be fully initialized BEFORE s6-rc starts svc-de, which happens automatically. Our custom_startup.sh ensures this by running early in container init.
-
-**Limitation on Older Kernels:** If XFCE components still fail to spawn even with D-Bus working, the older kernel likely has additional restrictions. Workaround: Container deployment may need `--cap-add=SYS_ADMIN` or `--privileged` to enable proper process spawning on older Oracle kernels. This is a deployment/kernel issue, not a code issue.
+**Why dbus-launch:** Ensures XFCE session has valid D-Bus communication channel. The `--sh-syntax` flag outputs shell commands to properly initialize D-Bus environment variables in the session.
 
 ### Supervisor Service Startup Organization
 

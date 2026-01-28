@@ -120,48 +120,6 @@ cd /opt/gmweb-startup && \
 nginx -s reload 2>/dev/null || true
 log "Supervisor ready (fresh from git)"
 
-ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
-ABC_GID=$(id -g abc 2>/dev/null || echo 1000)
-RUNTIME_DIR="/run/user/$ABC_UID"
-
-if [ ! -d "$RUNTIME_DIR" ]; then
-  log "Creating $RUNTIME_DIR..."
-  mkdir -p "$RUNTIME_DIR"
-fi
-
-chmod 700 "$RUNTIME_DIR"
-chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
-log "XDG_RUNTIME_DIR ready: $RUNTIME_DIR"
-
-export XDG_RUNTIME_DIR="$RUNTIME_DIR"
-export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
-
-DBUS_STARTED=0
-for attempt in {1..10}; do
-  if [ -S "$RUNTIME_DIR/bus" ] 2>/dev/null; then
-    log "D-Bus session socket ready"
-    DBUS_STARTED=1
-    break
-  fi
-
-  if [ $attempt -le 5 ]; then
-    log "D-Bus socket not found (attempt $attempt/10), starting dbus-daemon for session (Oracle kernel shim)..."
-    sudo -u abc DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
-      dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --nofork --print-address 2>/dev/null &
-    DBUS_DAEMON_PID=$!
-  fi
-
-  sleep 1
-done
-
-if [ $DBUS_STARTED -eq 1 ]; then
-  log "D-Bus session initialized successfully (Oracle kernel compatible)"
-else
-  log "WARNING: D-Bus session socket not ready, XFCE may not function properly"
-fi
-
-unset DBUS_DAEMON_PID
-
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
   sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
