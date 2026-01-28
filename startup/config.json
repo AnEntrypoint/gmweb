@@ -26,6 +26,10 @@
       "enabled": true,
       "type": "web"
     },
+    "log-viewer": {
+      "enabled": true,
+      "type": "web"
+    },
     "tmux": {
       "enabled": false,
       "type": "system"
