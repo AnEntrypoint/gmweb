@@ -27,7 +27,7 @@
       "type": "web"
     },
     "tmux": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "opencode": {

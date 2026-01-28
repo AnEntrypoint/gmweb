@@ -31,8 +31,8 @@ export default {
       await sleep(500);
     } catch (e) {}
 
-    const tmuxCmd = 'tmux -f /opt/gmweb-startup/tmux.conf new-session -A -s main -c /config bash -i -l';
-    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-c', tmuxCmd], {
+    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-i', '-l'], {
+      cwd: '/config',
       env: { ...env, TERM: 'xterm-256color' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
