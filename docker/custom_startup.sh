@@ -157,6 +157,69 @@ if [ ! -f /usr/bin/ttyd ]; then
   [ ! -f /usr/bin/ttyd ] && log "WARNING: ttyd failed"
 fi
 
+cat > /tmp/launch_xfce_components.sh << 'XFCE_LAUNCHER_EOF'
+#!/bin/bash
+# XFCE Component Launcher for Oracle Kernel Compatibility
+# Launches desktop components after XFCE session manager is ready
+# This works around Oracle kernel D-Bus compatibility issues
+
+export DISPLAY=:1
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/1000/bus"
+export XDG_RUNTIME_DIR="/run/user/1000"
+export HOME=/config
+
+log() {
+  echo "[xfce-launcher] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "$HOME/logs/startup.log"
+}
+
+# Wait for XFCE session manager to start (max 30 seconds)
+for i in {1..30}; do
+  if pgrep -u abc xfce4-session >/dev/null 2>&1; then
+    log "XFCE session detected (attempt $i/30)"
+    sleep 2  # Give session a moment to stabilize
+    break
+  fi
+  sleep 1
+done
+
+if ! pgrep -u abc xfce4-session >/dev/null 2>&1; then
+  log "WARNING: XFCE session manager not detected after 30s, skipping component launch"
+  exit 0
+fi
+
+# Launch XFCE components (they may already be running, that's OK)
+log "Launching XFCE desktop components..."
+
+# Panel (taskbar, clock, system tray)
+if ! pgrep -u abc xfce4-panel >/dev/null 2>&1; then
+  sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/usr/local/lib/libshim_close_range.so \
+    xfce4-panel >/dev/null 2>&1 &
+  log "xfce4-panel started (PID: $!)"
+fi
+
+# Desktop (wallpaper, icons)
+if ! pgrep -u abc xfdesktop >/dev/null 2>&1; then
+  sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/usr/local/lib/libshim_close_range.so \
+    xfdesktop >/dev/null 2>&1 &
+  log "xfdesktop started (PID: $!)"
+fi
+
+# Window Manager (borders, titles, Alt+Tab)
+if ! pgrep -u abc xfwm4 >/dev/null 2>&1; then
+  sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/usr/local/lib/libshim_close_range.so \
+    xfwm4 >/dev/null 2>&1 &
+  log "xfwm4 started (PID: $!)"
+fi
+
+log "XFCE component launcher complete"
+XFCE_LAUNCHER_EOF
+
+chmod +x /tmp/launch_xfce_components.sh
+log "XFCE launcher script prepared"
+
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
   sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
@@ -167,6 +230,10 @@ else
   log "ERROR: start.sh not found"
   exit 1
 fi
+
+# Launch XFCE components in background (after supervisor is running)
+bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1 &
+log "XFCE component launcher started (PID: $!)"
 
 {
   npm install -g better-sqlite3 2>&1 | tail -3

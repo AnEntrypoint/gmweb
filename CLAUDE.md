@@ -130,11 +130,25 @@ Plus retry logic: 3 attempts with 500ms delays between checks. Gives ttyd time t
 
 **Critical:** D-Bus must be ready before s6 starts XFCE. nginx handles HTTP/HTTPS with Basic Auth before any application services.
 
-### XFCE Desktop is Built-in to Webtop
+### XFCE Desktop Components - Oracle Kernel Fix
 
-**Note:** XFCE desktop environment (xfce4-session, xfwm4, xfce4-panel, xfdesktop) is part of the LinuxServer Webtop base image and started by s6-rc, NOT by gmweb supervisor.
+**Note:** XFCE desktop environment (xfce4-session, xfwm4, xfce4-panel, xfdesktop) is part of the LinuxServer Webtop base image and started by s6-rc.
 
-**Implication:** Do NOT add XFCE to supervisor config or try to manage it. It's already running via s6. The only role of gmweb is to ensure D-Bus is initialized before XFCE starts, and to provide the close_range shim for older kernels.
+**Oracle Kernel Issue:** On older Oracle kernels (5.15.0-1081-oracle and similar), the autostart mechanism for XFCE components breaks due to D-Bus compatibility issues. The session manager starts but panel, desktop, and window manager components don't auto-launch.
+
+**Root Cause:** Oracle kernel D-Bus behavior causes XFCE session manager to create additional D-Bus instances instead of using the shimmed D-Bus socket. This breaks the autostart mechanism that normally triggers component launch.
+
+**Solution:** Explicit component launcher in `custom_startup.sh`:
+1. Waits for XFCE session manager to be ready (max 30 seconds)
+2. Manually launches xfce4-panel, xfdesktop, xfwm4 with proper environment variables
+3. Sets DISPLAY, DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR, LD_PRELOAD for each component
+4. Runs as background process after supervisor starts (doesn't block init)
+
+**File:** `docker/custom_startup.sh` lines 160-220 (XFCE launcher script)
+
+**Result:** All XFCE desktop components now launch automatically on old Oracle kernels, restoring full desktop functionality (window management, panel, wallpaper, icons).
+
+**Implication:** Do NOT add XFCE to supervisor config or try to manage it via s6-overlay services. The background launcher is sufficient and keeps architecture simple.
 
 ### Init Script Must Exit
 
