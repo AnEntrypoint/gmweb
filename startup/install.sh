@@ -32,7 +32,7 @@ sudo apt update
 sudo apt-get install -y --no-install-recommends \
   curl bash git build-essential ca-certificates jq wget \
   software-properties-common apt-transport-https gnupg openssh-server \
-  openssh-client tmux lsof chromium chromium-sandbox xfce4-terminal xfce4 dbus-x11 \
+  openssh-client tmux lsof chromium chromium-sandbox \
   scrot xclip \
   libgbm1 libgtk-3-0 libnss3 libxss1 libasound2 libatk-bridge2.0-0 \
   libdrm2 libxcomposite1 libxdamage1 libxrandr2
