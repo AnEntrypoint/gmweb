@@ -354,21 +354,27 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 ### D-Bus Oracle Kernel Compatibility Shim
 
-**ISSUE:** On old Oracle kernels, standard dbus-launch fails to properly initialize D-Bus session, preventing XFCE desktop environment from starting.
+**ISSUE:** On older Oracle kernels, standard dbus-launch fails to properly initialize D-Bus session, preventing XFCE desktop environment from starting.
 
-**Symptom:** XFCE processes appear in ps (xfce4-session, xfce4-panel, etc.) but desktop doesn't render. Selkies shows blank screen despite Selkies process being able to capture xterm output.
+**Symptom (Older Kernels):** XFCE session manager spawns but components (xfwm4, xfce4-panel, thunar, etc.) fail with "Failed to close file descriptor for child process (Operation not permitted)". Selkies desktop works (can run xterm), but XFCE desktop manager components don't start.
 
-**Root cause:** Oracle kernels have incompatible D-Bus socket handling. When XFCE's dbus-launch tries to initialize a session bus, it fails silently or creates an unusable socket. XFCE components that depend on D-Bus for IPC (inter-process communication) cannot initialize properly.
+**Status:**
+- **Newer Oracle kernels:** D-Bus shim fixes the issue. XFCE desktop manager launches successfully.
+- **Older Oracle kernels:** D-Bus shim initializes socket (✓), but kernel still has deeper incompatibilities preventing XFCE process spawning. Socket ready but processes can't close file descriptors properly.
 
-**Solution:** Initialize D-Bus session daemon BEFORE s6 starts XFCE services, ensuring the session bus is fully functional before any D-Bus-dependent services launch.
+**Root cause:** Older Oracle kernels have incompatible D-Bus socket handling AND process capability restrictions. When XFCE's dbus-launch tries to initialize session bus, it fails. Additionally, even with D-Bus initialized, file descriptor management syscalls fail due to kernel-level restrictions.
+
+**D-Bus Shim Solution:** Initialize D-Bus session daemon BEFORE s6 starts XFCE services, ensuring the session bus is functional (fixes D-Bus socket issue on ALL kernels).
 
 **Implementation:**
 1. `custom_startup.sh` (lines 103-140): Explicitly create XDG_RUNTIME_DIR and start dbus-daemon --session with retry loop
-2. `startup/lib/dbus-shim.sh`: D-Bus initialization helper (for future direct invocation if needed)
+2. `startup/lib/dbus-shim.sh`: D-Bus initialization helper
 3. Export DBUS_SESSION_BUS_ADDRESS pointing to the pre-initialized socket
 4. Log initialization as "Oracle kernel compatible" for debugging
 
-**Critical timing:** D-Bus session must be fully initialized BEFORE s6-rc starts svc-de (XFCE desktop), which happens automatically. Our custom_startup.sh ensures this by running early in container init.
+**Critical timing:** D-Bus session must be fully initialized BEFORE s6-rc starts svc-de, which happens automatically. Our custom_startup.sh ensures this by running early in container init.
+
+**Limitation on Older Kernels:** If XFCE components still fail to spawn even with D-Bus working, the older kernel likely has additional restrictions. Workaround: Container deployment may need `--cap-add=SYS_ADMIN` or `--privileged` to enable proper process spawning on older Oracle kernels. This is a deployment/kernel issue, not a code issue.
 
 ### Supervisor Service Startup Organization
 

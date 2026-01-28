@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
+
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 mkdir -p "$LOG_DIR"
@@ -43,6 +45,24 @@ EOF
 fi
 
 log "Phase 1 complete"
+
+grep -q 'LD_PRELOAD=/usr/local/lib/libshim_close_range.so' "$HOME_DIR/.profile" || \
+  echo 'export LD_PRELOAD=/usr/local/lib/libshim_close_range.so' >> "$HOME_DIR/.profile"
+
+log "Restarting XFCE session with proper D-Bus and LD_PRELOAD..."
+pkill -u abc xfce4-session 2>/dev/null || true
+sleep 1
+
+sudo -u abc -H bash -c '
+  export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
+  export DISPLAY=:1
+  eval $(dbus-launch --sh-syntax)
+  export DBUS_SESSION_BUS_ADDRESS
+  xfce4-session &
+' 2>/dev/null &
+
+sleep 2
+log "XFCE session restarted with D-Bus and LD_PRELOAD"
 
 NVM_DIR=/usr/local/local/nvm
 export NVM_DIR
