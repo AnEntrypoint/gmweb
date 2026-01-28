@@ -28,6 +28,27 @@ location ~ /desk/websockets? {
 
 **Credentials:** Access https://domain/desk/ → Selkies login page → username: `abc`, password: from `$PASSWORD` environment variable
 
+## webssh2 Health Check - Shell Command Caveat
+
+**ISSUE:** webssh2 (ttyd-based web terminal) health check was failing immediately after startup, causing continuous restart loops and connection disconnections.
+
+**Symptom:** Supervisor logs show `[WARN] Health check failed` → `Restarting` repeatedly. SSH connections drop frequently.
+
+**Root Cause:** Health check uses pipe (`lsof -i :9999 | grep LISTEN`) which is bash syntax, but execSync was missing `shell: true` flag. Without shell interpretation, the pipe fails → health check fails → supervisor restarts service.
+
+**Solution:** Health check in `startup/services/webssh2.js`:
+```javascript
+execSync('lsof -i :9999 2>/dev/null | grep -q LISTEN', {
+  stdio: 'pipe',
+  shell: true,  // CRITICAL: enables pipe syntax
+  timeout: 2000
+});
+```
+
+Plus retry logic: 3 attempts with 500ms delays between checks. Gives ttyd time to bind to port 9999 after spawn.
+
+**Result:** Health checks now pass once ttyd is ready. No more restart loops or disconnections.
+
 ## Core Architecture
 
 ### LinuxServer Webtop + nginx + Selkies
