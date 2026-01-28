@@ -1,7 +1,7 @@
 import { spawnAsAbcUser, waitForPort } from '../lib/service-utils.js';
 import { execSync } from 'child_process';
 import { createRequire } from 'module';
-import { existsSync, mkdirSync, chmodSync } from 'fs';
+import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import os from 'os';
 
@@ -28,12 +28,14 @@ function getLatestDebUrl() {
 
 function extractDeb() {
   try {
-    execSync(`mkdir -p ${AIONUI_DIR} && dpkg-deb -x ${DEB_PATH} ${AIONUI_DIR}`);
+    execSync(`sudo rm -rf ${AIONUI_DIR}/opt ${AIONUI_DIR}/usr 2>/dev/null; sudo mkdir -p ${AIONUI_DIR}`);
+    execSync(`sudo dpkg-deb -x ${DEB_PATH} ${AIONUI_DIR}`);
     const nestedDir = join(AIONUI_DIR, 'opt/AionUi');
     if (!existsSync(join(nestedDir, 'AionUi'))) return false;
-    execSync(`cp -a ${nestedDir}/* ${AIONUI_DIR}/`);
-    chmodSync(AIONUI_BINARY, '755');
-    execSync(`chown -R abc:abc ${AIONUI_DIR}`);
+    execSync(`sudo cp -a ${nestedDir}/* ${AIONUI_DIR}/`);
+    execSync(`sudo rm -rf ${AIONUI_DIR}/opt ${AIONUI_DIR}/usr`);
+    execSync(`sudo chmod 755 ${AIONUI_BINARY}`);
+    execSync(`sudo chown -R abc:abc ${AIONUI_DIR}`);
     return true;
   } catch (e) {
     console.log(`[aion-ui-install] Extraction failed: ${e.message}`);
@@ -67,7 +69,7 @@ async function downloadAndInstallAionUI() {
   if (installationInProgress || installationFailed) return false;
   installationInProgress = true;
   try {
-    mkdirSync(AIONUI_DIR, { recursive: true });
+    execSync(`sudo mkdir -p ${AIONUI_DIR}`);
     if (existsSync(AIONUI_BINARY)) { markComplete(); return true; }
     if (existsSync(DEB_PATH) && extractDeb()) { markComplete(); return true; }
     const url = getLatestDebUrl();
