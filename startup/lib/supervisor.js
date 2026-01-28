@@ -155,7 +155,8 @@ export class Supervisor {
     const pw = this.env.PASSWORD || 'password';
     try {
       const hash = execSync('openssl passwd -apr1 -stdin', { input: pw, encoding: 'utf8' }).trim();
-      execSync(`sudo sh -c 'printf "abc:%s\\n" "${hash}" > /etc/nginx/.htpasswd'`, { timeout: 10000, stdio: 'pipe' });
+      const escaped = hash.replace(/\$/g, '\\$');
+      execSync(`sudo sh -c 'printf "abc:%s\\n" "${escaped}" > /etc/nginx/.htpasswd'`, { timeout: 10000, stdio: 'pipe' });
       execSync('sudo nginx -s reload', { timeout: 10000, stdio: 'pipe' });
       this.logger.log('INFO', 'nginx auth configured');
     } catch (err) { this.logger.log('WARN', `nginx auth: ${err.message}`); }
