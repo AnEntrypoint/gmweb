@@ -19,7 +19,7 @@
       "type": "system"
     },
     "webssh2": {
-      "enabled": false,
+      "enabled": true,
       "type": "web"
     },
     "file-manager": {
