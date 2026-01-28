@@ -82,16 +82,24 @@
 2. Create `/run/user/$UID` directory with 700 permissions
 3. Set `export XDG_RUNTIME_DIR="/run/user/$UID"`
 4. Set `export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"`
-5. Wait up to 60 seconds for D-Bus session socket at `$XDG_RUNTIME_DIR/bus` to appear
+5. **Explicitly start dbus-daemon for session** (retries up to 10 times):
+   - `sudo -u abc dbus-daemon --session --address=unix:path=$XDG_RUNTIME_DIR/bus`
+   - Container environment doesn't reliably create socket via `dbus-launch`
+   - Must explicitly start daemon to ensure `/run/user/$UID/bus` socket creation
 6. Pass both exports to supervisor via `-E` flag so services inherit them
 
 **Supervisor also sets these in getEnvironment():** Defensive fallback for any services spawned by supervisor that don't get the exported variables. supervisor.js sets them if not already present.
 
 **Critical timing:** Must happen BEFORE supervisor starts, because:
-- s6 starts D-Bus daemon in parallel with custom init
-- D-Bus socket appears in /run/user/UID after D-Bus daemon starts
+- XFCE session manager needs D-Bus socket to initialize
+- Socket must be created before xfconfd starts
 - If supervisor starts before socket is ready, xfconfd initialization fails
-- Waiting 60 seconds ensures socket is available when XFCE services need it
+
+**Container environment caveat:**
+- `dbus-launch` alone does NOT create session socket in container environments
+- Must explicitly start `dbus-daemon --session` with address parameter
+- Old approach (just waiting for socket) fails in containers
+- New approach: Start daemon explicitly and verify socket creation
 
 **Do NOT remove:** This is essential for any XFCE desktop environment to function. Even if startup appears to work without it, desktop services will crash or hang under load.
 
