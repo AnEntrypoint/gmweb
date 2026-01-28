@@ -116,16 +116,28 @@ log "XDG_RUNTIME_DIR ready: $RUNTIME_DIR"
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
 
-for i in {1..60}; do
+DBUS_STARTED=0
+for attempt in {1..10}; do
   if [ -S "$RUNTIME_DIR/bus" ] 2>/dev/null; then
     log "D-Bus session socket ready"
+    DBUS_STARTED=1
     break
   fi
-  if [ $i -eq 60 ]; then
-    log "WARNING: D-Bus session socket not found after 60s, continuing"
+
+  if [ $attempt -le 5 ]; then
+    log "D-Bus socket not found (attempt $attempt/10), starting dbus-daemon for session..."
+    sudo -u abc DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
+      dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --nofork --print-address 2>/dev/null &
   fi
+
   sleep 1
 done
+
+if [ $DBUS_STARTED -eq 1 ]; then
+  log "D-Bus session initialized successfully"
+else
+  log "WARNING: D-Bus session socket not ready, XFCE may not function properly"
+fi
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
