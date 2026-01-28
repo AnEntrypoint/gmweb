@@ -116,14 +116,12 @@ location ~ /desk/websockets? {
 **Implication:** Every container startup re-runs installation checks. First boot does installs (NVM, Node, packages). Subsequent boots use cache (fast). If install fails, system keeps running (background process).
 
 **Startup phases (custom_startup.sh):**
-1. Quick init: Permissions, paths, config (instant)
-2. Node.js: Install if not present (1st boot)
-3. Supervisor: Fetch repo, npm install (1st boot)
-4. Start supervisor: Service manager (every boot)
-5. Background installs: System packages + tools (non-blocking)
-   - nginx/desktop ready immediately
-   - Tools install while UI available
-   - Tool failures don't crash system
+1. Quick init: Permissions, paths, config, htpasswd generation (instant)
+2. Node.js: Install if not present (1st boot), cache thereafter
+3. Supervisor: Force-clean and re-clone from git EVERY boot, fresh npm install
+4. Pre-install critical binaries: ttyd, tmux, better-sqlite3, bcrypt
+5. Start supervisor: Service manager (every boot)
+6. Background installs: System packages + tools (non-blocking)
 
 ### Node.js Path Resolution - Dynamic Only
 
@@ -178,13 +176,14 @@ location ~ /desk/websockets? {
 **GOTCHA:** nginx loads htpasswd file at config parse time. Creating htpasswd AFTER nginx starts doesn't take effect.
 
 **Solution in custom_startup.sh:**
-1. Generate htpasswd file with PASSWORD env var (or default "test123")
+1. Generate htpasswd file with PASSWORD env var (or default "password")
 2. Call `nginx -s reload` to reload config with new credentials
 3. Allow 1 second for reload to complete
+4. After PHASE 3 git clone, nginx config is re-deployed from git and reloaded again
 
 **PASSWORD env var handling:**
 - `if [ -z "${PASSWORD}" ]` checks for unset variable (not just empty string)
-- Defaults to "test123" if PASSWORD not provided
+- Defaults to "password" if PASSWORD not provided (matches docker-compose.yaml default)
 - Startup logs indicate whether default or env var was used
 
 ### File Manager via gxe
@@ -256,9 +255,11 @@ location ~ /desk/websockets? {
 1. `better-sqlite3` must be installed globally: `npm install -g better-sqlite3`
 2. `bcrypt` must be available in npm: `npm install bcrypt` (in /config/node_modules)
 3. Password hashing uses bcrypt with cost factor 12, then converts `$2b$` prefix to `$2a$` for AionUI compatibility
-4. Credentials set after 8000ms delay to allow AionUI process initialization
+4. Credentials set after 8000ms initial delay, then retries up to 12 times (every 10s) if DB not ready
 
-**Location:** `startup/services/aion-ui.js` - `setCredentialsFromEnv()` function called 8 seconds after process start
+**Location:** `startup/services/aion-ui.js` - `setCredentialsFromEnv()` with retry loop
+
+**Retry logic:** If AionUI DB does not exist yet (first boot, AionUI still downloading), the function retries every 10 seconds up to 12 attempts (2 minutes total). Also falls back to rowid=1 update if system_default_user id not found.
 
 **Environment variables:**
 - `PASSWORD` - Primary password env var (fallback)
@@ -361,6 +362,31 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Content:** JSON object with services map, each service has `enabled` (boolean) and `type` (install/system/web).
 
+### Force-Fresh Clone on Every Boot (Stale Volume Fix)
+
+**CRITICAL:** `custom_startup.sh` MUST delete and re-clone startup files from git on EVERY boot. Never skip clone based on file existence checks.
+
+**Problem:** `/opt/gmweb-startup/` persists across container restarts (container filesystem layer). Old startup code, config.json, node_modules from previous deployments override new code. This causes stale services, wrong config, and broken updates.
+
+**Solution:** On every boot:
+1. `rm -rf` all JS, JSON, shell scripts, node_modules, lib, services from `/opt/gmweb-startup/`
+2. Preserve only `custom_startup.sh` (baked into Docker image, already running in memory)
+3. `git clone --depth 1` fresh from repo
+4. Copy fresh startup/* into `/opt/gmweb-startup/`
+5. Copy fresh nginx config and reload nginx
+6. Run fresh `npm install`
+
+**Why custom_startup.sh is preserved:** The script is already executing from the Docker image copy. Overwriting it mid-execution with a different version could cause undefined behavior. The Docker image version is the source of truth for the boot sequence.
+
+**Branch:** Clones from `main`.
+
+### Supervisor Code Split Into Modules
+
+**Architecture:** `startup/lib/supervisor.js` was split into 3 files to stay under 200 lines each:
+- `startup/lib/supervisor.js` - Core supervisor class (service lifecycle, health monitoring)
+- `startup/lib/supervisor-logger.js` - SupervisorLogger class (file-based logging, rotation)
+- `startup/lib/dependency-sort.js` - Topological sort and dependency grouping
+
 ### Supervisor Service Timeout Requirements
 
 **GOTCHA:** Services that start quickly (<10s) don't block startup. Services with large downloads or long initialization timeout as failures.
@@ -422,21 +448,19 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Prevents:** Unbounded log growth. Old logs archived with timestamp for recovery if needed.
 
-### Current Service Configuration (VERIFIED WORKING)
+### Current Service Configuration
 
-**Enabled (production):**
-- webssh2: Web terminal via ttyd, listens on port 9999, proxied to `/ssh/`
-- tmux: System terminal multiplexer for webssh2
-- aion-ui: Main AI UI application on port 25808
+**Enabled:**
+- webssh2: Web terminal via ttyd, port 9999, proxied to `/ssh/`
+- file-manager: NHFS file browser, port 9998, proxied to `/files/`
+- tmux: Terminal multiplexer for webssh2
+- opencode: Code editor tool
+- aion-ui: Main AI UI, port 25808, proxied to `/`
 
-**Disabled (not needed for core functionality):**
-- opencode-acp: Not part of critical path
-- file-manager: Replaced by nginx routes
-- wrangler, gcloud, scrot, playwriter, glootie-oc: Non-essential tools
+**Disabled:**
+- wrangler, gcloud, scrot, chromium-ext, playwriter, glootie-oc
 
-**Configuration:** `/opt/gmweb-startup/config.json` services map
-
-**Verified startup behavior:** All 3 enabled services start successfully, no restart loops, stable operation.
+**Configuration:** `/opt/gmweb-startup/config.json` (refreshed from git every boot)
 
 ### PASSWORD-Based Authentication System
 

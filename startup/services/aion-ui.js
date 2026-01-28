@@ -95,21 +95,46 @@ async function downloadAndInstallAionUI() {
   }
 }
 
-async function setCredentialsFromEnv() {
+async function setCredentialsFromEnv(attempt = 0) {
   const pw = process.env.AIONUI_PASSWORD || process.env.PASSWORD;
   const user = process.env.AIONUI_USERNAME || 'admin';
   if (!pw) return;
+  const MAX_ATTEMPTS = 12;
+  const RETRY_DELAY = 10000;
   try {
     const require = createRequire(import.meta.url);
     const Database = require(join(GLOBAL_MODULES, 'better-sqlite3'));
     const bcrypt = require('/config/node_modules/bcrypt');
-    const db = new Database('/config/.config/AionUi/aionui/aionui.db');
+    const dbPath = '/config/.config/AionUi/aionui/aionui.db';
+    if (!existsSync(dbPath)) {
+      if (attempt < MAX_ATTEMPTS) {
+        console.log(`[aion-ui] DB not ready, retry ${attempt + 1}/${MAX_ATTEMPTS} in ${RETRY_DELAY / 1000}s`);
+        setTimeout(() => setCredentialsFromEnv(attempt + 1), RETRY_DELAY);
+        return;
+      }
+      console.log(`[aion-ui] DB never appeared after ${MAX_ATTEMPTS} attempts`);
+      return;
+    }
+    const db = new Database(dbPath);
     const hash = bcrypt.hashSync(pw, 12).replace('$2b$', '$2a$');
     const r = db.prepare('UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE id = ?')
       .run(user, hash, Date.now(), 'system_default_user');
+    if (r.changes === 0) {
+      const r2 = db.prepare('UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE rowid = 1')
+        .run(user, hash, Date.now());
+      if (r2.changes > 0) console.log(`[aion-ui] Credentials set via rowid: ${user}`);
+    } else {
+      console.log(`[aion-ui] Credentials set: ${user}`);
+    }
     db.close();
-    if (r.changes > 0) console.log(`[aion-ui] Credentials set: ${user}`);
-  } catch (e) { console.log(`[aion-ui] Credentials: ${e.message}`); }
+  } catch (e) {
+    if (attempt < MAX_ATTEMPTS) {
+      console.log(`[aion-ui] Credentials attempt ${attempt + 1} failed: ${e.message}, retrying...`);
+      setTimeout(() => setCredentialsFromEnv(attempt + 1), RETRY_DELAY);
+    } else {
+      console.log(`[aion-ui] Credentials failed after ${MAX_ATTEMPTS} attempts: ${e.message}`);
+    }
+  }
 }
 
 export default {
