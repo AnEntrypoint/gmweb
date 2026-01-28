@@ -246,6 +246,10 @@ log "XFCE component launcher started (PID: $!)"
   apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
+
+  # Mark installations complete so supervisor can start AionUI
+  touch /tmp/gmweb-installs-complete
+  log "Installation marker file created"
 } >> "$LOG_DIR/startup.log" 2>&1 &
 log "Background installs started (PID: $!)"
 

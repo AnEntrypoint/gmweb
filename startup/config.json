@@ -39,7 +39,7 @@
       "type": "install"
     },
     "aion-ui": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "glootie-oc": {

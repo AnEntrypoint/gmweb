@@ -68,6 +68,11 @@ export class Supervisor {
         this.start();
       });
 
+      // Start delayed services (AionUI) after background installations complete
+      this.monitorDelayedServices().catch(err => {
+        this.logger.log('ERROR', 'Delayed service monitor crashed', err);
+      });
+
       this.logger.log('INFO', 'Supervisor ready');
       await new Promise(() => {});
     } catch (err) {
@@ -202,6 +207,35 @@ export class Supervisor {
       finalEnv.PATH = `${NVM_BIN}:${this.env.HOME || '/config'}/.local/bin:${finalEnv.PATH}`;
     }
     return spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'], detached: true, ...options, env: finalEnv });
+  }
+
+  async monitorDelayedServices() {
+    // Wait for background installations to complete, then start AionUI
+    // This ensures AionUI has access to all CLI tools (opencode, npm packages, etc.)
+    let aionuiStarted = false;
+    const aionuiService = this.services.get('aion-ui');
+    if (!aionuiService) return;
+
+    for (let i = 0; i < 180; i++) {  // Check for up to 3 minutes
+      if (!aionuiStarted && existsSync('/tmp/gmweb-installs-complete')) {
+        try {
+          this.logger.log('INFO', 'Background installations complete, starting AionUI');
+          await this.startService(aionuiService);
+          aionuiStarted = true;
+        } catch (err) {
+          this.logger.log('ERROR', 'Failed to start delayed AionUI', err);
+        }
+      }
+      if (aionuiStarted) break;
+      await sleep(1000);
+    }
+
+    if (!aionuiStarted) {
+      this.logger.log('WARN', 'Installation marker not found after 3 minutes, starting AionUI anyway');
+      try { await this.startService(aionuiService); } catch (err) {
+        this.logger.log('ERROR', 'Failed to start AionUI after timeout', err);
+      }
+    }
   }
 
   stop() {

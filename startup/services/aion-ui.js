@@ -150,7 +150,9 @@ export default {
     try { execSync('rm -rf /config/.config/AionUi/Singleton* 2>/dev/null || true'); } catch (e) {}
     try { execSync('pkill -f AionUi || true'); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
     const serviceEnv = { ...env, DISPLAY: ':1', AIONUI_PORT: String(PORT), AIONUI_ALLOWED_ORIGINS: '*' };
-    const ps = spawnAsAbcUser(`/opt/AionUi/AionUi --no-sandbox --webui --remote --port ${PORT}`, serviceEnv);
+    // Source bash profile to ensure AionUI has full CLI context (opencode, npm packages, etc.)
+    const command = `source /config/.profile && source /config/.bashrc 2>/dev/null || true && /opt/AionUi/AionUi --no-sandbox --webui --remote --port ${PORT}`;
+    const ps = spawnAsAbcUser(command, serviceEnv);
     ps.stdout?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation')) console.log(`[aion-ui] ${m}`); });
     ps.stderr?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation') && !m.includes('GPU process')) console.log(`[aion-ui:err] ${m}`); });
     ps.unref();
