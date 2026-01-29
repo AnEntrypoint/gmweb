@@ -32,7 +32,6 @@ server {
   }
 
   location /desk {
-    auth_basic off;
     alias /usr/share/selkies/web/;
     index index.html index.htm;
     try_files $uri $uri/ =404;
@@ -55,7 +54,6 @@ server {
   }
 
   location ~ /desk/websockets? {
-    auth_basic off;
     rewrite ^/desk/(.*) /$1 break;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -188,7 +186,6 @@ server {
   }
 
   location /desk {
-    auth_basic off;
     alias /usr/share/selkies/web/;
     index index.html index.htm;
     try_files $uri $uri/ =404;
@@ -211,7 +208,6 @@ server {
   }
 
   location ~ /desk/websockets? {
-    auth_basic off;
     rewrite ^/desk/(.*) /$1 break;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
