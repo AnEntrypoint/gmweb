@@ -40,6 +40,7 @@ async function main() {
         'tmux',
         'opencode',
         'aion-ui',
+        'moltbot',
         'playwriter',
         'glootie-oc'
       ];

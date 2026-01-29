@@ -1,0 +1,64 @@
+// Moltbot service - web UI for Moltinc workspace management
+// Runs via npx, configurable by user after setup
+// Docs: https://docs.molt.bot/
+
+import { spawn } from 'child_process';
+import { spawnAsAbcUser } from '../lib/service-utils.js';
+
+const PORT = parseInt(process.env.MOLTBOT_PORT || '7890');
+
+export default {
+  name: 'moltbot',
+  type: 'web',
+  requiresDesktop: false,
+  dependencies: [],
+
+  async start(env) {
+    console.log(`[moltbot] Starting on port ${PORT}...`);
+
+    // Spawn moltbot via npx with proper environment
+    const ps = spawnAsAbcUser(`npx molt web --port ${PORT}`, {
+      ...env,
+      MOLTBOT_PORT: String(PORT)
+    });
+
+    ps.stdout?.on('data', (data) => {
+      const msg = data.toString().trim();
+      if (msg) console.log(`[moltbot] ${msg}`);
+    });
+
+    ps.stderr?.on('data', (data) => {
+      const msg = data.toString().trim();
+      if (msg && !msg.includes('deprecat')) console.log(`[moltbot:err] ${msg}`);
+    });
+
+    ps.unref();
+
+    return {
+      pid: ps.pid,
+      process: ps,
+      cleanup: async () => {
+        try {
+          process.kill(-ps.pid, 'SIGTERM');
+          await new Promise(r => setTimeout(r, 2000));
+          process.kill(-ps.pid, 'SIGKILL');
+        } catch (e) {}
+      }
+    };
+  },
+
+  async health() {
+    // Check if port is listening
+    const { execSync } = await import('child_process');
+    try {
+      execSync(`lsof -i :${PORT} 2>/dev/null | grep -q LISTEN`, {
+        stdio: 'pipe',
+        shell: true,
+        timeout: 2000
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+};

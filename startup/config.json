@@ -42,6 +42,10 @@
       "enabled": true,
       "type": "web"
     },
+    "moltbot": {
+      "enabled": true,
+      "type": "web"
+    },
     "glootie-oc": {
       "enabled": false,
       "type": "install"
