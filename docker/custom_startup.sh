@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
+export LD_PRELOAD=/opt/lib/libshim_close_range.so
 
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
@@ -99,7 +99,7 @@ grep -q 'NVM_DIR=/config/nvm' "$HOME_DIR/.profile" || \
   cat >> "$HOME_DIR/.profile" << 'PROFILE_EOF'
 export NVM_DIR="/config/nvm"
 export NPM_CONFIG_PREFIX="/config/usr/local"
-export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
+export LD_PRELOAD=/opt/lib/libshim_close_range.so
 PROFILE_EOF
 
 # Add temp directory configuration to profile (prevents EXDEV errors in Claude plugin installation)
@@ -259,7 +259,7 @@ log "Launching XFCE desktop components..."
 # Panel (taskbar, clock, system tray)
 if ! pgrep -u abc xfce4-panel >/dev/null 2>&1; then
   sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
-    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/usr/local/lib/libshim_close_range.so \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
     xfce4-panel >/dev/null 2>&1 &
   log "xfce4-panel started (PID: $!)"
 fi
@@ -267,7 +267,7 @@ fi
 # Desktop (wallpaper, icons)
 if ! pgrep -u abc xfdesktop >/dev/null 2>&1; then
   sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
-    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/usr/local/lib/libshim_close_range.so \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
     xfdesktop >/dev/null 2>&1 &
   log "xfdesktop started (PID: $!)"
 fi
@@ -275,7 +275,7 @@ fi
 # Window Manager (borders, titles, Alt+Tab)
 if ! pgrep -u abc xfwm4 >/dev/null 2>&1; then
   sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
-    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/usr/local/lib/libshim_close_range.so \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
     xfwm4 >/dev/null 2>&1 &
   log "xfwm4 started (PID: $!)"
 fi
