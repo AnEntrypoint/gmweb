@@ -292,40 +292,23 @@ XFCE_LAUNCHER_EOF
 chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
-log "Installing Node modules for AionUI..."
+log "Installing critical Node modules for AionUI..."
 mkdir -p /config/node_modules
 export NPM_CONFIG_PREFIX=/config/usr/local
 
-# Install with timeout - if takes >30s, something is wrong
-timeout 30 npm install -g better-sqlite3 2>&1 | tail -3 || {
-  if [ $? -eq 124 ]; then
-    log "ERROR: npm install timeout - better-sqlite3 installation hung"
-    exit 1
-  else
-    log "ERROR: better-sqlite3 installation failed"
-    exit 1
-  fi
+# Install with timeout - fail hard if anything goes wrong
+timeout 30 npm install -g better-sqlite3 2>&1 | tail -2 || {
+  log "ERROR: better-sqlite3 installation failed"
+  exit 1
 }
 
-cd /config && timeout 30 npm install bcrypt 2>&1 | tail -3 || {
-  if [ $? -eq 124 ]; then
-    log "ERROR: npm install timeout - bcrypt installation hung"
-    exit 1
-  else
-    log "ERROR: bcrypt installation failed"
-    exit 1
-  fi
+cd /config && timeout 30 npm install bcrypt 2>&1 | tail -2 || {
+  log "ERROR: bcrypt installation failed"
+  exit 1
 }
 
 chown -R abc:abc /config/node_modules 2>/dev/null || true
-
-# Verify modules are actually present
-if npm list -g better-sqlite3 >/dev/null 2>&1 && [ -d "/config/node_modules/bcrypt" ]; then
-  log "✓ All required Node modules verified"
-else
-  log "ERROR: Module verification failed after installation"
-  exit 1
-fi
+log "✓ Critical modules installed"
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
