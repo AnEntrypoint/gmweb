@@ -331,7 +331,12 @@ log "XFCE component launcher started (PID: $!)"
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
 
-  # Mark installations complete so services can use additional tools
+  log "Installing CLI coding tools (qwen-code, codex, cursor)..."
+  npm install -g @qwen-code/qwen-code@latest 2>&1 | tail -3 && log "qwen-code installed" || log "WARNING: qwen-code install failed"
+  npm install -g @openai/codex 2>&1 | tail -3 && log "codex installed" || log "WARNING: codex install failed"
+  curl -fsSL https://cursor.com/install 2>/dev/null | bash 2>&1 | tail -5 && log "cursor CLI installed" || log "WARNING: cursor CLI install failed"
+  log "CLI coding tools installation complete"
+
   touch /tmp/gmweb-installs-complete
   log "Installation marker file created"
 } >> "$LOG_DIR/startup.log" 2>&1 &
