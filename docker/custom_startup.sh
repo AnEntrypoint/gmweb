@@ -5,6 +5,9 @@ export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
 
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
+
+# Clear all logs on every boot - fresh start
+rm -rf "$LOG_DIR" 2>/dev/null || true
 mkdir -p "$LOG_DIR"
 chmod 755 "$LOG_DIR"
 chown abc:abc "$LOG_DIR"
