@@ -1,3 +1,7 @@
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+
 export default {
   name: 'log-viewer',
   type: 'web',
@@ -5,9 +9,6 @@ export default {
   dependencies: [],
 
   async start(env) {
-    const http = require('http');
-    const fs = require('fs');
-    const path = require('path');
 
     const logsDir = '/config/logs';
     const port = 9997;
@@ -123,7 +124,6 @@ ps aux | grep xfce | grep -v grep
 
   async health() {
     try {
-      const http = require('http');
       await new Promise((resolve, reject) => {
         const req = http.get('http://127.0.0.1:9997/', (res) => {
           if (res.statusCode === 200) resolve();

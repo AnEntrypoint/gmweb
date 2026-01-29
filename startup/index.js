@@ -37,10 +37,12 @@ async function main() {
         'chromium-ext',
         'webssh2',
         'file-manager',
+        'log-viewer',
         'tmux',
         'opencode',
         'aion-ui',
         'moltbot',
+        'claude-config',
         'playwriter',
         'glootie-oc'
       ];
