@@ -98,23 +98,67 @@ async function downloadAndInstallAionUI() {
 async function setCredentialsFromEnv(attempt = 0) {
   const pw = process.env.AIONUI_PASSWORD || process.env.PASSWORD;
   const user = process.env.AIONUI_USERNAME || 'admin';
-  if (!pw) return;
-  const MAX_ATTEMPTS = 12;
-  const RETRY_DELAY = 10000;
+  if (!pw) { console.log('[aion-ui] No password provided, skipping credential setup'); return; }
+  const MAX_ATTEMPTS = 30;
+  const RETRY_DELAY = 2000;
   try {
     const require = createRequire(import.meta.url);
-    const Database = require('better-sqlite3');
-    const bcrypt = require('bcrypt');
+    let Database, bcrypt;
+    let moduleError = null;
+
+    const paths = [
+      'better-sqlite3',
+      '/config/node_modules/better-sqlite3',
+      '/usr/local/lib/node_modules/better-sqlite3',
+      join(dirname(process.execPath), '..', 'lib', 'node_modules', 'better-sqlite3')
+    ];
+
+    for (const path of paths) {
+      try {
+        Database = require(path);
+        break;
+      } catch (e) {
+        moduleError = e;
+      }
+    }
+
+    if (!Database) {
+      if (attempt < MAX_ATTEMPTS) {
+        if (attempt % 5 === 0) console.log(`[aion-ui] better-sqlite3 not ready (attempt ${attempt + 1}/${MAX_ATTEMPTS}), retrying...`);
+        setTimeout(() => setCredentialsFromEnv(attempt + 1), RETRY_DELAY);
+        return;
+      }
+      console.log(`[aion-ui] better-sqlite3 still missing after ${MAX_ATTEMPTS} attempts, giving up`);
+      return;
+    }
+
+    try {
+      bcrypt = require('bcrypt');
+    } catch (e) {
+      try {
+        bcrypt = require('/config/node_modules/bcrypt');
+      } catch (e2) {
+        if (attempt < MAX_ATTEMPTS) {
+          if (attempt % 5 === 0) console.log(`[aion-ui] bcrypt not ready (attempt ${attempt + 1}/${MAX_ATTEMPTS}), retrying...`);
+          setTimeout(() => setCredentialsFromEnv(attempt + 1), RETRY_DELAY);
+          return;
+        }
+        console.log('[aion-ui] bcrypt unavailable, giving up');
+        return;
+      }
+    }
+
     const dbPath = '/config/.config/AionUi/aionui/aionui.db';
     if (!existsSync(dbPath)) {
       if (attempt < MAX_ATTEMPTS) {
-        console.log(`[aion-ui] DB not ready, retry ${attempt + 1}/${MAX_ATTEMPTS} in ${RETRY_DELAY / 1000}s`);
+        if (attempt % 5 === 0) console.log(`[aion-ui] DB not ready, retry ${attempt + 1}/${MAX_ATTEMPTS}`);
         setTimeout(() => setCredentialsFromEnv(attempt + 1), RETRY_DELAY);
         return;
       }
       console.log(`[aion-ui] DB never appeared after ${MAX_ATTEMPTS} attempts`);
       return;
     }
+
     const db = new Database(dbPath);
     const hash = bcrypt.hashSync(pw, 12).replace('$2b$', '$2a$');
     const r = db.prepare('UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE id = ?')
@@ -122,14 +166,15 @@ async function setCredentialsFromEnv(attempt = 0) {
     if (r.changes === 0) {
       const r2 = db.prepare('UPDATE users SET username = ?, password_hash = ?, updated_at = ? WHERE rowid = 1')
         .run(user, hash, Date.now());
-      if (r2.changes > 0) console.log(`[aion-ui] Credentials set via rowid: ${user}`);
+      if (r2.changes > 0) console.log(`[aion-ui] ✓ Credentials set via rowid: ${user}`);
+      else console.log('[aion-ui] WARNING: No user rows found to update');
     } else {
-      console.log(`[aion-ui] Credentials set: ${user}`);
+      console.log(`[aion-ui] ✓ Credentials set: ${user}`);
     }
     db.close();
   } catch (e) {
     if (attempt < MAX_ATTEMPTS) {
-      console.log(`[aion-ui] Credentials attempt ${attempt + 1} failed: ${e.message}, retrying...`);
+      if (attempt % 5 === 0) console.log(`[aion-ui] Credentials attempt ${attempt + 1}/${MAX_ATTEMPTS} failed: ${e.message}`);
       setTimeout(() => setCredentialsFromEnv(attempt + 1), RETRY_DELAY);
     } else {
       console.log(`[aion-ui] Credentials failed after ${MAX_ATTEMPTS} attempts: ${e.message}`);
