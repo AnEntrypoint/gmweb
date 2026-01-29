@@ -50,6 +50,10 @@
       "enabled": false,
       "type": "install"
     },
+    "claude-config": {
+      "enabled": true,
+      "type": "install"
+    },
     "playwriter": {
       "enabled": false,
       "type": "system"
