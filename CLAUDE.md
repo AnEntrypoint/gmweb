@@ -392,9 +392,9 @@ chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
 
 **Implementation:**
 1. `docker/shim_close_range.c`: C code that stubs `close_range()` syscall (returns -1 with errno=38)
-2. `Dockerfile`: Compile shim to `libshim_close_range.so` and set `LD_PRELOAD=/usr/local/lib/libshim_close_range.so` in `/etc/environment` for all processes
+2. `Dockerfile`: Compile shim to `libshim_close_range.so` and set `LD_PRELOAD=/opt/lib/libshim_close_range.so` in `/etc/environment` for all processes
 3. `custom_startup.sh` (very early, before s6-rc starts services):
-   - Export `LD_PRELOAD=/usr/local/lib/libshim_close_range.so` immediately (redundant with Dockerfile but explicit)
+   - Export `LD_PRELOAD=/opt/lib/libshim_close_range.so` immediately (redundant with Dockerfile but explicit)
    - Initialize D-Bus: start `dbus-daemon --session` for abc user
    - Create `/run/user/1000/bus` socket and export `DBUS_SESSION_BUS_ADDRESS`
    - D-Bus is ready before s6-rc starts XFCE (s6-rc inherits env vars)
