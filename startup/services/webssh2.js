@@ -33,7 +33,7 @@ export default {
 
     const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-i', '-l'], {
       cwd: '/config',
-      env: { ...env, TERM: 'xterm-256color' },
+      env: { ...env, TERM: 'xterm-256color', HOME: '/config' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });

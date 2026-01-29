@@ -27,6 +27,11 @@ mkdir -p "$RUNTIME_DIR"
 chmod 700 "$RUNTIME_DIR"
 chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
 
+# Fix npm cache permissions if corrupted by previous installs
+if [ -d "/config/.npm" ]; then
+  chown -R "$ABC_UID:$ABC_GID" /config/.npm 2>/dev/null || true
+fi
+
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
 
@@ -258,7 +263,7 @@ log "Launching XFCE desktop components..."
 
 # Panel (taskbar, clock, system tray)
 if ! pgrep -u abc xfce4-panel >/dev/null 2>&1; then
-  sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+  sudo -u abc HOME=/config DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
     XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
     xfce4-panel >/dev/null 2>&1 &
   log "xfce4-panel started (PID: $!)"
@@ -266,7 +271,7 @@ fi
 
 # Desktop (wallpaper, icons)
 if ! pgrep -u abc xfdesktop >/dev/null 2>&1; then
-  sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+  sudo -u abc HOME=/config DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
     XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
     xfdesktop >/dev/null 2>&1 &
   log "xfdesktop started (PID: $!)"
@@ -274,7 +279,7 @@ fi
 
 # Window Manager (borders, titles, Alt+Tab)
 if ! pgrep -u abc xfwm4 >/dev/null 2>&1; then
-  sudo -u abc DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+  sudo -u abc HOME=/config DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
     XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
     xfwm4 >/dev/null 2>&1 &
   log "xfwm4 started (PID: $!)"

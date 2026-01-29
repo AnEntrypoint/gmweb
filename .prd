@@ -1,0 +1,22 @@
+# Outstanding Issues to Fix
+
+## Issue 1: WebSSH2/XFCE terminal starting in wrong working directory
+- Terminal opens in /opt subdirectory instead of home (/config)
+- webssh2.js line 35 has cwd: '/config' which is correct
+- Issue is likely in XFCE terminal emulator not respecting PWD or HOME not being set when XFCE components launch
+- Fix: Add HOME export and cd to HOME in XFCE launcher script and ensure tmux/bash defaults to HOME
+
+## Issue 2: AionUI password credentials not applying
+- setCredentialsFromEnv() fails because better-sqlite3 cannot be found
+- Error: "Cannot find module '/config/nvm/versions/node/v24.13.0/lib/node_modules/better-sqlite3'"
+- Root cause: Using incorrect path calculation for global node_modules, should use npm root -g or simpler approach
+- Fix: Install better-sqlite3 at container level or use direct npm search instead of GLOBAL_MODULES path construction
+
+## Issue 3: npm cache permissions for file-manager
+- file-manager service failing with "Your cache folder contains root-owned files"
+- Need to ensure npm cache is properly owned by abc user
+
+## Status
+- [ ] Fix webssh2 terminal working directory
+- [ ] Fix AionUI password credential setup
+- [ ] Fix npm cache permissions

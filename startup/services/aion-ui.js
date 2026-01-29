@@ -103,8 +103,8 @@ async function setCredentialsFromEnv(attempt = 0) {
   const RETRY_DELAY = 10000;
   try {
     const require = createRequire(import.meta.url);
-    const Database = require(join(GLOBAL_MODULES, 'better-sqlite3'));
-    const bcrypt = require('/config/node_modules/bcrypt');
+    const Database = require('better-sqlite3');
+    const bcrypt = require('bcrypt');
     const dbPath = '/config/.config/AionUi/aionui/aionui.db';
     if (!existsSync(dbPath)) {
       if (attempt < MAX_ATTEMPTS) {
