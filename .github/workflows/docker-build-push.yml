@@ -34,6 +34,8 @@ jobs:
             almagest/gmweb:${{ github.sha }}
           build-args: |
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       
       - name: Trigger Coolify deployment
         if: success()
