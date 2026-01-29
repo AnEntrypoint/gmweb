@@ -1,6 +1,20 @@
 # syntax=docker/dockerfile:1.4
 FROM lscr.io/linuxserver/webtop:ubuntu-xfce
 
+# EARLY SETUP: Create persistent /config directory structure for all installations
+# This ensures NVM, npm packages, and all user tools persist across container restarts
+RUN mkdir -p /config/usr/local /config/nvm /config/.tmp /config/logs && \
+    chmod 755 /config && \
+    chmod 755 /config/usr/local /config/nvm /config/.tmp /config/logs && \
+    # Remove ephemeral /usr/local to make way for persistent symlink
+    rm -rf /usr/local && \
+    ln -s /config/usr/local /usr/local && \
+    # Configure npm to use persistent global directory
+    echo 'prefix = /config/usr/local' > /etc/npmrc && \
+    # Set environment for persistent paths
+    echo 'NVM_DIR=/config/nvm' >> /etc/environment && \
+    echo 'NPM_CONFIG_PREFIX=/config/usr/local' >> /etc/environment
+
 COPY docker/custom_startup.sh /opt/gmweb-startup/custom_startup.sh
 COPY docker/nginx-sites-enabled-default /opt/gmweb-startup/nginx-sites-enabled-default
 COPY docker/shim_close_range.c /tmp/shim_close_range.c

@@ -84,15 +84,20 @@ export PASSWORD
 BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
 if [ ! -f "$BASHRC_MARKER" ]; then
   cat >> "$HOME_DIR/.bashrc" << 'EOF'
-export NVM_DIR="/usr/local/local/nvm"
+export NVM_DIR="/config/nvm"
+export NPM_CONFIG_PREFIX="/config/usr/local"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-export PATH="$(dirname "$(which node 2>/dev/null || echo /usr/local/bin/node)"):/usr/local/bin:$PATH"
+export PATH="$(dirname "$(which node 2>/dev/null || echo /config/usr/local/bin/node)"):/config/usr/local/bin:$PATH"
 EOF
   touch "$BASHRC_MARKER"
 fi
 
-grep -q 'LD_PRELOAD=/usr/local/lib/libshim_close_range.so' "$HOME_DIR/.profile" || \
-  echo 'export LD_PRELOAD=/usr/local/lib/libshim_close_range.so' >> "$HOME_DIR/.profile"
+grep -q 'NVM_DIR=/config/nvm' "$HOME_DIR/.profile" || \
+  cat >> "$HOME_DIR/.profile" << 'PROFILE_EOF'
+export NVM_DIR="/config/nvm"
+export NPM_CONFIG_PREFIX="/config/usr/local"
+export LD_PRELOAD=/usr/local/lib/libshim_close_range.so
+PROFILE_EOF
 
 # Add temp directory configuration to profile (prevents EXDEV errors in Claude plugin installation)
 grep -q 'export TMPDIR=' "$HOME_DIR/.profile" || {
@@ -106,8 +111,9 @@ TMPDIR_EOF
 
 log "Phase 1 complete"
 
-NVM_DIR=/usr/local/local/nvm
+NVM_DIR=/config/nvm
 export NVM_DIR
+export NPM_CONFIG_PREFIX=/config/usr/local
 
 if ! command -v node &>/dev/null; then
   mkdir -p "$NVM_DIR"
@@ -122,17 +128,19 @@ else
 fi
 
 . "$NVM_DIR/nvm.sh"
-export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:$PATH"
+export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:/config/usr/local/bin:$PATH"
 
 NODE_VERSION=$(node -v | tr -d 'v')
 NODE_BIN_DIR="$NVM_DIR/versions/node/v$NODE_VERSION/bin"
-log "Node.js $NODE_VERSION"
+log "Node.js $NODE_VERSION (NVM_DIR=$NVM_DIR)"
 
+mkdir -p /config/usr/local/bin
 for bin in node npm npx; do
-  ln -sf "$NODE_BIN_DIR/$bin" /usr/local/bin/$bin
+  ln -sf "$NODE_BIN_DIR/$bin" /config/usr/local/bin/$bin
 done
 chmod 777 "$NODE_BIN_DIR"
-chmod 777 "$NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules"
+chmod 777 "$NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules" 2>/dev/null || true
+chmod 777 /config/usr/local/bin 2>/dev/null || true
 
 log "Setting up supervisor (force-fresh every boot)..."
 rm -rf /tmp/gmweb
