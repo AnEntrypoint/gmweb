@@ -143,9 +143,10 @@ fi
 
 NVM_DIR=/config/nvm
 export NVM_DIR
-export NPM_CONFIG_PREFIX=/config/usr/local
-log "Persistent paths ready: NVM_DIR=$NVM_DIR NPM_PREFIX=$NPM_CONFIG_PREFIX"
+log "Persistent paths ready: NVM_DIR=$NVM_DIR"
 
+# Don't set NPM_CONFIG_PREFIX yet - NVM rejects it
+# Source NVM first, then set it after NVM is initialized
 if ! command -v node &>/dev/null; then
   mkdir -p "$NVM_DIR"
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
@@ -159,6 +160,7 @@ else
 fi
 
 . "$NVM_DIR/nvm.sh"
+export NPM_CONFIG_PREFIX=/config/usr/local
 export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:/config/usr/local/bin:$PATH"
 
 NODE_VERSION=$(node -v | tr -d 'v')
