@@ -27,10 +27,11 @@ mkdir -p "$RUNTIME_DIR"
 chmod 700 "$RUNTIME_DIR"
 chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
 
-# Fix npm cache permissions if corrupted by previous installs
-if [ -d "/config/.npm" ]; then
-  chown -R "$ABC_UID:$ABC_GID" /config/.npm 2>/dev/null || true
-fi
+# Fix npm cache and stale installs from persistent volume
+log "Cleaning persistent volume artifacts..."
+rm -rf /config/.npm 2>/dev/null || true
+rm -rf /config/node_modules/.bin/* 2>/dev/null || true
+npm cache clean --force 2>/dev/null || true
 
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
@@ -291,6 +292,21 @@ XFCE_LAUNCHER_EOF
 chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
+log "Pre-installing Node modules for AionUI (blocking)..."
+npm install -g better-sqlite3 2>&1 | tail -3 || log "WARNING: better-sqlite3 install may have failed"
+mkdir -p /config/node_modules
+cd /config && npm install bcrypt 2>&1 | tail -3 || log "WARNING: bcrypt install may have failed"
+chown -R abc:abc /config/node_modules 2>/dev/null || true
+
+# Verify better-sqlite3 is accessible
+if npm list -g better-sqlite3 >/dev/null 2>&1; then
+  log "✓ better-sqlite3 verified globally installed"
+else
+  log "WARNING: better-sqlite3 not found globally, may cause credential setup to fail"
+fi
+
+log "Node modules ready for AionUI"
+
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
   sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
@@ -307,18 +323,12 @@ bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1 &
 log "XFCE component launcher started (PID: $!)"
 
 {
-  npm install -g better-sqlite3 2>&1 | tail -3
-  mkdir -p /config/node_modules
-  cd /config && npm install bcrypt 2>&1 | tail -3
-  chown -R abc:abc /config/node_modules
-  log "better-sqlite3 + bcrypt installed"
-
   apt-get update
   apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
 
-  # Mark installations complete so supervisor can start AionUI
+  # Mark installations complete so services can use additional tools
   touch /tmp/gmweb-installs-complete
   log "Installation marker file created"
 } >> "$LOG_DIR/startup.log" 2>&1 &

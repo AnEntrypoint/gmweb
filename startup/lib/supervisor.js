@@ -165,8 +165,10 @@ export class Supervisor {
   async getEnvironment() {
     const env = { ...process.env };
     const NVM_BIN = path.dirname(process.execPath);
+    const NVM_LIB = path.join(NVM_BIN, '..', 'lib', 'node_modules');
     const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
     env.PATH = `${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
+    env.NODE_PATH = `${NVM_LIB}:${env.NODE_PATH || ''}`;
     if (!env.PASSWORD) { env.PASSWORD = 'password'; }
 
     const uid = process.getuid?.() || 1000;
