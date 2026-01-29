@@ -1,7 +1,0 @@
-# FINAL FIX DEPLOYED
-# Commit 8402322: Simplified startup with blocking npm install, minimal retries
-# Build 21489109989: In progress
-# Key changes:
-# - Blocking module install before supervisor starts
-# - Only 6 retries for AionUI credential setup (30s max)
-# - No startup restarts needed
