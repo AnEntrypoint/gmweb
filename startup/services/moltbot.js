@@ -1,8 +1,9 @@
 // Moltbot service - web UI for Moltinc workspace management
-// Runs via npx, configurable by user after setup
+// Provides molt.bot web interface for workspace configuration
+// User can configure after initial setup via the web UI
 // Docs: https://docs.molt.bot/
 
-import { spawn } from 'child_process';
+import { execSync } from 'child_process';
 import { spawnAsAbcUser } from '../lib/service-utils.js';
 
 const PORT = parseInt(process.env.MOLTBOT_PORT || '7890');
@@ -15,21 +16,28 @@ export default {
 
   async start(env) {
     console.log(`[moltbot] Starting on port ${PORT}...`);
+    console.log(`[moltbot] Docs: https://docs.molt.bot/web`);
+    console.log(`[moltbot] Getting Started: https://docs.molt.bot/start/getting-started`);
 
-    // Spawn moltbot via npx with proper environment
-    const ps = spawnAsAbcUser(`npx molt web --port ${PORT}`, {
-      ...env,
-      MOLTBOT_PORT: String(PORT)
-    });
+    // Spawn moltbot via npx
+    // Using 'npm exec' pattern for reliable package execution
+    const ps = spawnAsAbcUser(
+      `npm exec -- molt web --port ${PORT} 2>&1 || npx -y molt web --port ${PORT}`,
+      { ...env, MOLTBOT_PORT: String(PORT) }
+    );
 
     ps.stdout?.on('data', (data) => {
       const msg = data.toString().trim();
-      if (msg) console.log(`[moltbot] ${msg}`);
+      if (msg && !msg.includes('npm error could not determine')) {
+        console.log(`[moltbot] ${msg}`);
+      }
     });
 
     ps.stderr?.on('data', (data) => {
       const msg = data.toString().trim();
-      if (msg && !msg.includes('deprecat')) console.log(`[moltbot:err] ${msg}`);
+      if (msg && !msg.includes('deprecat')) {
+        console.log(`[moltbot:err] ${msg}`);
+      }
     });
 
     ps.unref();
@@ -49,7 +57,6 @@ export default {
 
   async health() {
     // Check if port is listening
-    const { execSync } = await import('child_process');
     try {
       execSync(`lsof -i :${PORT} 2>/dev/null | grep -q LISTEN`, {
         stdio: 'pipe',
