@@ -43,7 +43,7 @@
       "type": "web"
     },
     "moltbot": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "glootie-oc": {

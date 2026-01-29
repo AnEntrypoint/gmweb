@@ -545,3 +545,27 @@ docker exec <container> sudo nginx -s reload
 
 **Permanent fix:** supervisor.js ensureNginxAuth() should be called AFTER verifying nginx is actually listening, or add retry logic with timeout for nginx reload.
 
+## Moltbot Service Setup
+
+**Status:** Pre-configured but disabled by default. User must enable and configure.
+
+**Service:** `startup/services/moltbot.js` - Runs molt.bot workspace management UI on port 7890
+
+**Route:** `/molt/` proxied via nginx (HTTP/HTTPS)
+
+**Configuration:**
+1. Enable in `startup/config.json`: change `"enabled": false` to `"enabled": true`
+2. Optional: Set `MOLTBOT_PORT` env var to use different port
+3. Optional: Update nginx location block in `docker/nginx-sites-enabled-default` to serve at different URL path
+4. Restart container to apply changes
+
+**Docs:** https://docs.molt.bot/ (web guide, installation, getting started)
+
+**Service Details:**
+- Type: web service (port-based health checks)
+- Command: `npm exec -- molt web --port 7890` (with npx fallback)
+- Logging: supervisor.log + per-service moltbot logs
+- Health: Checks port listening every 30s, auto-restarts on failure
+
+**Why disabled by default:** Moltbot requires explicit configuration. User determines whether to enable and how to configure it (port, path, credentials).
+
