@@ -3,11 +3,14 @@ FROM lscr.io/linuxserver/webtop:ubuntu-xfce
 
 # EARLY SETUP: Create persistent /config directory structure for all installations
 # This ensures NVM, npm packages, and all user tools persist across container restarts
-RUN mkdir -p /config/usr/local/lib /config/nvm /config/.tmp /config/logs && \
-    chmod 755 /config && \
-    chmod 755 /config/usr/local /config/usr/local/lib /config/nvm /config/.tmp /config/logs && \
+# Note: /config is a mounted volume, so structure may already exist but needs verification
+RUN mkdir -p /config/usr/local/lib /config/usr/local/bin /config/nvm /config/.tmp /config/logs && \
+    chmod 755 /config 2>/dev/null || true && \
+    chmod 755 /config/usr/local /config/usr/local/lib /config/usr/local/bin /config/nvm /config/.tmp /config/logs 2>/dev/null || true && \
+    # Clean up any old residual symlinks from previous container versions
+    rm -rf /usr/local/local 2>/dev/null || true && \
     # Remove ephemeral /usr/local to make way for persistent symlink
-    rm -rf /usr/local && \
+    rm -rf /usr/local 2>/dev/null || true && \
     ln -s /config/usr/local /usr/local && \
     # Configure npm to use persistent global directory
     echo 'prefix = /config/usr/local' > /etc/npmrc && \

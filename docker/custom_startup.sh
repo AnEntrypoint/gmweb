@@ -111,9 +111,37 @@ TMPDIR_EOF
 
 log "Phase 1 complete"
 
+# MIGRATION: Handle transition from old paths to new persistent paths
+log "Verifying persistent path structure..."
+mkdir -p /config/usr/local/lib /config/usr/local/bin /config/nvm /config/.tmp /config/logs
+chmod 755 /config/usr/local /config/usr/local/lib /config/usr/local/bin /config/nvm /config/.tmp /config/logs 2>/dev/null || true
+
+# If old NVM exists in /usr/local/local, migrate it
+if [ -d "/usr/local/local/nvm" ] && [ ! -e "/config/nvm/nvm.sh" ]; then
+  log "Migrating NVM from /usr/local/local/nvm to /config/nvm"
+  rm -rf /config/nvm && mv /usr/local/local/nvm /config/nvm 2>/dev/null || true
+fi
+# Clean up any stale old paths that might interfere
+rm -rf /usr/local/local 2>/dev/null || true
+
+# Verify symlink is correct
+if [ ! -L /usr/local ]; then
+  log "WARNING: /usr/local is not a symlink, attempting to fix"
+  rm -rf /usr/local 2>/dev/null || true
+  ln -s /config/usr/local /usr/local
+fi
+
+# Verify symlink target is correct
+SYMLINK_TARGET=$(readlink /usr/local 2>/dev/null)
+if [ "$SYMLINK_TARGET" != "/config/usr/local" ]; then
+  log "WARNING: /usr/local symlink incorrect ($SYMLINK_TARGET), fixing to /config/usr/local"
+  rm -f /usr/local && ln -s /config/usr/local /usr/local
+fi
+
 NVM_DIR=/config/nvm
 export NVM_DIR
 export NPM_CONFIG_PREFIX=/config/usr/local
+log "Persistent paths ready: NVM_DIR=$NVM_DIR NPM_PREFIX=$NPM_CONFIG_PREFIX"
 
 if ! command -v node &>/dev/null; then
   mkdir -p "$NVM_DIR"
