@@ -5,7 +5,16 @@
 set -o pipefail
 HOME_DIR="${HOME:-/config}"
 LOG_DIR="$HOME_DIR/logs"
-NODE_BIN="$(which node 2>/dev/null || echo /usr/local/bin/node)"
+NVM_DIR="${NVM_DIR:-$HOME_DIR/nvm}"
+
+# Source NVM to load node/npm into PATH
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+NODE_BIN="$(which node 2>/dev/null)"
+if [ -z "$NODE_BIN" ]; then
+  echo "ERROR: Node.js not found in PATH or NVM. NVM_DIR=$NVM_DIR"
+  exit 1
+fi
 SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
 
 # Ensure log directory exists with proper permissions
