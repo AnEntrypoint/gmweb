@@ -57,6 +57,10 @@
     "playwriter": {
       "enabled": false,
       "type": "system"
+    },
+    "proxypilot": {
+      "enabled": true,
+      "type": "install"
     }
   }
 }

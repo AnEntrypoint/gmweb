@@ -40,6 +40,7 @@ async function main() {
         'log-viewer',
         'tmux',
         'opencode',
+        'proxypilot',
         'aion-ui',
         'moltbot',
         'claude-config',
