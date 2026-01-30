@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# CRITICAL: Unset LD_PRELOAD immediately before anything else
+unset LD_PRELOAD
+
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 
@@ -17,9 +20,14 @@ log() {
 BOOT_ID="$(date '+%s')-$$"
 log "===== GMWEB STARTUP (boot: $BOOT_ID) ====="
 
+# Clean up stale LD_PRELOAD from persistent .profile (can get stale from failed runs)
+if [ -f "$HOME_DIR/.profile" ]; then
+  grep -v "LD_PRELOAD" "$HOME_DIR/.profile" > "$HOME_DIR/.profile.tmp" && \
+  mv "$HOME_DIR/.profile.tmp" "$HOME_DIR/.profile" || true
+  log "✓ Cleaned stale LD_PRELOAD from .profile"
+fi
+
 # Compile close_range shim immediately (before anything else uses LD_PRELOAD)
-# CRITICAL: Do NOT set LD_PRELOAD until after shim is compiled
-unset LD_PRELOAD
 mkdir -p /opt/lib
 
 if [ ! -f /opt/lib/libshim_close_range.so ]; then
