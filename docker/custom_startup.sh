@@ -20,6 +20,24 @@ log() {
 BOOT_ID="$(date '+%s')-$$"
 log "===== GMWEB STARTUP (boot: $BOOT_ID) ====="
 
+# CRITICAL: Configure nginx FIRST, before anything else
+# This ensures /desk is accessible immediately
+log "Phase 0: Configure nginx (FIRST - must be done before anything else)"
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+# Set up password for HTTP Basic Auth
+if [ -z "${PASSWORD}" ]; then
+  PASSWORD="password"
+  log "Using default password"
+else
+  log "Using PASSWORD from env"
+fi
+printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; printf 'abc:%s\n' "$hash" > /etc/nginx/.htpasswd; }
+chmod 644 /etc/nginx/.htpasswd
+sudo nginx -s reload 2>/dev/null || true
+export PASSWORD
+log "✓ HTTP Basic Auth configured"
+
 # Clean up stale LD_PRELOAD from persistent .profile (can get stale from failed runs)
 if [ -f "$HOME_DIR/.profile" ]; then
   grep -v "LD_PRELOAD" "$HOME_DIR/.profile" > "$HOME_DIR/.profile.tmp" && \
