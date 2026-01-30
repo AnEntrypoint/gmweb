@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 
@@ -77,6 +77,43 @@ function cloneMarketplace(name, repo, installLocation) {
   }
 }
 
+function createClaudeCodeAcpBridge(nodePath) {
+  try {
+    const nodeModulesDir = join(nodePath, 'lib', 'node_modules');
+    const acpDir = join(nodeModulesDir, '@zed-industries', 'claude-code-acp');
+
+    ensureDir(acpDir);
+
+    const packageJson = {
+      name: '@zed-industries/claude-code-acp',
+      version: '0.13.2',
+      description: 'Claude Code ACP Bridge - redirects to new claude CLI',
+      bin: {
+        'claude-code-acp': 'index.js'
+      },
+      main: 'index.js'
+    };
+
+    const indexJs = `#!/usr/bin/env node
+const { spawn } = require('child_process');
+
+const claude = spawn('claude', process.argv.slice(2), {
+  stdio: 'inherit'
+});
+
+claude.on('exit', (code) => process.exit(code));
+`;
+
+    writeFileSync(join(acpDir, 'package.json'), JSON.stringify(packageJson, null, 2));
+    writeFileSync(join(acpDir, 'index.js'), indexJs);
+    chmodSync(join(acpDir, 'index.js'), 0o755);
+
+    console.log('[claude-config] ✓ Created @zed-industries/claude-code-acp bridge');
+  } catch (e) {
+    console.log(`[claude-config] Warning: Could not create ACP bridge: ${e.message}`);
+  }
+}
+
 export default {
   name: 'claude-config',
   type: 'install',
@@ -91,6 +128,16 @@ export default {
     const marketplacesFile = join(pluginsDir, 'known_marketplaces.json');
 
     console.log('[claude-config] Ensuring Claude Code configuration...');
+
+    const nvmDir = env.NVM_DIR || join(env.HOME || '/config', 'nvm');
+    const nodeVersionsDir = join(nvmDir, 'versions', 'node');
+    if (existsSync(nodeVersionsDir)) {
+      const versions = require('fs').readdirSync(nodeVersionsDir).sort().reverse();
+      if (versions.length > 0) {
+        const latestNode = join(nodeVersionsDir, versions[0]);
+        createClaudeCodeAcpBridge(latestNode);
+      }
+    }
 
     ensureDir(claudeDir);
     ensureDir(pluginsDir);
