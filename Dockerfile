@@ -8,15 +8,8 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Compile close_range syscall shim at build time (Oracle kernel compatibility)
-RUN mkdir -p /opt/lib && cat > /tmp/shim_close_range.c << 'EOF'
-#define _GNU_SOURCE
-#include <errno.h>
-
-int close_range(unsigned int first, unsigned int last, int flags) {
-    errno = 38;
-    return -1;
-}
-EOF
+RUN mkdir -p /opt/lib
+COPY docker/shim_close_range.c /tmp/shim_close_range.c
 RUN gcc -fPIC -shared /tmp/shim_close_range.c -o /opt/lib/libshim_close_range.so && \
     rm /tmp/shim_close_range.c
 
