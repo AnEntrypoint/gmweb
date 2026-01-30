@@ -44,7 +44,6 @@ async function buildBinary() {
     console.log(`[${NAME}] Building ProxyPilot binary...`);
     const buildCmd = 'go mod download && go build -o proxypilot ./cmd/server';
 
-    // Check if Go is available
     try {
       execSync('command -v go', { stdio: 'pipe', shell: '/bin/bash' });
     } catch {
@@ -76,7 +75,6 @@ async function startBinary() {
       return null;
     }
 
-    // Setup config file
     const configPath = join(PP_DIR, 'config.yaml');
     const examplePath = join(PP_DIR, 'config.example.yaml');
     if (!existsSync(configPath) && existsSync(examplePath)) {
@@ -84,43 +82,31 @@ async function startBinary() {
       copyFileSync(examplePath, configPath);
     }
 
-    // Create cli-proxy-api directory
     mkdirSync(join(HOME_DIR, '.cli-proxy-api'), { recursive: true });
 
-    // Kill any existing proxypilot process
     try {
       execSync(`pkill -f "${PP_BIN}"`, { stdio: 'pipe' });
     } catch {}
 
-    // Start proxypilot
     console.log(`[${NAME}] Starting ProxyPilot daemon...`);
     const ps = spawn(PP_BIN, [], {
       cwd: PP_DIR,
       env: { ...process.env, HOME: HOME_DIR },
       detached: true,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-
-    ps.stdout?.on('data', d => {
-      console.log(`[${NAME}] ${d.toString().trim()}`);
-    });
-    ps.stderr?.on('data', d => {
-      console.log(`[${NAME}:err] ${d.toString().trim()}`);
+      stdio: ['ignore', 'ignore', 'ignore']
     });
 
     ps.unref();
 
-    // Wait a moment for startup
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 1500));
 
-    // Verify it started
     try {
       execSync(`pgrep -f "${PP_BIN}"`, { stdio: 'pipe' });
       console.log(`[${NAME}] ✓ ProxyPilot started on :8317`);
-      return ps;
+      return { pid: ps.pid };
     } catch {
       console.log(`[${NAME}] WARNING: ProxyPilot start may have failed`);
-      return ps;
+      return { pid: ps.pid };
     }
   } catch (err) {
     console.log(`[${NAME}:err] Start failed: ${err.message}`);
@@ -137,12 +123,11 @@ export default {
   async start(env) {
     console.log(`[${NAME}] Setting up ProxyPilot...`);
 
-    // Check if binary is up to date (older than 24 hours)
     let needsUpdate = true;
     if (existsSync(PP_BIN)) {
       const mtime = execSync(`stat -c %Y "${PP_BIN}"`, { encoding: 'utf8' }).trim();
       const age = (Date.now() / 1000) - parseInt(mtime);
-      needsUpdate = age > 86400; // 24 hours in seconds
+      needsUpdate = age > 86400;
     }
 
     if (needsUpdate) {
@@ -158,11 +143,9 @@ export default {
       pid: ps?.pid || 0,
       process: ps,
       cleanup: async () => {
-        if (ps) {
+        if (ps?.pid) {
           try {
-            process.kill(-ps.pid, 'SIGTERM');
-            await new Promise(r => setTimeout(r, 2000));
-            process.kill(-ps.pid, 'SIGKILL');
+            execSync(`kill -9 ${ps.pid}`, { stdio: 'pipe' });
           } catch (e) {}
         }
       }
