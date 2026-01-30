@@ -32,8 +32,9 @@ if [ -z "${PASSWORD}" ]; then
 else
   log "Using PASSWORD from env"
 fi
-printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; printf 'abc:%s\n' "$hash" > /etc/nginx/.htpasswd; }
-chmod 644 /etc/nginx/.htpasswd
+# Use sudo to write htpasswd (nginx needs root permissions)
+printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; sudo sh -c "printf 'abc:%s\n' \"$hash\" > /etc/nginx/.htpasswd"; }
+sudo chmod 644 /etc/nginx/.htpasswd
 sudo nginx -s reload 2>/dev/null || true
 export PASSWORD
 log "✓ HTTP Basic Auth configured"
@@ -168,24 +169,13 @@ cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
 cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
 log "✓ Startup files copied to /opt/gmweb-startup"
 
-log "Phase 2: Configure nginx HTTP Basic Auth + routing (FIRST - /desk must be accessible)"
+log "Phase 2: Update nginx routing from git config"
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
-cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
-
-if [ -z "${PASSWORD}" ]; then
-  PASSWORD="password"
-  log "Using default password"
-else
-  log "Using PASSWORD from env"
-fi
-printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; printf 'abc:%s\n' "$hash" > /etc/nginx/.htpasswd; }
-chmod 644 /etc/nginx/.htpasswd
-
-# Attempt nginx reload (non-blocking - don't wait, supervisor will handle nginx if needed)
+# Copy updated nginx config from git (already has Phase 0 auth setup)
+sudo cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default 2>/dev/null || true
+# Reload nginx to pick up new config (non-blocking)
 sudo nginx -s reload 2>/dev/null || true
-log "✓ HTTP Basic Auth configured (user: abc)"
-log "✓ /desk should now be accessible"
-export PASSWORD
+log "✓ Nginx config updated from git"
 
 [ -d "$HOME_DIR/.npm" ] && chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || mkdir -p "$HOME_DIR/.npm" && chown -R abc:abc "$HOME_DIR/.npm"
 [ -f /opt/proxypilot-config.yaml ] && [ ! -f "$HOME_DIR/config.yaml" ] && cp /opt/proxypilot-config.yaml "$HOME_DIR/config.yaml" && chown abc:abc "$HOME_DIR/config.yaml"
@@ -271,11 +261,12 @@ export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:/config/usr/local/bin:$PA
 
 # Configure npm globally (write with proper error handling)
 mkdir -p /etc/npm 2>/dev/null || true
-echo 'prefix = /config/usr/local' > /etc/npmrc 2>/dev/null || log "WARNING: Could not write /etc/npmrc"
+# Configure npm with sudo (needs root permissions)
+sudo sh -c "echo 'prefix = /config/usr/local' > /etc/npmrc" 2>/dev/null || log "WARNING: Could not write /etc/npmrc"
 
-# Set npm environment in /etc/environment for all shell sessions (safe append)
-[ -f /etc/environment ] && grep -q 'NVM_DIR=/config/nvm' /etc/environment || echo 'NVM_DIR=/config/nvm' >> /etc/environment 2>/dev/null || true
-[ -f /etc/environment ] && grep -q 'NPM_CONFIG_PREFIX' /etc/environment || echo 'NPM_CONFIG_PREFIX=/config/usr/local' >> /etc/environment 2>/dev/null || true
+# Set npm environment in /etc/environment for all shell sessions (safe append, use sudo)
+[ -f /etc/environment ] && grep -q 'NVM_DIR=/config/nvm' /etc/environment || sudo sh -c "echo 'NVM_DIR=/config/nvm' >> /etc/environment" 2>/dev/null || true
+[ -f /etc/environment ] && grep -q 'NPM_CONFIG_PREFIX' /etc/environment || sudo sh -c "echo 'NPM_CONFIG_PREFIX=/config/usr/local' >> /etc/environment" 2>/dev/null || true
 
 NODE_VERSION=$(node -v | tr -d 'v')
 NODE_BIN_DIR="$NVM_DIR/versions/node/v$NODE_VERSION/bin"
