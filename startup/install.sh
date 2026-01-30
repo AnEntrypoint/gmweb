@@ -278,8 +278,8 @@ log "Installing global npm packages..."
 npm install -g better-sqlite3 2>&1 | tail -3
 log "better-sqlite3 installed"
 
-mkdir -p /config/node_modules
-cd /config && npm install bcrypt 2>&1 | tail -3
+mkdir -p /config/.gmweb-deps
+cd /config/.gmweb-deps && npm install bcrypt 2>&1 | tail -3
 log "bcrypt installed"
 
 npm install -g agent-browser 2>&1 | tail -3

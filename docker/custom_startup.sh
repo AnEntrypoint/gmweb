@@ -293,7 +293,7 @@ chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
 log "Installing critical Node modules for AionUI..."
-mkdir -p /config/node_modules
+mkdir -p /config/.gmweb-deps
 export NPM_CONFIG_PREFIX=/config/usr/local
 
 # Install with timeout - fail hard if anything goes wrong
@@ -302,12 +302,12 @@ timeout 30 npm install -g better-sqlite3 2>&1 | tail -2 || {
   exit 1
 }
 
-cd /config && timeout 30 npm install bcrypt 2>&1 | tail -2 || {
+cd /config/.gmweb-deps && timeout 30 npm install bcrypt 2>&1 | tail -2 || {
   log "ERROR: bcrypt installation failed"
   exit 1
 }
 
-chown -R abc:abc /config/node_modules 2>/dev/null || true
+chown -R abc:abc /config/.gmweb-deps 2>/dev/null || true
 log "✓ Critical modules installed"
 
 log "Starting supervisor..."
