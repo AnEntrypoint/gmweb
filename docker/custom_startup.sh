@@ -243,18 +243,26 @@ fi
 # Clean up any stale old paths that might interfere
 rm -rf /usr/local/local 2>/dev/null || true
 
-# Verify symlink is correct
+# Verify symlink is correct - must use sudo to remove/create symlink
 if [ ! -L /usr/local ]; then
   log "WARNING: /usr/local is not a symlink, attempting to fix"
-  rm -rf /usr/local 2>/dev/null || true
-  ln -s /config/usr/local /usr/local
+  sudo rm -rf /usr/local 2>/dev/null || true
+  sudo ln -s /config/usr/local /usr/local || {
+    log "ERROR: Failed to create /usr/local symlink"
+    exit 1
+  }
+  log "✓ /usr/local symlink fixed"
 fi
 
 # Verify symlink target is correct
 SYMLINK_TARGET=$(readlink /usr/local 2>/dev/null)
 if [ "$SYMLINK_TARGET" != "/config/usr/local" ]; then
   log "WARNING: /usr/local symlink incorrect ($SYMLINK_TARGET), fixing to /config/usr/local"
-  rm -f /usr/local && ln -s /config/usr/local /usr/local
+  sudo rm -f /usr/local && sudo ln -s /config/usr/local /usr/local || {
+    log "ERROR: Failed to fix /usr/local symlink"
+    exit 1
+  }
+  log "✓ /usr/local symlink corrected"
 fi
 
 NVM_DIR=/config/nvm
