@@ -32,13 +32,22 @@ if [ -z "${PASSWORD}" ]; then
 else
   log "Using PASSWORD from env"
 fi
-# Generate hash and write htpasswd (use temporary file to avoid subshell issues with sudo)
+# Generate hash and write htpasswd (always use /dev/stdin to safely handle special chars)
 HASH=$(printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin)
+if [ -z "$HASH" ] || ! echo "$HASH" | grep -q "^\$apr1\$"; then
+  log "ERROR: Failed to generate valid apr1 hash for password"
+  exit 1
+fi
 echo "abc:$HASH" | sudo tee /etc/nginx/.htpasswd > /dev/null
 sudo chmod 644 /etc/nginx/.htpasswd
+# Verify htpasswd was written correctly
+if ! sudo grep -q "^abc:\$apr1\$" /etc/nginx/.htpasswd; then
+  log "ERROR: htpasswd file is invalid or not properly written"
+  exit 1
+fi
 sudo nginx -s reload 2>/dev/null || true
 export PASSWORD
-log "✓ HTTP Basic Auth configured"
+log "✓ HTTP Basic Auth configured with valid apr1 hash"
 
 # Clean up stale LD_PRELOAD from persistent .profile (can get stale from failed runs)
 if [ -f "$HOME_DIR/.profile" ]; then
