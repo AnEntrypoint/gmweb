@@ -108,9 +108,10 @@ if [ ! -d "$RUNTIME_DIR" ]; then
 fi
 
 # Fix npm cache and stale installs from persistent volume
+# Use sudo to handle any root-owned files from previous runs
 log "Cleaning persistent volume artifacts..."
-rm -rf /config/.npm 2>/dev/null || true
-rm -rf /config/node_modules/.bin/* 2>/dev/null || true
+sudo rm -rf /config/.npm 2>/dev/null || true
+sudo rm -rf /config/node_modules/.bin/* 2>/dev/null || true
 npm cache clean --force 2>/dev/null || true
 
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
@@ -198,7 +199,7 @@ sudo cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-availabl
 sudo nginx -s reload 2>/dev/null || true
 log "✓ Nginx config updated from git"
 
-[ -d "$HOME_DIR/.npm" ] && chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || mkdir -p "$HOME_DIR/.npm" && chown -R abc:abc "$HOME_DIR/.npm"
+sudo mkdir -p "$HOME_DIR/.npm" 2>/dev/null && sudo chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || true
 
 PROFILE_MARKER="$HOME_DIR/.gmweb-profile-setup"
 if [ ! -f "$PROFILE_MARKER" ]; then
