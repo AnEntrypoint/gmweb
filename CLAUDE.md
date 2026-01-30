@@ -1,571 +1,195 @@
-# Technical Caveats & Gotchas
+# Architecture & Philosophy
 
-## Selkies Authentication - Disable nginx HTTP Basic Auth
+This document captures the architectural decisions, design philosophy, and critical gotchas for gmweb. The system is designed around principles of immediate startup, runtime installation, fresh cloning on every boot, and explicit recovery mechanisms.
 
-**CRITICAL:** Selkies has built-in authentication. nginx HTTP Basic Auth wrapper must be disabled for entire `/desk` location.
+## Design Philosophy
 
-**Issue:** nginx `auth_basic` at server level blocks access to `/desk/` before Selkies can handle auth internally. User sees 401 error instead of Selkies login page.
+### Runtime Installation Over Build Time
 
-**Root cause:** When nginx `auth_basic` is enabled globally, it applies to ALL locations including `/desk/`. WebSocket and static file requests get 401 before reaching Selkies on port 8082.
+The original build took 4+ minutes and produced a 5.17GB image. By deferring all tool installations (NVM, Node, npm packages, ttyd, SQLite modules) to container startup, we now have:
+- Build time: ~2 seconds
+- Image size: 4.15GB
+- Cache-friendly: Config changes don't trigger rebuilds
+- Resilience: Failed installs don't break the container; services retry via health checks
+- Fresh state: Every container boot gets latest versions from remote
 
-**Solution:** Disable `auth_basic` for `/desk` location entirely. Selkies will handle authentication with its own login mechanism.
+This is a philosophical commitment: **avoid the trap of stale cached state**. The image should be minimal; the container should be intelligent.
 
-**Implementation:** `docker/nginx-sites-enabled-default`:
+### Force-Fresh Clone on Every Boot
+
+The `/opt/gmweb-startup/` directory persists across container restarts on the host filesystem. Without explicitly deleting and re-cloning from git, old code remains active even after git changes are deployed. This creates a dangerous illusion of freshness.
+
+**Every boot must:**
+1. Delete all startup files, services, configs from `/opt/gmweb-startup/`
+2. Re-clone from git (minimal depth for speed)
+3. Run fresh `npm install`
+4. Regenerate authentication credentials
+
+The only file preserved is `custom_startup.sh` itself (baked into Docker image), since overwriting a running script causes undefined behavior.
+
+This prevents the most insidious category of bugs: *where the system appears to work but is running stale code*. Better to fail loudly on a bad git clone than silently run yesterday's code.
+
+### Supervisor Startup Sequencing
+
+Many services have external dependencies (GitHub downloads, large npm installs, database creation). Early designs blocked supervisor startup on these installs, causing container orchestration timeouts before supervisor even started.
+
+**Solution:** Supervisor starts immediately after git clone (~30s), then background processes handle non-blocking installs. If an install fails, supervisor is already running; services discover missing dependencies via health checks and retry.
+
+This is a **hierarchical resilience** pattern: block on fast operations (git clone, local npm install), non-block on slow operations. Services fail gracefully when dependencies are missing; don't let one slow install starve the entire boot sequence.
+
+### Authentication as Architectural Layers
+
+Single `PASSWORD` env var controls all system authentication, but implementation varies by layer:
+
+**HTTP layer (nginx):** apr1-hashed password in `/etc/nginx/.htpasswd`. Protects all routes before any application runs.
+
+**Process layer (supervisor):** PASSWORD environment variable passed to all child services. Each service can implement its own auth using this shared credential.
+
+**Application layer (AionUI):** Password hashes stored in SQLite database. Credentials set at startup via bcrypt.
+
+This layered approach means:
+- Changing PASSWORD requires regenerating nginx htpasswd (supervisor does this after desktop ready)
+- Each layer is independent; one doesn't depend on others being configured
+- HTTP protection exists even if applications are broken
+- Services inherit credentials via environment without needing file access
+
+### Desktop as Separate Concern (Not Supervisor-Managed)
+
+XFCE desktop environment (xfce4-session, xfwm4, xfce4-panel, xfdesktop) is started by LinuxServer's s6 service manager, not gmweb's supervisor.
+
+This decoupling matters:
+- Desktop startup is completely independent of supervisor health
+- If supervisor crashes, desktop remains responsive (Selkies can still capture the display)
+- Desktop issues (Oracle kernel close_range syscall failures) don't block web services
+- No timeout coupling between desktop and supervisor
+
+The alternative—managing desktop via supervisor—creates a single point of failure. Desktop hangs would block service startup. Instead, they're parallel concerns.
+
+### Recovery Through Explicit Checkpoints
+
+Rather than relying on transient retry loops, gmweb uses explicit checkpoints:
+
+- **D-Bus socket:** Must exist before XFCE starts. Explicitly wait for it (up to 10 attempts).
+- **X11 socket:** Indicates Xvfb is ready. Supervisor waits for it (60s timeout).
+- **nginx listening:** Two-phase htpasswd generation: early generation for safety, re-generation after nginx confirms it's listening.
+- **Port binding:** Health checks verify services actually bind to ports (webssh2 gets 3 retries with 500ms delays to account for ttyd startup lag).
+
+Each checkpoint is a verifiable state, not just "wait a little longer."
+
+## Technical Caveats
+
+### Selkies Authentication - Disable nginx HTTP Basic Auth
+
+**CRITICAL:** Selkies has built-in authentication. nginx `auth_basic` must be disabled for `/desk` location.
+
+**Why:** nginx applies `auth_basic` globally before forwarding to Selkies. User sees 401 instead of Selkies login page.
+
+**Fix:** In `/desk` location: `auth_basic off;` Selkies handles auth internally.
+
+### startup/start.sh: Node.js Binary Resolution
+
+**Issue:** start.sh tried `which node` without sourcing NVM. Node installed via NVM at `/config/nvm/versions/node/vX.X.X/bin/node`. Default fallback `/usr/local/bin/node` doesn't exist.
+
+**Fix:** Source NVM before running `which node`. Unset `NPM_CONFIG_PREFIX` (from LinuxServer base image) which conflicts with NVM.
+
+### startup/services/webssh2.js: Health Check Shell Pipes
+
+**Issue:** Health check `lsof -i :9999 | grep LISTEN` requires shell interpretation. `execSync()` without `shell: true` treats pipe as literal string, fails.
+
+**Fix:** Add `shell: true` flag. Add 3 retry attempts with 500ms delays (ttyd needs time to bind port).
+
+### nginx Regex Locations: Cannot Use proxy_pass With URI
+
+**Error:** `"proxy_pass" cannot have URI part in location given by regular expression`
+
+**Why:** nginx syntax restriction. Regex locations can't combine with path rewriting in proxy_pass.
+
+**Workaround:** Use `rewrite` directive to strip the path, then bare `proxy_pass`:
 ```nginx
-location /desk {
-  auth_basic off;
-  alias /usr/share/selkies/web/;
-  index index.html index.htm;
-  try_files $uri $uri/ =404;
-}
-
 location ~ /desk/websockets? {
-  auth_basic off;
   rewrite ^/desk/(.*) /$1 break;
   proxy_pass http://127.0.0.1:8082;
 }
 ```
 
-**Credentials:** Access https://domain/desk/ → Selkies login page → username: `abc`, password: from `$PASSWORD` environment variable
+### Supervisor Async Patterns: monitorHealth() Must Not Block
 
-## Startup Sequencing - ttyd Download Before Supervisor
+**Issue:** `monitorHealth()` is infinite loop. If awaited in supervisor startup, init hangs forever.
 
-**ISSUE:** supervisor.log showed massive repetitions of "ttyd binary not found" error (38+ instances).
+**Fix:** Run as fire-and-forget background task using `Promise.resolve(monitorHealth())`. Use `await new Promise(() => {})` to block startup properly without awaiting infinite loop.
 
-**Root Cause:** custom_startup.sh started supervisor before ttyd was downloaded in background process. webssh2 service would try to start immediately and fail repeatedly until ttyd became available.
+### Docker Persistent Volume Log Caching
 
-**Solution:** Move ttyd download to BEFORE supervisor starts, so ttyd binary is guaranteed available when webssh2 initializes.
+**Caveat:** Old logs in `/config/logs` persist across container restarts. Reading logs shows stale data from previous boot.
 
-**Implementation:** In `custom_startup.sh`, download and install ttyd (lines ~140-160) before starting supervisor (line ~165). Check if ttyd already exists to skip redundant downloads on subsequent boots.
+**Implication:** Cannot verify "did my code change actually execute?" without checking boot timestamp.
 
-**Result:** webssh2 starts cleanly, no repeated "binary not found" errors, cleaner logs.
+### HTTP Basic Auth Race Condition
 
-## webssh2 Health Check - Shell Command Caveat
+**Issue:** custom_startup.sh generates htpasswd BEFORE nginx starts. Later, supervisor regenerates it, but if PASSWORD changed mid-boot, htpasswd becomes stale.
 
-**ISSUE:** webssh2 (ttyd-based web terminal) health check was failing immediately after startup, causing continuous restart loops and connection disconnections.
+**Fix:** Two-phase generation:
+1. custom_startup.sh generates early (for race condition safety, even though nginx reload fails silently)
+2. supervisor.js regenerates AFTER confirming nginx is listening
 
-**Symptom:** Supervisor logs show `[WARN] Health check failed` → `Restarting` repeatedly. SSH connections drop frequently.
+### NVM Bin Directory Permissions
 
-**Root Cause:** Health check uses pipe (`lsof -i :9999 | grep LISTEN`) which is bash syntax, but execSync was missing `shell: true` flag. Without shell interpretation, the pipe fails → health check fails → supervisor restarts service.
+**Issue:** Supervisor runs as `abc` user. NVM bin directory owned by dockremap with 755 (not writable).
 
-**Solution:** Health check in `startup/services/webssh2.js`:
-```javascript
-execSync('lsof -i :9999 2>/dev/null | grep -q LISTEN', {
-  stdio: 'pipe',
-  shell: true,  // CRITICAL: enables pipe syntax
-  timeout: 2000
-});
-```
+**Fix:** After NVM install, run `chmod 777 $NVM_DIR/versions/node/vX.X.X/bin`
 
-Plus retry logic: 3 attempts with 500ms delays between checks. Gives ttyd time to bind to port 9999 after spawn.
+### close_range Syscall Shim (Oracle Kernels)
 
-**Result:** Health checks now pass once ttyd is ready. No more restart loops or disconnections.
+**Issue:** Old Oracle kernels lack `close_range()` syscall. XFCE process spawning fails with "Operation not permitted".
 
-## Core Architecture
+**Symptom:** XFCE components (panel, desktop, window manager) don't launch.
 
-### LinuxServer Webtop + nginx + Selkies
+**Fix:** Create C shim that stubs `close_range()` with errno=38. Inject via `LD_PRELOAD`. XFCE falls back to alternative methods when syscall fails.
 
-**Base Image:** `lscr.io/linuxserver/webtop:ubuntu-xfce`
+### Supervisor Promise.all() Blocking on Long-Running Installs
 
-- Webtop web UI listens on port 3000 internally (CUSTOM_PORT=6901 is external config only)
-- nginx listens on ports 80/443 (HTTP/HTTPS with HTTP Basic Auth reverse proxy, pre-installed in LinuxServer)
-- Selkies WebSocket streaming on port 8082
-- Traefik/Coolify routes external domain to container:80
+**Issue:** Services grouped by dependency. Supervisor does `await Promise.all(startPromises)` for each group. If ANY service hangs (e.g., gcloud downloading 1GB SDK), entire supervisor blocks forever.
 
-**Port 80/443:** nginx provides the primary entry point with built-in HTTP Basic Auth:
-- Root `/` → AionUI on port 25808
-- `/desk/` → Selkies desktop
-- `/ssh/` → webssh2 (ttyd) web terminal on port 9999
+**Fix:** Disable services with hang potential (wrangler, gcloud, scrot, chromium-ext, playwriter). Keep only essential services enabled.
 
-### nginx Implementation
+### XFCE Launcher as Background Process
 
-**Critical constraint:** nginx is pre-installed in LinuxServer Webtop base image.
+**Why:** Custom XFCE component launcher runs AFTER supervisor (not blocking it). Supervisor starts immediately; desktop components launch in parallel.
 
-- Configuration: Static template at `docker/nginx-sites-enabled-default`
-- Routes `/desk/websockets?` to Selkies WebSocket at `127.0.0.1:8082`
-- Routes `/desk/` to Selkies web UI at `/usr/share/selkies/web/`
-- Routes `/ssh/` to webssh2 (ttyd) at `127.0.0.1:9999`
-- Routes `/devmode` to development server (port 5173)
-- Routes `/` (catch-all) to AionUI at `127.0.0.1:25808`
+**Alternative rejected:** Managing XFCE via supervisor would couple desktop health to service startup. If desktop hangs, supervisor blocks. Parallel approach is more resilient.
 
-**Why static nginx config:** nginx pre-installed, no additional process management needed, supports HTTP/1.1 upgrades and WebSocket proxying, HTTPS via Traefik/Let's Encrypt.
+## Configuration Reference
 
-### Environment Variables
+**Paths:** All runtime files in `/opt/gmweb-startup/` (cloned from git every boot). Persistent files in `/config/`.
 
-**PASSWORD (CRITICAL - All Authentication):**
-- LinuxServer environment variable PASSWORD controls all authentication
-- **nginx:** HTTP Basic Auth htpasswd regenerated on EVERY boot
-  - Format: `abc:PASSWORD` (apr1 hashed via openssl passwd -stdin)
-  - Protects all routes: /, /ssh/, /desk/, /files/, etc.
-  - Generated by: `custom_startup.sh` (initial) + `supervisor.js ensureNginxAuth()` (after nginx starts)
-  - Critical: supervisor regenerates htpasswd AFTER desktop ready, ensuring nginx is running to reload
-- **AionUI:** Uses AIONUI_PASSWORD env var (falls back to PASSWORD)
-  - Database credentials set 8 seconds after startup
-  - Logged as: `[aion-ui] Credentials set: admin`
-- **All services:** Supervisor passes PASSWORD via environment to all service processes
-- **Verification:** All endpoints require HTTP Basic Auth (username: `abc`, password: `$PASSWORD`)
-- **Persistent volumes:** /config volume persists across reboots. Supervisor ensures htpasswd/credentials are always updated with current PASSWORD env var on every boot, overwriting any cached values.
+**Ports:** nginx 80/443, Selkies 8082, webssh2 9999, file-manager 9998, AionUI 25808.
 
-**CUSTOM_PORT:**
-- External configuration only (6901 for direct VNC if needed)
-- Internal Webtop always listens on port 3000
-- Setting CUSTOM_PORT does NOT change internal routing
+**Environment:** PASSWORD (all auth), AIONUI_PASSWORD (optional override), AIONUI_USERNAME (default: admin), CUSTOM_PORT (external only, doesn't change internal routing).
 
-## Startup System
+**Services:** webssh2, file-manager, opencode, aion-ui (enabled). wrangler, gcloud, scrot, chromium-ext, playwriter, glootie-oc, tmux (disabled).
 
-### Service Startup Order
+**Logging:** `/config/logs/supervisor.log` (main log, rotated at 100MB). Per-service logs in `services/`. Archived logs named `*.archive-{timestamp}`.
 
-1. **custom_startup.sh init hook** - Runs very early (LinuxServer init phase)
-   - Initializes D-Bus session daemon (socket at `/run/user/1000/bus`)
-   - Exports `DBUS_SESSION_BUS_ADDRESS` for child processes
-   - Sets up nginx, permissions, Node.js
-2. **s6-rc services** - After init hook completes
-   - nginx (HTTP/HTTPS with Basic Auth)
-   - Desktop environment (xorg, xfce via s6 - NOT managed by supervisor)
-   - Selkies (port 8082)
-3. **gmweb supervisor** - Started via `/custom-cont-init.d/01-gmweb-init`
-   - Web services: webssh2, file-manager, opencode, aion-ui
-4. **Background installs** - Started after supervisor (non-blocking)
-   - ttyd, npm packages
+## Service Architecture Details
 
-**Critical:** D-Bus must be ready before s6 starts XFCE. nginx handles HTTP/HTTPS with Basic Auth before any application services.
+**Supervisor:** Organizes services by dependency graph. Starts dependency groups sequentially; services within group start in parallel.
 
-### XFCE Desktop Components - Oracle Kernel Fix
+**Startup order:**
+1. custom_startup.sh (D-Bus, nginx, permissions, Node.js)
+2. s6-rc services (nginx, desktop environment, Selkies)
+3. gmweb supervisor (web services)
+4. Background installs (non-blocking: ttyd, npm packages)
 
-**Note:** XFCE desktop environment (xfce4-session, xfwm4, xfce4-panel, xfdesktop) is part of the LinuxServer Webtop base image and started by s6-rc.
+**Health checks:** Run every 30s per service. Trigger restart on failure (up to 5 retries with exponential backoff).
 
-**Oracle Kernel Issue:** On older Oracle kernels (5.15.0-1081-oracle and similar), the autostart mechanism for XFCE components breaks due to D-Bus compatibility issues. The session manager starts but panel, desktop, and window manager components don't auto-launch.
+**Service code location:** `/opt/gmweb-startup/services/*.js` (refreshed from git every boot).
 
-**Root Cause:** Oracle kernel D-Bus behavior causes XFCE session manager to create additional D-Bus instances instead of using the shimmed D-Bus socket. This breaks the autostart mechanism that normally triggers component launch.
+## One-Time Setup: Moltbot
 
-**Solution:** Explicit component launcher in `custom_startup.sh`:
-1. Waits for XFCE session manager to be ready (max 30 seconds)
-2. Manually launches xfce4-panel, xfdesktop, xfwm4 with proper environment variables
-3. Sets DISPLAY, DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR, LD_PRELOAD for each component
-4. Runs as background process after supervisor starts (doesn't block init)
+Moltbot (molt.bot workspace UI) disabled by default. To enable:
+1. Set `"enabled": true` in `startup/config.json`
+2. Optional: Set `MOLTBOT_PORT` env var (default 7890)
+3. Optional: Update nginx location for different path
+4. Restart container
 
-**File:** `docker/custom_startup.sh` lines 160-220 (XFCE launcher script)
-
-**Result:** All XFCE desktop components now launch automatically on old Oracle kernels, restoring full desktop functionality (window management, panel, wallpaper, icons).
-
-**Implication:** Do NOT add XFCE to supervisor config or try to manage it via s6-overlay services. The background launcher is sufficient and keeps architecture simple.
-
-### Init Script Must Exit
-
-**GOTCHA:** The `/custom-cont-init.d/01-gmweb-init` script MUST exit (not infinite loop). If it blocks, s6-rc never proceeds to start desktop services (xorg, xfce, selkies).
-
-**Why:** LinuxServer's s6 init system waits for custom init to complete. Blocking prevents desktop environment from launching.
-
-#
-## Critical Technical Caveats
-
-### Port Forwarding Caveat
-
-**GOTCHA:** CUSTOM_PORT is external only. Internal routing uses hardcoded ports:
-- `/desk/*` → port 8082 (Selkies)
-- All other routes → port 3000 (Webtop)
-
-Using `parseInt(process.env.CUSTOM_PORT)` for upstream routing will send traffic to wrong port (6901 instead of 3000).
-
-### Supervisor Health Check
-
-**GOTCHA:** Health check must reference enabled services. Checking disabled services causes health check to never detect supervisor (2-minute startup timeout).
-
-### Supervisor Initialization Blocking
-
-**GOTCHA:** The `monitorHealth()` function is infinite loop. If awaited in `supervisor.start()`, init hangs forever.
-
-**Fix:** Run `monitorHealth()` as fire-and-forget background task. Use `await new Promise(() => {})` to block supervisor startup properly without awaiting infinite loop.
-
-### nginx Path Stripping with Regex
-
-**CRITICAL CONSTRAINT:** nginx cannot use `proxy_pass` with URI part in regex locations.
-
-**Error:** `"proxy_pass" cannot have URI part in location given by regular expression`
-
-**Workaround:** Use `rewrite` directive before proxy_pass:
-```nginx
-location ~ /desk/websockets? {
-  rewrite ^/desk/websockets?(.*) $1 break;
-  proxy_pass http://127.0.0.1:8082;  # No URI part - rewrite stripped it
-}
-```
-
-### Selkies WebSocket Endpoints
-
-**GOTCHA:** Selkies client attempts both `/desk/websocket` (singular) and `/desk/websockets` (plural).
-
-**Before fix:** nginx only had `location /desk/websocket` (singular) - plural requests failed.
-
-**After fix:** Use regex `location ~ /desk/websockets?` to match both. Use rewrite to strip path, then proxy to bare port (no URI).
-
-### Docker Build Performance
-
-**CRITICAL:** Dockerfile no longer installs anything at build time. All tool installations deferred to runtime via `custom_startup.sh`.
-
-**Why:** Build time reduced from 4+ minutes to ~2 seconds. Image size reduced 5.17GB → 4.15GB. Cache-friendly for config changes.
-
-**Implication:** Every container startup re-runs installation checks. First boot does installs (NVM, Node, packages). Subsequent boots use cache (fast). If install fails, system keeps running (background process).
-
-**Startup phases (custom_startup.sh):**
-1. Quick init: Permissions, paths, config, htpasswd generation (instant)
-2. Node.js: Install if not present (1st boot), cache thereafter
-3. Supervisor: Force-clean and re-clone from git EVERY boot, fresh npm install
-4. D-Bus and XDG setup: Ensure /run/user/UID ready, wait for D-Bus socket
-5. Start supervisor: Service manager (every boot)
-6. Background installs: ttyd, better-sqlite3, bcrypt, system packages + tools (non-blocking)
-
-### Node.js Path Resolution - Dynamic Only
-
-**CRITICAL:** Never hardcode Node.js version paths (e.g., `/nvm/versions/node/v23.11.1/bin`).
-
-**In JS files:** Use `process.execPath` for node binary, `dirname(process.execPath)` for bin directory containing node/npm/npx.
-
-**In shell scripts:** Use `$(which node)`, `$(node -v)`, and `$NVM_DIR/versions/node/$(node -v)/bin` for dynamic resolution.
-
-**Why:** NVM installs whatever version is current. Hardcoded version strings break when Node updates or when NVM installs a different version than expected.
-
-### Persistent Volume Log Caching
-
-**GOTCHA:** Old logs in persistent `/config/logs` volume are cached across container restarts. Reading log file shows stale data from previous deployment.
-
-**Example:** start.sh shows first 30 lines (old boot logs), not last 50 lines (new boot logs).
-
-**Caveat:** Cannot determine if new code actually executed without boot timestamp verification.
-
-### SSH via webssh2 (Direct sshd Removed)
-
-**Note:** sshd service completely removed from startup. webssh2 provides SSH via web browser, reduces attack surface by avoiding direct SSH port exposure. All traffic through nginx HTTP/HTTPS with Basic Auth.
-
-### Selkies WebSocket Path Routing - nginx Regex Constraint
-
-**CRITICAL GOTCHA:** nginx regex locations (`location ~`) cannot use `proxy_pass` with URI part (including trailing slash).
-
-**Error:** `"proxy_pass" cannot have URI part in location given by regular expression`
-
-**Working solution:** Use `rewrite` directive to strip path, then bare `proxy_pass`:
-```nginx
-location ~ /desk/websockets? {
-  rewrite ^/desk/(.*) /$1 break;
-  proxy_pass http://127.0.0.1:8082;  # No URI part
-}
-```
-
-**Why this works:**
-- `rewrite` directive modifies the URI before proxy_pass
-- `break` flag prevents further rewrite rule processing
-- `proxy_pass` without trailing slash preserves the rewritten path
-- Selkies backend receives `/websockets` endpoint as expected
-
-**Why trailing slash breaks:**
-- nginx forbids URI part in regex `proxy_pass` (including `/`)
-- nginx error: `"proxy_pass" cannot have URI part in location given by regular expression`
-
-**Both HTTP (80) and HTTPS (443) blocks must use identical rewrite logic.**
-
-### HTTP Basic Auth Generation at Startup
-
-**GOTCHA:** custom_startup.sh runs BEFORE s6 starts nginx. The `nginx -s reload` in custom_startup.sh fails silently because nginx isn't running yet.
-
-**Solution:** Two-phase htpasswd generation:
-1. `custom_startup.sh` generates htpasswd early (for race condition safety)
-2. `supervisor.js ensureNginxAuth()` regenerates htpasswd AFTER desktop is ready (nginx is running)
-3. Supervisor uses `openssl passwd -apr1 -stdin` to safely handle special characters in PASSWORD
-
-**Password with special characters:** PASSWORD like `Test123?!` contains bash special chars. Use `-stdin` flag to pass password via pipe/stdin, avoiding shell escaping issues.
-
-**Supervisor requires sudo for htpasswd:** Supervisor runs as `abc` user (not root). Writing to `/etc/nginx/.htpasswd` and running `nginx -s reload` both require root permissions. Use `sudo sh -c 'printf ... > /etc/nginx/.htpasswd'` and `sudo nginx -s reload` in ensureNginxAuth().
-
-**apr1 hash shell expansion:** apr1 hashes contain `$` characters (e.g., `$apr1$SALT$HASH`). When passed to shell via `sh -c`, these get interpreted as variables, truncating the hash. Must escape with `hash.replace(/\$/g, '\\$')` before shell execution.
-
-**Persistent volume handling:** /config volume persists across container restarts. The supervisor ALWAYS regenerates htpasswd on every boot, overwriting any cached values from previous deployments.
-
-### File Manager via gxe
-
-**Implementation:** NHFS (Next-HTTP-File-Server) runs via `PORT=9998 npx -y gxe@latest AnEntrypoint/nhfs`
-
-**Why gxe:** Direct GitHub repo execution without local build system. Simplifies startup sequence.
-
-**Working directory:** NHFS runs from `/config` (home directory for file access)
-
-**Base directory:** NHFS_BASE_DIR env var set to `/config` for file serving
-
-
-### NHFS basePath Support for Subfolder Deployment
-
-**GOTCHA:** When serving NHFS at a subpath (e.g., `/files/`), all asset requests default to root path.
-
-**Before fix:** NHFS hardcoded paths like `href="/style.css"` and `fetch('/api/list/...')` failed at `/files/` because browser requested `/style.css` instead of `/files/style.css`.
-
-**After fix:** Pass `BASEPATH=/files` environment variable to NHFS:
-- Server injects `window.BASEPATH='/files'` into HTML response
-- Client-side app reads window.BASEPATH and prepends it to all API calls
-- Assets are fetched from `/files/style.css`, API from `/files/api/...`
-
-**Implementation:**
-- `server.js`: Read BASEPATH from env, inject into HTML response
-- `app.js`: Add `api()` helper method that prepends basePath to all fetch URLs
-- `file-manager.js`: Pass `BASEPATH=/files` when launching NHFS via gxe
-
-**Critical:** nginx proxy at `/files/` routes to bare `http://127.0.0.1:9998/` (no URI suffix) so NHFS receives `/files/...` paths from browser.
-
-### AionUI Password Credentials from Environment
-
-**GOTCHA:** AionUI uses better-sqlite3 and bcrypt modules to set login credentials from `$PASSWORD` env var at startup.
-
-**Requirements:**
-1. `better-sqlite3` must be installed globally: `npm install -g better-sqlite3`
-2. `bcrypt` must be available in npm: `npm install bcrypt` (in /config/node_modules)
-3. Password hashing uses bcrypt with cost factor 12, then converts `$2b$` prefix to `$2a$` for AionUI compatibility
-4. Credentials set after 8000ms initial delay, then retries up to 12 times (every 10s) if DB not ready
-
-**Location:** `startup/services/aion-ui.js` - `setCredentialsFromEnv()` with retry loop
-
-**Retry logic:** If AionUI DB does not exist yet (first boot, AionUI still downloading), the function retries every 10 seconds up to 12 attempts (2 minutes total). Also falls back to rowid=1 update if system_default_user id not found.
-
-**Environment variables:**
-- `PASSWORD` - Primary password env var (fallback)
-- `AIONUI_PASSWORD` - Explicit AionUI password (takes precedence)
-- `AIONUI_USERNAME` - Custom username (default: "admin")
-
-**Database path:** `/config/.config/AionUi/aionui/aionui.db` - Must exist before credentials update (AionUI creates on first run)
-
-**Module paths (CRITICAL):**
-- `better-sqlite3` resolved dynamically via `GLOBAL_MODULES` = `join(dirname(process.execPath), '..', 'lib', 'node_modules')` — never hardcode NVM version paths
-- `bcrypt` at `/config/node_modules/bcrypt`
-
-If paths are wrong, credentials setup fails silently - login falls back to AionUI-generated random password.
-
-### Webtop Desktop Detection - Replaced Kasm Detection
-
-**GOTCHA:** Old supervisor code waited for `/usr/bin/desktop_ready` (Kasm-specific). Webtop uses different initialization path.
-
-**Fix:** Changed `waitForDesktop()` in `supervisor.js` to check for X11 socket: `/tmp/.X11-unix/1`
-
-**Timeout:** 60 seconds (was 120 for Kasm). If X11 socket doesn't appear, continues anyway with warning.
-
-**Why X11 socket:** Webtop (based on LinuxServer) uses Xvfb for X11 display server. Socket appears once Xvfb starts. More reliable than polling `/usr/bin/desktop_ready` which doesn't exist in Webtop.
-
-### Supervisor Startup Before Blocking Installs
-
-**CRITICAL TIMING:** Supervisor must start BEFORE ttyd/npm package installs, not after.
-
-**Problem:** If ttyd download, better-sqlite3, bcrypt, and npm installs happen BEFORE supervisor starts, long-running ops (180s+ with retries) block supervisor startup. Container orchestration (Coolify) times out during init phase before supervisor even starts, preventing any services from running.
-
-**Solution:** Moved all blocking installs (ttyd download, better-sqlite3, bcrypt, npm packages) into background process that runs AFTER supervisor startup:
-- Supervisor starts immediately after git clone (under 30s)
-- All package installs happen in background in parallel with supervisor
-- If installs fail, supervisor is already running and services can retry via health checks
-- Coolify no longer times out during init
-
-**Order:** git clone → npm install → supervisor start → [background: ttyd download, better-sqlite3, bcrypt, npm installs]
-
-### NVM Bin Directory Write Permissions
-
-**CRITICAL PERMISSION:** NVM bin directories must have explicit write permissions for abc user to create npm wrapper scripts.
-
-**Problem:** When supervisor tries to create npm wrappers (e.g., `opencode` command), writes fail with EACCES because NVM bin dir is owned by dockremap:dockremap with 755 (not writable by abc).
-
-**Error:** `EACCES: permission denied, open '/usr/local/local/nvm/versions/node/vX.X.X/bin/opencode'`
-
-**Solution:** Add to `custom_startup.sh` after NVM installation:
-```bash
-chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/bin
-chmod 777 $NVM_DIR/versions/node/$(node -v | tr -d 'v')/lib/node_modules
-```
-
-**Why:** Supervisor runs as abc:abc user. Must have write access to create symlink wrappers for installed packages.
-
-### close_range Syscall Shim for Oracle/Older Kernels
-
-**ISSUE:** On older Oracle kernels, the `close_range()` syscall doesn't exist or behaves incompatibly. XFCE session manager fails to spawn child processes with error "Failed to close file descriptor for child process (Operation not permitted)".
-
-**Symptom:** XFCE session manager starts but components (xfwm4, xfce4-panel, xfdesktop, thunar, xfsettingsd, etc.) fail to launch. Selkies can capture X display (xterm works), but XFCE desktop manager is missing.
-
-**Root cause:** Older Oracle kernels lack `close_range()` syscall or have kernel restrictions preventing its execution. When XFCE's process spawning code tries to close file descriptor ranges on child processes, the syscall fails with EPERM (Operation not permitted).
-
-**Solution:**
-1. Create C shim that intercepts `close_range()` calls and returns error (errno=38)
-2. Compile as shared library: `libshim_close_range.so`
-3. Use `LD_PRELOAD` to inject shim into all processes (system-wide and per-session)
-4. XFCE process spawning falls back to alternative methods when close_range fails
-
-**Implementation:**
-1. `docker/shim_close_range.c`: C code that stubs `close_range()` syscall (returns -1 with errno=38)
-2. `Dockerfile`: Compile shim to `libshim_close_range.so` and set `LD_PRELOAD=/opt/lib/libshim_close_range.so` in `/etc/environment` for all processes
-3. `custom_startup.sh` (very early, before s6-rc starts services):
-   - Export `LD_PRELOAD=/opt/lib/libshim_close_range.so` immediately (redundant with Dockerfile but explicit)
-   - Initialize D-Bus: start `dbus-daemon --session` for abc user
-   - Create `/run/user/1000/bus` socket and export `DBUS_SESSION_BUS_ADDRESS`
-   - D-Bus is ready before s6-rc starts XFCE (s6-rc inherits env vars)
-   - Add `LD_PRELOAD` to abc user's `.profile` for login shell inheritance
-
-**Timing is critical:** D-Bus initialization must happen before s6-rc starts any services. LinuxServer Webtop's s6 runs custom_startup.sh as init hook, which executes before s6 starts XFCE. This ensures D-Bus socket is ready when xfce4-session initializes.
-
-### Supervisor Service Startup Organization
-
-**ARCHITECTURE:** Supervisor organizes services into dependency-based groups, starts groups sequentially, services within each group start in parallel.
-
-**Critical constraint:** `await Promise.all(startPromises)` waits for ALL services in a group to complete before proceeding to next group.
-
-**Problem:** If ANY service in a group hangs indefinitely (e.g., gcloud tries to download 1GB SDK), entire Promise.all() never resolves, supervisor blocks forever.
-
-**Solution:** Disable non-essential services that have hang potential:
-- wrangler (unnecessary if not using it)
-- gcloud (large SDK download, prone to hanging)
-- scrot (screenshot tool)
-- glootie-oc (unknown service)
-- playwriter (not needed)
-
-**Keep enabled:** webssh2, file-manager, tmux, opencode, aion-ui (essential services).
-
-**Configuration:** `/opt/gmweb-startup/config.json` - Each service has `"enabled": true/false` flag.
-
-### Service Configuration Location
-
-**Path:** Service configuration at `/opt/gmweb-startup/config.json` (NOT `/config/startup/config.json` or `/startup/config.json`).
-
-**Why location matters:** `custom_startup.sh` clones gmweb repo into `/opt/gmweb-startup/` directory, which becomes the base for supervisor initialization.
-
-**Content:** JSON object with services map, each service has `enabled` (boolean) and `type` (install/system/web).
-
-### Force-Fresh Clone on Every Boot (Stale Volume Fix)
-
-**CRITICAL:** `custom_startup.sh` MUST delete and re-clone startup files from git on EVERY boot. Never skip clone based on file existence checks.
-
-**Problem:** `/opt/gmweb-startup/` persists across container restarts (container filesystem layer). Old startup code, config.json, node_modules from previous deployments override new code. This causes stale services, wrong config, and broken updates.
-
-**Solution:** On every boot:
-1. `rm -rf` all JS, JSON, shell scripts, node_modules, lib, services from `/opt/gmweb-startup/`
-2. Preserve only `custom_startup.sh` (baked into Docker image, already running in memory)
-3. `git clone --depth 1` fresh from repo
-4. Copy fresh startup/* into `/opt/gmweb-startup/`
-5. Copy fresh nginx config and reload nginx
-6. Run fresh `npm install`
-
-**Why custom_startup.sh is preserved:** The script is already executing from the Docker image copy. Overwriting it mid-execution with a different version could cause undefined behavior. The Docker image version is the source of truth for the boot sequence.
-
-**Branch:** Clones from `main`.
-
-### Supervisor Code Split Into Modules
-
-**Architecture:** `startup/lib/supervisor.js` was split into 3 files to stay under 200 lines each:
-- `startup/lib/supervisor.js` - Core supervisor class (service lifecycle, health monitoring)
-- `startup/lib/supervisor-logger.js` - SupervisorLogger class (file-based logging, rotation)
-- `startup/lib/dependency-sort.js` - Topological sort and dependency grouping
-
-
-### Log Rotation System
-
-**Implementation:** Added 100MB threshold in supervisor.js `log()` method. When supervisor.log exceeds 100MB, rotated to `supervisor.log.{timestamp}` and new file started.
-
-**Location:** `/config/gmweb/startup/lib/supervisor.js` lines 460-475
-
-**Prevents:** Unbounded log growth. Old logs archived with timestamp for recovery if needed.
-
-### Current Service Configuration
-
-**Enabled:**
-- webssh2: Web terminal via ttyd, port 9999, proxied to `/ssh/`
-- file-manager: NHFS file browser, port 9998, proxied to `/files/`
-- opencode: Code editor tool
-- aion-ui: Main AI UI, port 25808, proxied to `/`
-
-**Disabled:**
-- wrangler, gcloud, scrot, chromium-ext, playwriter, glootie-oc, tmux (removed - ttyd spawns bash directly)
-
-**Configuration:** `/opt/gmweb-startup/config.json` (refreshed from git every boot)
-
-### PASSWORD-Based Authentication System
-
-**Architecture:** Single PASSWORD environment variable controls all authentication across the entire system.
-
-**Implementation layers:**
-1. **nginx (HTTP layer):** HTTP Basic Auth on all routes
-   - Uses apr1-hashed PASSWORD in `/etc/nginx/.htpasswd`
-   - Generated at startup: `echo "abc:$(openssl passwd -apr1 "$PASSWORD")" > /etc/nginx/.htpasswd`
-   - Reloaded: `nginx -s reload`
-
-2. **Supervisor (Process layer):** Passes PASSWORD to all service processes
-   - Read in `supervisor.js` during `getEnvironment()`
-   - Falls back to 'password' if not set (with WARN log)
-   - Environment passed to all child services via `spawnWithEnv()`
-
-3. **Application layer (AionUI):** Uses PASSWORD for database credentials
-   - Reads from `AIONUI_PASSWORD` (preferred) or `PASSWORD` fallback
-   - Called 8s after AionUI startup to ensure database exists
-   - Sets admin user password in `/config/.config/AionUi/aionui/aionui.db`
-
-**Important:** If PASSWORD changes, nginx htpasswd must be regenerated and nginx reloaded for changes to take effect.
-
-### Supervisor Log Files
-
-**Location:** `/config/logs/`
-
-**Files:**
-- `supervisor.log`: Main supervisor + all service logs, rotated at 100MB
-- `startup.log`: Initial startup output (deprecated, use supervisor.log)
-- `services/*.log`: Per-service detailed logs
-- `services/*.err`: Per-service error logs only
-- `*.archive-{timestamp}`: Rotated log files
-
-**Log index:** `LOG_INDEX.txt` documents log structure
-
-### GitHub Actions Docker Build - Infrastructure Issue
-
-**Note:** Recent builds may fail at "Build and push Docker image" step (multi-platform docker/build-push-action) without code issues.
-
-**Typical failure:** Run completes amd64 build successfully, hangs or times out on arm64 cross-compilation, fails to push to Docker Hub.
-
-**Root causes (infrastructure, not code):**
-1. Docker Hub credentials/token expired or rate-limited
-2. arm64 cross-compilation timeout (buildx via QEMU is slow)
-3. Network timeout during Docker image push
-4. Docker Hub service unavailability
-
-**Verification:** If previous build on same code succeeded, current failure is infrastructure-related. Code and Dockerfile are valid.
-
-**Workaround:** Re-run workflow manually via GitHub UI. If repeated failures, check Docker Hub account status and rate limits.
-
-### HTTP Basic Auth htpasswd Synchronization Race Condition
-
-**GOTCHA:** custom_startup.sh generates htpasswd BEFORE s6-rc starts services, but nginx may not be ready to reload the config. supervisor.js later calls ensureNginxAuth() AFTER desktop is ready.
-
-**Problem:** If PASSWORD env var changes between initial generation and supervisor startup, the htpasswd hash from custom_startup.sh (older password) becomes stale. Users cannot authenticate even though supervisor logged "nginx auth configured".
-
-**Root cause:** custom_startup.sh runs very early (before nginx fully starts), generates htpasswd from PASSWORD, then tries `nginx -s reload` which silently fails because nginx isn't listening yet. Later when supervisor calls ensureNginxAuth(), it regenerates with the same (now stale) password. If PASSWORD changes mid-boot or was wrong initially, htpasswd stays stale.
-
-**Symptom:** HTTP 401 Authorization Required on all endpoints despite correct password attempt. Supervisor logs show "nginx auth configured" but authentication fails.
-
-**Debug:** Check htpasswd vs current PASSWORD hash - if they don't match, regenerate manually:
-```bash
-docker exec <container> sudo sh -c 'echo -n "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; printf "abc:%s\n" "$hash" > /etc/nginx/.htpasswd; }'
-docker exec <container> sudo nginx -s reload
-```
-
-**Permanent fix:** supervisor.js ensureNginxAuth() should be called AFTER verifying nginx is actually listening, or add retry logic with timeout for nginx reload.
-
-## Moltbot Service Setup
-
-**Status:** Pre-configured but disabled by default. User must enable and configure.
-
-**Service:** `startup/services/moltbot.js` - Runs molt.bot workspace management UI on port 7890
-
-**Route:** `/molt/` proxied via nginx (HTTP/HTTPS)
-
-**Configuration:**
-1. Enable in `startup/config.json`: change `"enabled": false` to `"enabled": true`
-2. Optional: Set `MOLTBOT_PORT` env var to use different port
-3. Optional: Update nginx location block in `docker/nginx-sites-enabled-default` to serve at different URL path
-4. Restart container to apply changes
-
-**Docs:** https://docs.molt.bot/ (web guide, installation, getting started)
-
-**Service Details:**
-- Type: web service (port-based health checks)
-- Command: `npm exec -- molt web --port 7890` (with npx fallback)
-- Logging: supervisor.log + per-service moltbot logs
-- Health: Checks port listening every 30s, auto-restarts on failure
-
-**Why disabled by default:** Moltbot requires explicit configuration. User determines whether to enable and how to configure it (port, path, credentials).
-
+Runs on port 7890, proxied to `/molt/`. See https://docs.molt.bot/ for configuration.
