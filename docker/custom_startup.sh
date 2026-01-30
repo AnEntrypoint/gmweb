@@ -408,7 +408,7 @@ log "XFCE component launcher started (PID: $!)"
 
 {
   apt-get update
-  apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
+  apt-get install -y --no-install-recommends git curl lsof sudo gh 2>&1 | tail -3 || apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
 
