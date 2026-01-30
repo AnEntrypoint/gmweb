@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import os from 'os';
 
 const PORT = 25808;
-const AIONUI_DIR = '/opt/AionUi';
+const AIONUI_DIR = '/config/workspace/aionui';
 const AIONUI_BINARY = join(AIONUI_DIR, 'AionUi');
 const DEB_PATH = '/tmp/aionui-latest.deb';
 const NODE_BIN_DIR = dirname(process.execPath);
@@ -70,8 +70,12 @@ async function downloadAndInstallAionUI() {
   installationInProgress = true;
   try {
     execSync(`sudo mkdir -p ${AIONUI_DIR}`);
-    if (existsSync(AIONUI_BINARY)) { markComplete(); return true; }
+    // Always check for updates, do not exit early if binary exists
+    // if (existsSync(AIONUI_BINARY)) { markComplete(); return true; }
+    
+    // Check if we already have the latest deb downloaded
     if (existsSync(DEB_PATH) && extractDeb()) { markComplete(); return true; }
+    
     const url = getLatestDebUrl();
     console.log(`[aion-ui-install] Downloading: ${url}`);
     for (let i = 1; i <= 3; i++) {
@@ -104,8 +108,11 @@ async function setCredentialsFromEnv(attempt = 0) {
 
   try {
     const require = createRequire(import.meta.url);
-    const Database = require('better-sqlite3');
-    const bcrypt = require('bcrypt');
+    // Use explicit paths to avoid resolution issues
+    let Database, bcrypt;
+    try { Database = require('/config/usr/local/lib/node_modules/better-sqlite3'); } catch (e) { Database = require('better-sqlite3'); }
+    try { bcrypt = require('/config/.gmweb-deps/node_modules/bcrypt'); } catch (e) { bcrypt = require('bcrypt'); }
+    
     const dbPath = '/config/.config/AionUi/aionui/aionui.db';
 
     if (!existsSync(dbPath)) {
@@ -157,14 +164,14 @@ export default {
       console.log('[aion-ui] Timeout waiting for installations, starting anyway');
     }
 
-    if (existsSync(AIONUI_BINARY)) { markComplete(); }
-    else { downloadAndInstallAionUI().catch(e => console.log(`[aion-ui-install] ${e.message}`)); }
+    try { execSync(`sudo rm -rf ${AIONUI_DIR} ${DEB_PATH} 2>/dev/null || true`); } catch (e) {}
+    downloadAndInstallAionUI().catch(e => console.log(`[aion-ui-install] ${e.message}`));
     try { execSync('rm -rf /config/.config/AionUi/Singleton* 2>/dev/null || true'); } catch (e) {}
     try { execSync('pkill -f AionUi || true'); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
     const serviceEnv = { ...env, DISPLAY: ':1', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus', AIONUI_PORT: String(PORT), AIONUI_ALLOWED_ORIGINS: '*' };
     // Source bash profile to ensure AionUI has full CLI context (opencode, npm packages, etc.)
     // Start in /config directory so AionUI treats it as home for file access
-    const command = `cd /config && source /config/.profile && source /config/.bashrc 2>/dev/null || true && /opt/AionUi/AionUi --no-sandbox --webui --remote --port ${PORT}`;
+    const command = `cd /config && source /config/.profile && source /config/.bashrc 2>/dev/null || true && ${AIONUI_BINARY} --no-sandbox --webui --remote --port ${PORT}`;
     const ps = spawnAsAbcUser(command, serviceEnv);
     ps.stdout?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation')) console.log(`[aion-ui] ${m}`); });
     ps.stderr?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation') && !m.includes('GPU process')) console.log(`[aion-ui:err] ${m}`); });

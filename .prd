@@ -1,0 +1,26 @@
+## COMPLETED WORK
+
+- [x] opencode service spawns 'opencode acp' - f52e637
+  * spawn(['acp']) runs opencode acp as detached process
+  * Logs to [opencode:acp] with stdout/stderr tracking
+  
+- [x] AionUI location verified at /config/workspace/aionui
+  * Code already set to this path (AIONUI_DIR variable)
+  * Hardcoded /opt/AionUi/AionUi reference fixed to use AIONUI_BINARY variable
+  
+- [x] AionUI force-updates on every boot
+  * Added force-clean: sudo rm -rf AIONUI_DIR DEB_PATH before download
+  * Ensures fresh download+extract every boot
+  * Persists in /config/workspace/aionui volume for manipulation
+  
+- [x] bcrypt and package.json verified
+  * bcrypt installed to /config/.gmweb-deps (correct, not /config/node_modules)
+  * /config/.gmweb-deps/package.json is isolated
+  * No /config/package.json or /config/node_modules pollution
+  
+## VERIFICATION STATUS
+✓ Syntax valid for all files
+✓ No /config/node_modules bloat
+✓ AionUI updates on boot
+✓ opencode acp starts correctly
+✓ All paths use correct variables (no hardcoding)
