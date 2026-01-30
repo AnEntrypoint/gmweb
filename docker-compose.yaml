@@ -29,3 +29,5 @@ services:
 volumes:
   gmweb-config:
     driver: local
+  gmweb-local:
+    driver: local
