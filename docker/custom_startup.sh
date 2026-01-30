@@ -204,9 +204,7 @@ BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
 if [ ! -f "$BASHRC_MARKER" ]; then
   cat >> "$HOME_DIR/.bashrc" << 'EOF'
 export NVM_DIR="/config/nvm"
-export NPM_CONFIG_PREFIX="/config/usr/local"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-export PATH="$(dirname "$(which node 2>/dev/null || echo /config/usr/local/bin/node)"):/config/usr/local/bin:$PATH"
 EOF
   touch "$BASHRC_MARKER"
 fi
@@ -214,8 +212,8 @@ fi
 grep -q 'NVM_DIR=/config/nvm' "$HOME_DIR/.profile" || \
   cat >> "$HOME_DIR/.profile" << 'PROFILE_EOF'
 export NVM_DIR="/config/nvm"
-export NPM_CONFIG_PREFIX="/config/usr/local"
 export LD_PRELOAD=/opt/lib/libshim_close_range.so
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 PROFILE_EOF
 
 # Add temp directory configuration to profile (prevents EXDEV errors in Claude plugin installation)
@@ -230,47 +228,13 @@ TMPDIR_EOF
 
 log "Phase 1 complete"
 
-# MIGRATION: Handle transition from old paths to new persistent paths
 log "Verifying persistent path structure..."
-mkdir -p /config/usr/local/lib /config/usr/local/bin /config/nvm /config/.tmp /config/logs
-chmod 755 /config/usr/local /config/usr/local/lib /config/usr/local/bin /config/nvm /config/.tmp /config/logs 2>/dev/null || true
-
-# If old NVM exists in /usr/local/local, migrate it
-if [ -d "/usr/local/local/nvm" ] && [ ! -e "/config/nvm/nvm.sh" ]; then
-  log "Migrating NVM from /usr/local/local/nvm to /config/nvm"
-  rm -rf /config/nvm && mv /usr/local/local/nvm /config/nvm 2>/dev/null || true
-fi
-# Clean up any stale old paths that might interfere
-rm -rf /usr/local/local 2>/dev/null || true
-
-# Verify symlink is correct - must use sudo to remove/create symlink
-if [ ! -L /usr/local ]; then
-  log "WARNING: /usr/local is not a symlink, attempting to fix"
-  sudo rm -rf /usr/local 2>/dev/null || true
-  sudo ln -s /config/usr/local /usr/local || {
-    log "ERROR: Failed to create /usr/local symlink"
-    exit 1
-  }
-  log "✓ /usr/local symlink fixed"
-fi
-
-# Verify symlink target is correct
-SYMLINK_TARGET=$(readlink /usr/local 2>/dev/null)
-if [ "$SYMLINK_TARGET" != "/config/usr/local" ]; then
-  log "WARNING: /usr/local symlink incorrect ($SYMLINK_TARGET), fixing to /config/usr/local"
-  sudo rm -f /usr/local && sudo ln -s /config/usr/local /usr/local || {
-    log "ERROR: Failed to fix /usr/local symlink"
-    exit 1
-  }
-  log "✓ /usr/local symlink corrected"
-fi
+mkdir -p /config/nvm /config/.tmp /config/logs
+chmod 755 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
 
 NVM_DIR=/config/nvm
 export NVM_DIR
 log "Persistent paths ready: NVM_DIR=$NVM_DIR"
-
-# Don't set NPM_CONFIG_PREFIX yet - NVM rejects it
-# Source NVM first, then set it after NVM is initialized
 if ! command -v node &>/dev/null; then
   mkdir -p "$NVM_DIR"
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
@@ -284,29 +248,9 @@ else
 fi
 
 . "$NVM_DIR/nvm.sh"
-export NPM_CONFIG_PREFIX=/config/usr/local
-export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:/config/usr/local/bin:$PATH"
-
-# Configure npm globally (write with proper error handling)
-mkdir -p /etc/npm 2>/dev/null || true
-# Configure npm with sudo (needs root permissions)
-sudo sh -c "echo 'prefix = /config/usr/local' > /etc/npmrc" 2>/dev/null || log "WARNING: Could not write /etc/npmrc"
-
-# Set npm environment in /etc/environment for all shell sessions (safe append, use sudo)
-[ -f /etc/environment ] && grep -q 'NVM_DIR=/config/nvm' /etc/environment || sudo sh -c "echo 'NVM_DIR=/config/nvm' >> /etc/environment" 2>/dev/null || true
-[ -f /etc/environment ] && grep -q 'NPM_CONFIG_PREFIX' /etc/environment || sudo sh -c "echo 'NPM_CONFIG_PREFIX=/config/usr/local' >> /etc/environment" 2>/dev/null || true
 
 NODE_VERSION=$(node -v | tr -d 'v')
-NODE_BIN_DIR="$NVM_DIR/versions/node/v$NODE_VERSION/bin"
 log "Node.js $NODE_VERSION (NVM_DIR=$NVM_DIR)"
-
-mkdir -p /config/usr/local/bin
-for bin in node npm npx; do
-  ln -sf "$NODE_BIN_DIR/$bin" /config/usr/local/bin/$bin
-done
-chmod 777 "$NODE_BIN_DIR"
-chmod 777 "$NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules" 2>/dev/null || true
-chmod 777 /config/usr/local/bin 2>/dev/null || true
 
 log "Setting up supervisor..."
 # Clean up temp clone dir
@@ -417,7 +361,6 @@ log "XFCE launcher script prepared"
 
 log "Installing critical Node modules for AionUI..."
 mkdir -p /config/.gmweb-deps
-export NPM_CONFIG_PREFIX=/config/usr/local
 
 # Install with timeout - fail hard if anything goes wrong
 timeout 30 npm install -g better-sqlite3 2>&1 | tail -2 || {
