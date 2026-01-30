@@ -50,7 +50,7 @@ RUN mkdir -p /etc/nginx/sites-available && \
     cp /tmp/nginx-sites-enabled-default /etc/nginx/sites-available/default
 
 # Copy custom startup script as init hook
-COPY docker/custom_startup.sh /custom-cont-init.d/01-gmweb-startup
-RUN chmod +x /custom-cont-init.d/01-gmweb-startup
+COPY docker/custom_startup.sh /custom-cont-init.d/01-gmweb-startup.sh
+RUN chmod +x /custom-cont-init.d/01-gmweb-startup.sh
 
 EXPOSE 80 443

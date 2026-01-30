@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-export LD_PRELOAD=/opt/lib/libshim_close_range.so
-
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 
@@ -18,6 +16,26 @@ log() {
 
 BOOT_ID="$(date '+%s')-$$"
 log "===== GMWEB STARTUP (boot: $BOOT_ID) ====="
+
+# Compile close_range shim if not present (for raw webtop deployments)
+if [ ! -f /opt/lib/libshim_close_range.so ]; then
+  log "Compiling close_range shim..."
+  mkdir -p /opt/lib
+  cat > /tmp/shim_close_range.c << 'SHIMEOF'
+#define _GNU_SOURCE
+#include <errno.h>
+
+int close_range(unsigned int first, unsigned int last, int flags) {
+    errno = 38;
+    return -1;
+}
+SHIMEOF
+  gcc -fPIC -shared /tmp/shim_close_range.c -o /opt/lib/libshim_close_range.so 2>&1 | tail -2
+  rm /tmp/shim_close_range.c
+  log "✓ Shim compiled"
+fi
+
+export LD_PRELOAD=/opt/lib/libshim_close_range.so
 
 ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
 ABC_GID=$(id -g abc 2>/dev/null || echo 1000)
