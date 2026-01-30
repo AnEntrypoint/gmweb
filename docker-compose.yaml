@@ -9,10 +9,8 @@ x-bake:
 
 services:
   gmweb:
-    build:
-      context: .
-      args:
-        BUILD_DATE: ${BUILD_DATE:-unknown}
+    image: lscr.io/linuxserver/webtop:ubuntu-xfce
+    command: bash -c "curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmweb/main/startup.sh | bash"
     environment:
       - PUID=1000
       - PGID=1000

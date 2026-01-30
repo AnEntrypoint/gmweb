@@ -1,26 +1,41 @@
-## COMPLETED WORK
+## COMPLETED: ELIMINATE DOCKERFILE MAINTENANCE
 
-- [x] opencode service spawns 'opencode acp' - f52e637
-  * spawn(['acp']) runs opencode acp as detached process
-  * Logs to [opencode:acp] with stdout/stderr tracking
-  
-- [x] AionUI location verified at /config/workspace/aionui
-  * Code already set to this path (AIONUI_DIR variable)
-  * Hardcoded /opt/AionUi/AionUi reference fixed to use AIONUI_BINARY variable
-  
-- [x] AionUI force-updates on every boot
-  * Added force-clean: sudo rm -rf AIONUI_DIR DEB_PATH before download
-  * Ensures fresh download+extract every boot
-  * Persists in /config/workspace/aionui volume for manipulation
-  
-- [x] bcrypt and package.json verified
-  * bcrypt installed to /config/.gmweb-deps (correct, not /config/node_modules)
-  * /config/.gmweb-deps/package.json is isolated
-  * No /config/package.json or /config/node_modules pollution
-  
-## VERIFICATION STATUS
-✓ Syntax valid for all files
-✓ No /config/node_modules bloat
-✓ AionUI updates on boot
-✓ opencode acp starts correctly
-✓ All paths use correct variables (no hardcoding)
+### PHASE 1: CREATE UNIFIED STARTUP SCRIPT ✓
+- [x] Created /startup.sh combining all logic
+  * 276 lines, includes Dockerfile setup + install.sh + custom_startup.sh
+  * All 7 phases present: setup, packages, D-Bus, nginx, Node.js, supervisor, background
+  * Bash syntax verified
+
+### PHASE 2: UPDATE DOCKERFILE ✓
+- [x] Minimized to 3 lines: FROM lscr.io/linuxserver/webtop:ubuntu-xfce + EXPOSE
+- [x] Removed all RUN commands (moved to startup.sh)
+- [x] Removed custom init hook setup (using docker-compose command instead)
+
+### PHASE 3: UPDATE DOCKER-COMPOSE ✓
+- [x] Changed to use lscr.io/linuxserver/webtop:ubuntu-xfce directly (no build)
+- [x] Added command: bash -c "curl ... startup.sh | bash"
+- [x] All volumes and environment preserved
+- [x] No build section needed
+
+### PHASE 4: VERIFY ✓
+- [x] startup.sh syntax valid
+- [x] All phases present in startup.sh
+- [x] nginx auth configured FIRST (before services)
+- [x] Supervisor startup blocking
+- [x] Background tasks non-blocking (CLI tools, ttyd)
+- [x] Git clone from https://github.com/AnEntrypoint/gmweb/main
+
+### KEY BENEFITS
+✓ No Dockerfile maintenance needed
+✓ startup.sh is single source of truth
+✓ Can be called directly from GitHub in docker-compose
+✓ All updates happen at runtime (no image rebuild)
+✓ nginx routing configured before services start
+✓ Desktop starts without waiting for background installs
+✓ System is idempotent - can restart safely
+
+### REMOVED FILES/LOGIC
+- docker/custom_startup.sh (logic merged into startup.sh)
+- Most Dockerfile RUN commands (logic merged into startup.sh)
+- docker/install.sh (logic merged into startup.sh)
+- custom-cont-init.d setup (using docker-compose command instead)
