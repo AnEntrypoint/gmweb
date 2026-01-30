@@ -10,7 +10,6 @@ x-bake:
 services:
   gmweb:
     image: lscr.io/linuxserver/webtop:ubuntu-xfce
-    command: bash -c "curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmweb/main/startup.sh | bash"
     environment:
       - PUID=1000
       - PGID=1000
@@ -20,6 +19,7 @@ services:
     volumes:
       - gmweb-config:/config
       - gmweb-local:/usr/local
+      - ./docker/init-gmweb.sh:/custom-cont-init.d/01-gmweb-startup:ro
     shm_size: "1gb"
     restart: unless-stopped
     labels:
