@@ -32,8 +32,9 @@ if [ -z "${PASSWORD}" ]; then
 else
   log "Using PASSWORD from env"
 fi
-# Use sudo to write htpasswd (nginx needs root permissions)
-printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; sudo sh -c "printf 'abc:%s\n' \"$hash\" > /etc/nginx/.htpasswd"; }
+# Generate hash and write htpasswd (use temporary file to avoid subshell issues with sudo)
+HASH=$(printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin)
+echo "abc:$HASH" | sudo tee /etc/nginx/.htpasswd > /dev/null
 sudo chmod 644 /etc/nginx/.htpasswd
 sudo nginx -s reload 2>/dev/null || true
 export PASSWORD
