@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, copyFileSync } from 'fs';
 import { join } from 'path';
 
 const NAME = 'proxypilot';
-const PP_DIR = '/opt/proxypilot';
+const PP_DIR = '/config/proxypilot';
 const PP_BIN = join(PP_DIR, 'proxypilot');
 const REPO_URL = 'https://github.com/Finesssee/ProxyPilot.git';
 const GIT_TAG = 'v6.6.99';
