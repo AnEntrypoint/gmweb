@@ -109,16 +109,28 @@ else
   log "WARNING: D-Bus socket not ready"
 fi
 
-log "Phase 1: Git clone - get startup files and nginx config"
+log "Phase 1: Git clone - get startup files and nginx config (minimal history)"
 rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
        /opt/gmweb-startup/services /opt/gmweb-startup/package* \
        /opt/gmweb-startup/*.js /opt/gmweb-startup/*.json /opt/gmweb-startup/*.sh 2>/dev/null || true
 
 mkdir -p /opt/gmweb-startup
-git clone --depth 1 --single-branch --branch main https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3
+
+# Clone with minimal history and data - much faster
+# --depth 1: no history
+# --filter=blob:none: only get tree/commit objects, fetch blobs on demand (even smaller)
+# --single-branch: only main branch
+timeout 120 git clone --depth 1 --filter=blob:none --single-branch --branch main \
+  https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3
+
+if [ ! -d /tmp/gmweb/startup ]; then
+  log "ERROR: Git clone failed, startup files missing"
+  exit 1
+fi
+
 cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
 cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
-log "✓ Startup files cloned"
+log "✓ Startup files cloned (minimal)"
 
 log "Phase 2: Configure nginx HTTP Basic Auth + routing (FIRST - /desk must be accessible)"
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
@@ -220,12 +232,13 @@ fi
 export NPM_CONFIG_PREFIX=/config/usr/local
 export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:/config/usr/local/bin:$PATH"
 
-# Configure npm globally
-echo 'prefix = /config/usr/local' > /etc/npmrc
+# Configure npm globally (write with proper error handling)
+mkdir -p /etc/npm 2>/dev/null || true
+echo 'prefix = /config/usr/local' > /etc/npmrc 2>/dev/null || log "WARNING: Could not write /etc/npmrc"
 
-# Set npm environment in /etc/environment for all shell sessions
-grep -q 'NVM_DIR=/config/nvm' /etc/environment || echo 'NVM_DIR=/config/nvm' >> /etc/environment
-grep -q 'NPM_CONFIG_PREFIX' /etc/environment || echo 'NPM_CONFIG_PREFIX=/config/usr/local' >> /etc/environment
+# Set npm environment in /etc/environment for all shell sessions (safe append)
+[ -f /etc/environment ] && grep -q 'NVM_DIR=/config/nvm' /etc/environment || echo 'NVM_DIR=/config/nvm' >> /etc/environment 2>/dev/null || true
+[ -f /etc/environment ] && grep -q 'NPM_CONFIG_PREFIX' /etc/environment || echo 'NPM_CONFIG_PREFIX=/config/usr/local' >> /etc/environment 2>/dev/null || true
 
 NODE_VERSION=$(node -v | tr -d 'v')
 NODE_BIN_DIR="$NVM_DIR/versions/node/v$NODE_VERSION/bin"
