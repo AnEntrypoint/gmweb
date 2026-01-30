@@ -49,8 +49,12 @@ COPY docker/nginx-sites-enabled-default /tmp/nginx-sites-enabled-default
 RUN mkdir -p /etc/nginx/sites-available && \
     cp /tmp/nginx-sites-enabled-default /etc/nginx/sites-available/default
 
-# Copy custom startup script as init hook
-COPY docker/custom_startup.sh /custom-cont-init.d/01-gmweb-startup.sh
-RUN chmod +x /custom-cont-init.d/01-gmweb-startup.sh
+# Copy init wrapper that can find and execute custom_startup.sh
+COPY docker/init-wrapper.sh /custom-cont-init.d/01-gmweb-init
+RUN chmod +x /custom-cont-init.d/01-gmweb-init
+
+# Also copy custom_startup.sh to image (for Dockerfile deployments)
+COPY docker/custom_startup.sh /custom-cont-init.d/custom_startup.sh
+RUN chmod +x /custom-cont-init.d/custom_startup.sh
 
 EXPOSE 80 443
