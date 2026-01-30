@@ -16,10 +16,7 @@ services:
       - PGID=1000
       - TZ=${TZ:-Etc/UTC}
       - PASSWORD=${PASSWORD:-password}
-      - CUSTOM_PORT=6901
-      - CUSTOM_HTTPS_PORT=6902
       - FILE_MANAGER_PATH=/config/Desktop
-      - SUBFOLDER=/desk/
     volumes:
       - gmweb-config:/config
       - gmweb-local:/usr/local
