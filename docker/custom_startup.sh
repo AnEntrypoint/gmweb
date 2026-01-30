@@ -120,17 +120,32 @@ mkdir -p /opt/gmweb-startup
 # --depth 1: no history
 # --filter=blob:none: only get tree/commit objects, fetch blobs on demand (even smaller)
 # --single-branch: only main branch
-timeout 120 git clone --depth 1 --filter=blob:none --single-branch --branch main \
-  https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3
+CLONE_RETRY=0
+CLONE_MAX_RETRY=3
+while [ $CLONE_RETRY -lt $CLONE_MAX_RETRY ]; do
+  rm -rf /tmp/gmweb 2>/dev/null || true
+  if timeout 120 git clone --depth 1 --filter=blob:none --single-branch --branch main \
+    https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3; then
+    if [ -d /tmp/gmweb/startup ]; then
+      log "✓ Git clone succeeded (attempt $((CLONE_RETRY + 1))/$CLONE_MAX_RETRY)"
+      break
+    fi
+  fi
+  CLONE_RETRY=$((CLONE_RETRY + 1))
+  if [ $CLONE_RETRY -lt $CLONE_MAX_RETRY ]; then
+    log "WARNING: Git clone failed, retrying (attempt $((CLONE_RETRY + 1))/$CLONE_MAX_RETRY)..."
+    sleep $((CLONE_RETRY * 5))
+  fi
+done
 
 if [ ! -d /tmp/gmweb/startup ]; then
-  log "ERROR: Git clone failed, startup files missing"
+  log "ERROR: Git clone failed after $CLONE_MAX_RETRY attempts, startup files missing"
   exit 1
 fi
 
 cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
 cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
-log "✓ Startup files cloned (minimal)"
+log "✓ Startup files copied to /opt/gmweb-startup"
 
 log "Phase 2: Configure nginx HTTP Basic Auth + routing (FIRST - /desk must be accessible)"
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
