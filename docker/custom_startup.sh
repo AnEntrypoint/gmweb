@@ -30,20 +30,39 @@ int close_range(unsigned int first, unsigned int last, int flags) {
     return -1;
 }
 SHIMEOF
-  gcc -fPIC -shared /tmp/shim_close_range.c -o /opt/lib/libshim_close_range.so 2>&1 | tail -2
+  gcc -fPIC -shared /tmp/shim_close_range.c -o /tmp/libshim_close_range.so 2>&1 | tail -2
+  # Use sudo to move shim to /opt/lib if we don't have write permission
+  if [ -w /opt/lib ]; then
+    mv /tmp/libshim_close_range.so /opt/lib/libshim_close_range.so
+  else
+    sudo mv /tmp/libshim_close_range.so /opt/lib/libshim_close_range.so 2>/dev/null || {
+      log "WARNING: Could not move shim to /opt/lib, using /tmp location"
+      export SHIM_PATH=/tmp/libshim_close_range.so
+    }
+  fi
   rm /tmp/shim_close_range.c
   log "✓ Shim compiled"
 fi
 
-export LD_PRELOAD=/opt/lib/libshim_close_range.so
+# Set LD_PRELOAD to use shim from either /opt/lib or /tmp
+if [ -f /opt/lib/libshim_close_range.so ]; then
+  export LD_PRELOAD=/opt/lib/libshim_close_range.so
+elif [ -f /tmp/libshim_close_range.so ]; then
+  export LD_PRELOAD=/tmp/libshim_close_range.so
+  log "Using shim from /tmp (LD_PRELOAD=$LD_PRELOAD)"
+fi
 
 ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
 ABC_GID=$(id -g abc 2>/dev/null || echo 1000)
 RUNTIME_DIR="/run/user/$ABC_UID"
 
-mkdir -p "$RUNTIME_DIR"
-chmod 700 "$RUNTIME_DIR"
-chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR"
+# Create or fix permissions on runtime directory
+if [ ! -d "$RUNTIME_DIR" ]; then
+  # Try to create as current user first, fall back to sudo
+  mkdir -p "$RUNTIME_DIR" 2>/dev/null || sudo mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
+  [ -d "$RUNTIME_DIR" ] && chmod 700 "$RUNTIME_DIR" 2>/dev/null || sudo chmod 700 "$RUNTIME_DIR" 2>/dev/null || true
+  [ -d "$RUNTIME_DIR" ] && chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR" 2>/dev/null || sudo chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR" 2>/dev/null || true
+fi
 
 # Fix npm cache and stale installs from persistent volume
 log "Cleaning persistent volume artifacts..."
