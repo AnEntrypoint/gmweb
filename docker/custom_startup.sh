@@ -92,8 +92,8 @@ else
   log "✓ Shim already exists at /opt/lib/libshim_close_range.so"
 fi
 
-# NOW set LD_PRELOAD - shim is guaranteed to exist
-export LD_PRELOAD=/opt/lib/libshim_close_range.so
+# NOTE: LD_PRELOAD only set for XFCE/desktop components below, not globally
+# (Global LD_PRELOAD breaks shell pipes and command execution)
 
 ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
 ABC_GID=$(id -g abc 2>/dev/null || echo 1000)
