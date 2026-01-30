@@ -21,6 +21,10 @@ server {
     return 301 /molt/;
   }
 
+  location = /proxypilot.html {
+    return 301 /proxypilot/management.html;
+  }
+
   location /_next/ {
     proxy_pass http://127.0.0.1:9998/files/_next/;
     proxy_set_header Host $host;
@@ -182,6 +186,10 @@ server {
 
   location = /molt {
     return 301 /molt/;
+  }
+
+  location = /proxypilot.html {
+    return 301 /proxypilot/management.html;
   }
 
   location /_next/ {
