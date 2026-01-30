@@ -150,6 +150,37 @@ sudo rm -rf /config/.npm 2>/dev/null || true
 sudo rm -rf /config/node_modules/.bin/* 2>/dev/null || true
 npm cache clean --force 2>/dev/null || true
 
+# Create global npm configuration to prevent permission issues
+# Use a cache directory and set proper permissions
+mkdir -p /config/.npm
+sudo chown -R abc:abc /config/.npm 2>/dev/null || true
+sudo chmod -R 755 /config/.npm 2>/dev/null || true
+
+cat > /tmp/npmrc << 'NPMRC_EOF'
+cache=/config/.npm
+prefix=/config/usr/local
+NPMRC_EOF
+sudo cp /tmp/npmrc /etc/npmrc 2>/dev/null || true
+rm -f /tmp/npmrc
+
+# Create npm wrapper script that ensures cache consistency
+mkdir -p /config/usr/local/bin
+cat > /config/usr/local/bin/npm-wrapper << 'WRAPPER_EOF'
+#!/bin/bash
+# NPM wrapper - ensures cache permissions before running npm
+sudo chown -R abc:abc /config/.npm 2>/dev/null || true
+exec /config/usr/local/bin/npm.real "$@"
+WRAPPER_EOF
+chmod +x /config/usr/local/bin/npm-wrapper
+
+# Backup original npm and create wrapper
+if [ -f /config/usr/local/bin/npm ] && [ ! -f /config/usr/local/bin/npm.real ]; then
+  sudo mv /config/usr/local/bin/npm /config/usr/local/bin/npm.real 2>/dev/null || true
+  sudo ln -sf /config/usr/local/bin/npm-wrapper /config/usr/local/bin/npm 2>/dev/null || true
+fi
+
+log "✓ npm configuration and wrapper set"
+
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
 
