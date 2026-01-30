@@ -9,7 +9,10 @@ x-bake:
 
 services:
   gmweb:
-    image: lscr.io/linuxserver/webtop:ubuntu-xfce
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gmweb:latest
     environment:
       - PUID=1000
       - PGID=1000
@@ -19,8 +22,6 @@ services:
     volumes:
       - gmweb-config:/config
       - gmweb-local:/usr/local
-      - ./docker/99-gmweb-startup.sh:/custom-cont-init.d/99-gmweb-startup.sh:ro
-      - ./docker/custom_startup.sh:/tmp/gmweb/custom_startup.sh:ro
     shm_size: "1gb"
     restart: unless-stopped
     labels:

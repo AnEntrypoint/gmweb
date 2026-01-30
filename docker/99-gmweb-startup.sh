@@ -1,30 +1,21 @@
 #!/bin/bash
-# LinuxServer init shim - mounts to /etc/cont-init.d/ or /custom-cont-init.d/
-# Executes custom_startup.sh from mounted location or downloads from GitHub
+# LinuxServer init script - executes GMWeb custom_startup.sh
+# Follows https://docs.linuxserver.io/general/container-customization/
 
 set -e
 
-echo "[init-shim] GMWeb startup shim starting..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Try multiple locations for custom_startup.sh
-if [ -f /tmp/gmweb/custom_startup.sh ]; then
-  echo "[init-shim] Found custom_startup.sh at /tmp/gmweb/custom_startup.sh"
-  exec bash /tmp/gmweb/custom_startup.sh
+echo "[gmweb-init] GMWeb initialization starting at $(date)"
+
+# Try to find and execute custom_startup.sh in same directory or /tmp
+if [ -f "$SCRIPT_DIR/custom_startup.sh" ]; then
+  echo "[gmweb-init] Found custom_startup.sh at $SCRIPT_DIR/custom_startup.sh, executing..."
+  exec bash "$SCRIPT_DIR/custom_startup.sh"
 elif [ -f /tmp/custom_startup.sh ]; then
-  echo "[init-shim] Found custom_startup.sh at /tmp/custom_startup.sh"
+  echo "[gmweb-init] Found custom_startup.sh at /tmp/custom_startup.sh, executing..."
   exec bash /tmp/custom_startup.sh
-elif [ -f /docker/custom_startup.sh ]; then
-  echo "[init-shim] Found custom_startup.sh at /docker/custom_startup.sh"
-  exec bash /docker/custom_startup.sh
 else
-  # Download from GitHub as last resort
-  echo "[init-shim] Downloading custom_startup.sh from GitHub..."
-  mkdir -p /tmp/gmweb
-  if curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmweb/main/docker/custom_startup.sh -o /tmp/gmweb/custom_startup.sh; then
-    chmod +x /tmp/gmweb/custom_startup.sh
-    exec bash /tmp/gmweb/custom_startup.sh
-  else
-    echo "[init-shim] ERROR: Could not find or download custom_startup.sh"
-    exit 1
-  fi
+  echo "[gmweb-init] ERROR: custom_startup.sh not found"
+  exit 1
 fi
