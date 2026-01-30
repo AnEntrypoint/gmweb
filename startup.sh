@@ -57,67 +57,19 @@ fi
 
 grep -q 'LD_PRELOAD=/opt/lib/libshim_close_range.so' /etc/environment || echo 'LD_PRELOAD=/opt/lib/libshim_close_range.so' >> /etc/environment
 
-log "Phase 2: System packages (from install.sh)"
-
-apt-get update -qq 2>/dev/null || true
-apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates jq wget \
-  software-properties-common apt-transport-https gnupg openssh-server openssh-client tmux lsof \
-  chromium chromium-sandbox scrot xclip \
-  libgbm1 libgtk-3-0 libnss3 libxss1 libasound2 libatk-bridge2.0-0 \
-  libdrm2 libxcomposite1 libxdamage1 libxrandr2 2>&1 | tail -5
-
-echo "${ABC_UID}:${ABC_GID} ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null 2>&1 || true
-
-sudo mkdir -p /run/sshd
-sudo sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config || true
-sudo sed -i 's/^UsePAM.*/UsePAM no/' /etc/ssh/sshd_config || true
-sudo /usr/bin/ssh-keygen -A 2>/dev/null || true
-
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
-echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-apt-get update -qq && apt-get install -y --no-install-recommends gh 2>&1 | tail -3
-
-rm -rf /var/lib/apt/lists/*
-log "✓ System packages installed"
-
-log "Phase 3: Initialize D-Bus and environment"
-
-rm -rf /config/.npm 2>/dev/null || true
-rm -rf /config/node_modules/.bin/* 2>/dev/null || true
-npm cache clean --force 2>/dev/null || true
-
-export XDG_RUNTIME_DIR="$RUNTIME_DIR"
-export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
-
-SAFE_TMPDIR="$HOME_DIR/.tmp"
-mkdir -p "$SAFE_TMPDIR"
-chmod 700 "$SAFE_TMPDIR"
-chown abc:abc "$SAFE_TMPDIR"
-export TMPDIR="$SAFE_TMPDIR"
-export TMP="$SAFE_TMPDIR"
-export TEMP="$SAFE_TMPDIR"
-
-find "$SAFE_TMPDIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
-find "$SAFE_TMPDIR" -maxdepth 1 -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
-
-rm -f "$RUNTIME_DIR/bus"
-pkill -u abc dbus-daemon 2>/dev/null || true
-
-sudo -u abc DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
-  dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --print-address 2>/dev/null &
-DBUS_DAEMON_PID=$!
-
-for i in {1..10}; do
-  if [ -S "$RUNTIME_DIR/bus" ]; then
-    log "D-Bus session ready (attempt $i/10)"
-    break
-  fi
-  sleep 0.5
-done
-
-log "Phase 4: nginx HTTP Basic Auth + routing (CRITICAL - BEFORE services start)"
+log "Phase 2: nginx HTTP Basic Auth + routing (CRITICAL - FIRST)"
 
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+if [ -z "${PASSWORD}" ]; then
+  PASSWORD="password"
+  log "Using default PASSWORD"
+else
+  log "Using PASSWORD from environment"
+fi
+
+printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin 2>/dev/null | { read hash; printf 'abc:%s\n' "$hash" > /etc/nginx/.htpasswd; }
+chmod 644 /etc/nginx/.htpasswd
 
 log "Downloading nginx config from GitHub..."
 curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmweb/main/docker/nginx-sites-enabled-default -o /etc/nginx/sites-available/default 2>/dev/null || {
@@ -162,20 +114,69 @@ server {
 NGINX_EOF
 }
 
-if [ -z "${PASSWORD}" ]; then
-  PASSWORD="password"
-  log "Using default PASSWORD"
-else
-  log "Using PASSWORD from environment"
-fi
-
-printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin 2>/dev/null | { read hash; printf 'abc:%s\n' "$hash" > /etc/nginx/.htpasswd; }
-chmod 644 /etc/nginx/.htpasswd
 sleep 1
 nginx -s reload 2>/dev/null || nginx &>/dev/null &
 log "✓ nginx routing + HTTP Basic Auth configured (user: abc)"
 
 export PASSWORD
+
+log "Phase 3: System packages (from install.sh)"
+
+apt-get update -qq 2>/dev/null || true
+apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates jq wget \
+  software-properties-common apt-transport-https gnupg openssh-server openssh-client tmux lsof \
+  chromium chromium-sandbox scrot xclip \
+  libgbm1 libgtk-3-0 libnss3 libxss1 libasound2 libatk-bridge2.0-0 \
+  libdrm2 libxcomposite1 libxdamage1 libxrandr2 2>&1 | tail -5
+
+echo "${ABC_UID}:${ABC_GID} ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null 2>&1 || true
+
+sudo mkdir -p /run/sshd
+sudo sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config || true
+sudo sed -i 's/^UsePAM.*/UsePAM no/' /etc/ssh/sshd_config || true
+sudo /usr/bin/ssh-keygen -A 2>/dev/null || true
+
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
+echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+apt-get update -qq && apt-get install -y --no-install-recommends gh 2>&1 | tail -3
+
+rm -rf /var/lib/apt/lists/*
+log "✓ System packages installed"
+
+log "Phase 4: Initialize D-Bus and environment"
+
+rm -rf /config/.npm 2>/dev/null || true
+rm -rf /config/node_modules/.bin/* 2>/dev/null || true
+npm cache clean --force 2>/dev/null || true
+
+export XDG_RUNTIME_DIR="$RUNTIME_DIR"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
+
+SAFE_TMPDIR="$HOME_DIR/.tmp"
+mkdir -p "$SAFE_TMPDIR"
+chmod 700 "$SAFE_TMPDIR"
+chown abc:abc "$SAFE_TMPDIR"
+export TMPDIR="$SAFE_TMPDIR"
+export TMP="$SAFE_TMPDIR"
+export TEMP="$SAFE_TMPDIR"
+
+find "$SAFE_TMPDIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
+find "$SAFE_TMPDIR" -maxdepth 1 -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
+
+rm -f "$RUNTIME_DIR/bus"
+pkill -u abc dbus-daemon 2>/dev/null || true
+
+sudo -u abc DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+  dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --print-address 2>/dev/null &
+DBUS_DAEMON_PID=$!
+
+for i in {1..10}; do
+  if [ -S "$RUNTIME_DIR/bus" ]; then
+    log "D-Bus session ready (attempt $i/10)"
+    break
+  fi
+  sleep 0.5
+done
 
 log "Phase 5: Node.js and supervisor setup"
 
@@ -208,23 +209,53 @@ fi
 if ! command -v node &>/dev/null; then
   log "Installing Node.js via NVM..."
   mkdir -p "$NVM_DIR"
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
+
+  # Download NVM with error checking
+  if ! curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh 2>/dev/null | bash 2>&1 | tail -5; then
+    log "ERROR: NVM installation failed"
+    exit 1
+  fi
+
+  # Source NVM
+  if [ ! -f "$NVM_DIR/nvm.sh" ]; then
+    log "ERROR: NVM script not found after installation"
+    exit 1
+  fi
+
   . "$NVM_DIR/nvm.sh"
-  nvm install --lts 2>&1 | tail -5
+
+  # Install Node.js
+  if ! nvm install --lts 2>&1 | tail -5; then
+    log "ERROR: Node.js LTS installation failed"
+    exit 1
+  fi
+
   nvm use default 2>&1 | tail -2
   log "✓ Node.js installed"
 else
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  log "✓ Node.js already installed"
+  log "✓ Node.js already available"
 fi
 
-. "$NVM_DIR/nvm.sh"
-export NPM_CONFIG_PREFIX=/config/usr/local
-export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:/config/usr/local/bin:$PATH"
+# Always source NVM to ensure it's loaded
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+else
+  log "ERROR: NVM script not available"
+  exit 1
+fi
 
-NODE_VERSION=$(node -v | tr -d 'v')
+export NPM_CONFIG_PREFIX=/config/usr/local
+
+# Get Node version and setup paths
+NODE_VERSION=$(node -v 2>/dev/null | tr -d 'v')
+if [ -z "$NODE_VERSION" ]; then
+  log "ERROR: Node.js not found after NVM setup"
+  exit 1
+fi
+
+export PATH="$NVM_DIR/versions/node/v$NODE_VERSION/bin:/config/usr/local/bin:$PATH"
 NODE_BIN_DIR="$NVM_DIR/versions/node/v$NODE_VERSION/bin"
-log "Node.js v$NODE_VERSION ready"
+log "✓ Node.js v$NODE_VERSION ready"
 
 mkdir -p /config/usr/local/bin
 for bin in node npm npx; do
