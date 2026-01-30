@@ -109,6 +109,19 @@ else
   log "WARNING: D-Bus socket not ready"
 fi
 
+log "Phase 1: Git clone - get startup files and nginx config"
+rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
+       /opt/gmweb-startup/services /opt/gmweb-startup/package* \
+       /opt/gmweb-startup/*.js /opt/gmweb-startup/*.json /opt/gmweb-startup/*.sh 2>/dev/null || true
+
+mkdir -p /opt/gmweb-startup
+git clone --depth 1 --single-branch --branch main https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3
+cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
+cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
+log "✓ Startup files cloned"
+
+log "Phase 2: Configure nginx HTTP Basic Auth + routing (FIRST - /desk must be accessible)"
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
 
 if [ -z "${PASSWORD}" ]; then
@@ -121,7 +134,8 @@ printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; printf 'abc
 chmod 644 /etc/nginx/.htpasswd
 sleep 1
 nginx -s reload 2>/dev/null || true
-log "HTTP Basic Auth configured (user: abc)"
+log "✓ HTTP Basic Auth configured (user: abc)"
+log "✓ /desk should now be accessible"
 export PASSWORD
 
 [ -d "$HOME_DIR/.npm" ] && chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || mkdir -p "$HOME_DIR/.npm" && chown -R abc:abc "$HOME_DIR/.npm"
@@ -218,23 +232,9 @@ chmod 777 "$NODE_BIN_DIR"
 chmod 777 "$NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules" 2>/dev/null || true
 chmod 777 /config/usr/local/bin 2>/dev/null || true
 
-log "Setting up supervisor (force-fresh every boot)..."
-rm -rf /tmp/gmweb
-git clone --depth 1 --single-branch --branch main https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3
-
-KEEP_SCRIPTS="/tmp/_keep_docker_scripts"
-mkdir -p "$KEEP_SCRIPTS"
-cp /opt/gmweb-startup/custom_startup.sh "$KEEP_SCRIPTS/" 2>/dev/null || true
-
-rm -rf /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
-       /opt/gmweb-startup/services /opt/gmweb-startup/package* \
-       /opt/gmweb-startup/*.js /opt/gmweb-startup/*.json /opt/gmweb-startup/*.sh
-
-cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
-cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
-cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
-cp "$KEEP_SCRIPTS/custom_startup.sh" /opt/gmweb-startup/ 2>/dev/null || true
-rm -rf /tmp/gmweb "$KEEP_SCRIPTS"
+log "Setting up supervisor..."
+# Clean up temp clone dir
+rm -rf /tmp/gmweb /tmp/_keep_docker_scripts 2>/dev/null || true
 
 cd /opt/gmweb-startup && \
   npm install --production --omit=dev 2>&1 | tail -3 && \
