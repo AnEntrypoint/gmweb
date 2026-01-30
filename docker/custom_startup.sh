@@ -28,24 +28,34 @@ mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 # Set up password for HTTP Basic Auth
 if [ -z "${PASSWORD}" ]; then
   PASSWORD="password"
-  log "Using default password"
+  log "WARNING: PASSWORD not set in environment, using fallback 'password'"
 else
-  log "Using PASSWORD from env"
+  log "✓ PASSWORD from environment (${#PASSWORD} chars)"
 fi
+
 # Generate hash and write htpasswd (always use /dev/stdin to safely handle special chars)
-HASH=$(printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin)
-if [ -z "$HASH" ] || ! echo "$HASH" | grep -q "^\$apr1\$"; then
-  log "ERROR: Failed to generate valid apr1 hash for password"
+HASH=$(printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin 2>&1) || {
+  log "ERROR: openssl passwd failed"
+  exit 1
+}
+
+# Validate hash format (apr1 hash starts with $apr1$)
+if [ -z "$HASH" ] || ! echo "$HASH" | grep -q '^\$apr1\$'; then
+  log "ERROR: Invalid apr1 hash generated: $HASH"
   exit 1
 fi
+
+# Write htpasswd with validated hash
 echo "abc:$HASH" | sudo tee /etc/nginx/.htpasswd > /dev/null
 sudo chmod 644 /etc/nginx/.htpasswd
+
 # Verify htpasswd was written correctly
-if ! sudo grep -q "^abc:\$apr1\$" /etc/nginx/.htpasswd; then
+if ! sudo grep -q '^abc:\$apr1\$' /etc/nginx/.htpasswd; then
   log "ERROR: htpasswd file is invalid or not properly written"
   exit 1
 fi
-sudo nginx -s reload 2>/dev/null || true
+
+sudo nginx -s reload 2>/dev/null || log "WARNING: nginx reload failed (nginx may not be running yet)"
 export PASSWORD
 log "✓ HTTP Basic Auth configured with valid apr1 hash"
 
