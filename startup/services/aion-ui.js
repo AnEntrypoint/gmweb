@@ -70,12 +70,15 @@ async function downloadAndInstallAionUI() {
   installationInProgress = true;
   try {
     execSync(`sudo mkdir -p ${AIONUI_DIR}`);
-    // Always check for updates, do not exit early if binary exists
-    // if (existsSync(AIONUI_BINARY)) { markComplete(); return true; }
-    
-    // Check if we already have the latest deb downloaded
+    // If binary already exists in persistent /config location, don't re-download
+    if (existsSync(AIONUI_BINARY)) {
+      markComplete();
+      return true;
+    }
+
+    // Check if we already have the latest deb downloaded in /tmp
     if (existsSync(DEB_PATH) && extractDeb()) { markComplete(); return true; }
-    
+
     const url = getLatestDebUrl();
     console.log(`[aion-ui-install] Downloading: ${url}`);
     for (let i = 1; i <= 3; i++) {
@@ -164,8 +167,14 @@ export default {
       console.log('[aion-ui] Timeout waiting for installations, starting anyway');
     }
 
-    try { execSync(`sudo rm -rf ${AIONUI_DIR} ${DEB_PATH} 2>/dev/null || true`); } catch (e) {}
-    downloadAndInstallAionUI().catch(e => console.log(`[aion-ui-install] ${e.message}`));
+    // Only download/install if binary doesn't exist (persistent installation in /config)
+    if (!existsSync(AIONUI_BINARY)) {
+      console.log('[aion-ui] Binary not found, downloading...');
+      downloadAndInstallAionUI().catch(e => console.log(`[aion-ui-install] ${e.message}`));
+    } else {
+      console.log('[aion-ui] Using existing installation from /config/workspace/aionui');
+    }
+
     try { execSync('rm -rf /config/.config/AionUi/Singleton* 2>/dev/null || true'); } catch (e) {}
     try { execSync('pkill -f AionUi || true'); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
     const serviceEnv = { ...env, DISPLAY: ':1', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus', AIONUI_PORT: String(PORT), AIONUI_ALLOWED_ORIGINS: '*' };
