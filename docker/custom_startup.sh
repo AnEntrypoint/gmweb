@@ -219,11 +219,28 @@ fi
 
 BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
 if [ ! -f "$BASHRC_MARKER" ]; then
+  # Create or append to bashrc if it doesn't exist
   cat >> "$HOME_DIR/.bashrc" << 'EOF'
+
+# gmweb NVM setup - ensures Node.js is available in non-login shells
+export NVM_DIR="/config/nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# nvm bash completion (optional)
+[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+EOF
+  touch "$BASHRC_MARKER"
+  log "✓ bashrc updated with NVM configuration"
+else
+  # Even if marker exists, ensure bashrc has the NVM setup (in case it got lost)
+  if ! grep -q "NVM_DIR" "$HOME_DIR/.bashrc"; then
+    cat >> "$HOME_DIR/.bashrc" << 'EOF'
+
+# gmweb NVM setup - ensures Node.js is available in non-login shells
 export NVM_DIR="/config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 EOF
-  touch "$BASHRC_MARKER"
+    log "✓ bashrc re-updated with missing NVM configuration"
+  fi
 fi
 
 log "Phase 1 complete"
@@ -378,7 +395,8 @@ log "✓ Critical modules installed"
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
-  sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
+  # Explicitly pass NVM_DIR and other critical env vars to ensure Node.js is available
+  NVM_DIR=/config/nvm NODE_OPTIONS="--no-warnings" sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
   SUPERVISOR_PID=$!
   sleep 2
   kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"

@@ -9,8 +9,23 @@ NVM_DIR="${NVM_DIR:-$HOME_DIR/nvm}"
 
 unset NPM_CONFIG_PREFIX
 
+# Ensure NVM_DIR exists
+if [ ! -d "$NVM_DIR" ]; then
+  echo "ERROR: NVM_DIR does not exist: $NVM_DIR"
+  exit 1
+fi
+
+# Try to source .bashrc first (handles non-login shells)
+if [ -f "$HOME_DIR/.bashrc" ]; then
+  . "$HOME_DIR/.bashrc" 2>/dev/null || true
+fi
+
 # Source NVM to load node/npm into PATH
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+else
+  echo "WARNING: NVM script not found at $NVM_DIR/nvm.sh, using fallback"
+fi
 
 # If nvm.sh didn't load node, add it to PATH manually
 NODE_BIN="$(which node 2>/dev/null)"
@@ -23,11 +38,12 @@ if [ -z "$NODE_BIN" ] && [ -d "$NVM_DIR/versions/node" ]; then
   fi
 fi
 
+# Final verification
 if [ -z "$NODE_BIN" ] || [ ! -f "$NODE_BIN" ]; then
   echo "ERROR: Node.js not found in PATH or NVM. NVM_DIR=$NVM_DIR"
-  echo "DEBUG: Checked for $NODE_BIN"
-  echo "DEBUG: ls -l $NVM_DIR/versions/node/*/bin/node:"
-  ls -l "$NVM_DIR/versions/node/*/bin/node" 2>&1 || echo "No node binaries found"
+  echo "DEBUG: NODE_BIN=$NODE_BIN"
+  echo "DEBUG: Checking NVM directory structure:"
+  ls -la "$NVM_DIR/versions/node/" 2>&1 | head -20 || echo "NVM versions directory not found or empty"
   exit 1
 fi
 SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
