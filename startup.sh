@@ -115,9 +115,52 @@ for i in {1..10}; do
   sleep 0.5
 done
 
-log "Phase 4: nginx HTTP Basic Auth (CRITICAL - BEFORE services start)"
+log "Phase 4: nginx HTTP Basic Auth + routing (CRITICAL - BEFORE services start)"
 
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+log "Downloading nginx config from GitHub..."
+curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmweb/main/docker/nginx-sites-enabled-default -o /etc/nginx/sites-available/default 2>/dev/null || {
+  log "Failed to download nginx config, using fallback"
+  cat > /etc/nginx/sites-available/default << 'NGINX_EOF'
+server {
+  listen 80 default_server;
+  listen [::]:80 default_server;
+  server_name _;
+  auth_basic "GMWeb";
+  auth_basic_user_file /etc/nginx/.htpasswd;
+
+  location /desk {
+    auth_basic off;
+    alias /usr/share/selkies/web/;
+    index index.html index.htm;
+    try_files $uri $uri/ =404;
+  }
+
+  location ~ /desk/websockets? {
+    auth_basic off;
+    rewrite ^/desk/(.*) /$1 break;
+    proxy_pass http://127.0.0.1:8082;
+  }
+
+  location /ssh {
+    proxy_pass http://127.0.0.1:9999;
+  }
+
+  location /files {
+    proxy_pass http://127.0.0.1:9998/;
+  }
+
+  location /devmode {
+    proxy_pass http://127.0.0.1:5173;
+  }
+
+  location / {
+    proxy_pass http://127.0.0.1:25808;
+  }
+}
+NGINX_EOF
+}
 
 if [ -z "${PASSWORD}" ]; then
   PASSWORD="password"
@@ -130,7 +173,7 @@ printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin 2>/dev/null | { read hash;
 chmod 644 /etc/nginx/.htpasswd
 sleep 1
 nginx -s reload 2>/dev/null || nginx &>/dev/null &
-log "✓ HTTP Basic Auth configured (user: abc)"
+log "✓ nginx routing + HTTP Basic Auth configured (user: abc)"
 
 export PASSWORD
 
