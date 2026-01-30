@@ -83,49 +83,32 @@ function createClaudeCodeAcpBridge(nodePath) {
     const acpDir = join(nodeModulesDir, '@zed-industries', 'claude-code-acp');
     const binDir = join(nodePath, 'bin');
 
-    ensureDir(acpDir);
+    try {
+      execSync(`rm -rf "${acpDir}"`, { stdio: 'pipe' });
+    } catch (e) {}
 
-    const packageJson = {
-      name: '@zed-industries/claude-code-acp',
-      version: '0.13.2',
-      description: 'Claude Code ACP Bridge - redirects to new claude CLI',
-      bin: {
-        'claude-code-acp': 'index.js'
-      },
-      main: 'index.js'
-    };
-
-    const indexJs = `#!/usr/bin/env node
-const { spawn } = require('child_process');
-
-const claude = spawn('claude', process.argv.slice(2), {
-  stdio: ['pipe', 'pipe', 'pipe']
-});
-
-process.stdin.pipe(claude.stdin);
-claude.stdout.pipe(process.stdout);
-claude.stderr.pipe(process.stderr);
-
-claude.on('exit', (code) => {
-  process.stdin.unpipe(claude.stdin);
-  process.exit(code);
-});
-`;
-
-    writeFileSync(join(acpDir, 'package.json'), JSON.stringify(packageJson, null, 2));
-    writeFileSync(join(acpDir, 'index.js'), indexJs);
-    chmodSync(join(acpDir, 'index.js'), 0o755);
+    try {
+      execSync(`npm install --prefix "${nodeModulesDir}/.." @zed-industries/claude-code-acp@latest`, {
+        stdio: 'pipe',
+        timeout: 120000,
+        env: { ...process.env, NPM_CONFIG_FETCH_TIMEOUT: '120000' }
+      });
+    } catch (e) {
+      console.log(`[claude-config] Warning: npm install failed, will retry: ${e.message}`);
+      return;
+    }
 
     const binPath = join(binDir, 'claude-code-acp');
     try {
       execSync(`rm -f "${binPath}"`, { stdio: 'pipe' });
     } catch (e) {}
-    execSync(`ln -s ../lib/node_modules/@zed-industries/claude-code-acp/index.js "${binPath}"`, { stdio: 'pipe' });
+
+    execSync(`ln -s ../lib/node_modules/@zed-industries/claude-code-acp/lib/index.js "${binPath}"`, { stdio: 'pipe' });
     chmodSync(binPath, 0o755);
 
-    console.log('[claude-config] ✓ Created @zed-industries/claude-code-acp bridge');
+    console.log('[claude-config] ✓ Installed and linked @zed-industries/claude-code-acp');
   } catch (e) {
-    console.log(`[claude-config] Warning: Could not create ACP bridge: ${e.message}`);
+    console.log(`[claude-config] Warning: Could not setup ACP bridge: ${e.message}`);
   }
 }
 
