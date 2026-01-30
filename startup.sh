@@ -335,6 +335,47 @@ log "Phase 7: Background tasks (non-blocking)"
   npm install -g @openai/codex 2>&1 | tail -2 && log "✓ codex installed" || log "WARNING: codex install failed"
   curl -fsSL https://cursor.com/install 2>/dev/null | bash 2>&1 | tail -3 && log "✓ cursor CLI installed" || log "WARNING: cursor CLI install failed"
 
+  log "Setting up ProxyPilot..."
+  PP_DIR="/opt/proxypilot"
+  PP_BIN="$PP_DIR/proxypilot"
+  mkdir -p "$PP_DIR"
+
+  PP_NEED_UPDATE=1
+  if [ -f "$PP_BIN" ]; then
+    PP_NEED_UPDATE=$([ -z "$(find "$PP_BIN" -mmin -1440 2>/dev/null)" ] && echo 1 || echo 0)
+  fi
+
+  if [ "$PP_NEED_UPDATE" = "1" ]; then
+    cd "$PP_DIR"
+    if [ ! -d .git ]; then
+      git clone --depth 1 --branch v6.6.99 https://github.com/Finesssee/ProxyPilot.git . 2>&1 | grep -E "(Cloning|fatal)" | head -1
+    else
+      git fetch origin tag v6.6.99 2>/dev/null; git checkout v6.6.99 2>/dev/null || true
+    fi
+
+    if command -v go &>/dev/null; then
+      go mod download && go build -o proxypilot ./cmd/server 2>&1 | tail -1
+      log "✓ ProxyPilot built"
+    else
+      log "WARNING: Go required but not found, installing..."
+      GOARCH=$([ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo "arm64")
+      mkdir -p "$HOME_DIR/go-install" && cd "$HOME_DIR/go-install"
+      curl -sL "https://go.dev/dl/go1.24.0.linux-${GOARCH}.tar.gz" 2>/dev/null | tar -xz
+      export PATH="$HOME_DIR/go-install/go/bin:$PATH"
+      cd "$PP_DIR" && go mod download && go build -o proxypilot ./cmd/server 2>&1 | tail -1
+      [ -f proxypilot ] && log "✓ ProxyPilot built" || log "WARNING: ProxyPilot build failed"
+    fi
+  fi
+
+  if [ -f "$PP_BIN" ]; then
+    [ -f "$PP_DIR/config.yaml" ] || ([ -f "$PP_DIR/config.example.yaml" ] && cp "$PP_DIR/config.example.yaml" "$PP_DIR/config.yaml")
+    mkdir -p "$HOME_DIR/.cli-proxy-api"
+    pkill -f "$PP_BIN" 2>/dev/null || true
+    nohup "$PP_BIN" > /tmp/proxypilot.log 2>&1 &
+    sleep 1
+    pgrep -f "$PP_BIN" >/dev/null 2>&1 && log "✓ ProxyPilot started on :8317" || log "WARNING: ProxyPilot start failed"
+  fi
+
   touch /tmp/gmweb-installs-complete
   log "Installation marker created"
 } >> "$LOG_DIR/startup.log" 2>&1 &
