@@ -1,41 +1,43 @@
-## COMPLETED: ELIMINATE DOCKERFILE MAINTENANCE
+# Coolify Deployment Analysis - Terminal Startup Issues
 
-### PHASE 1: CREATE UNIFIED STARTUP SCRIPT ✓
-- [x] Created /startup.sh combining all logic
-  * 276 lines, includes Dockerfile setup + install.sh + custom_startup.sh
-  * All 7 phases present: setup, packages, D-Bus, nginx, Node.js, supervisor, background
-  * Bash syntax verified
+## Completed Work Items
 
-### PHASE 2: UPDATE DOCKERFILE ✓
-- [x] Minimized to 3 lines: FROM lscr.io/linuxserver/webtop:ubuntu-xfce + EXPOSE
-- [x] Removed all RUN commands (moved to startup.sh)
-- [x] Removed custom init hook setup (using docker-compose command instead)
+- [x] Research Coolify CLI and setup
+- [x] Connect to specified deployment using Coolify CLI
+- [x] Retrieve logs from failed deployment
+- [x] Identify terminal/webssh2 startup failure root causes
+- [x] Fix Node.js binary path resolution in start.sh
+- [x] Fix NPM_CONFIG_PREFIX conflict with NVM in start.sh
+- [x] Unset NPM_CONFIG_PREFIX in custom_startup.sh
+- [x] Remove NPM_CONFIG_PREFIX from webssh2 environment
+- [x] Clean stale NPM_CONFIG_PREFIX from persistent .profile
 
-### PHASE 3: UPDATE DOCKER-COMPOSE ✓
-- [x] Changed to use lscr.io/linuxserver/webtop:ubuntu-xfce directly (no build)
-- [x] Added command: bash -c "curl ... startup.sh | bash"
-- [x] All volumes and environment preserved
-- [x] No build section needed
+## Remaining Work Items
 
-### PHASE 4: VERIFY ✓
-- [x] startup.sh syntax valid
-- [x] All phases present in startup.sh
-- [x] nginx auth configured FIRST (before services)
-- [x] Supervisor startup blocking
-- [x] Background tasks non-blocking (CLI tools, ttyd)
-- [x] Git clone from https://github.com/AnEntrypoint/gmweb/main
+- [ ] Push fixes and redeploy
+- [ ] Verify supervisor starts cleanly
+- [ ] Verify terminals open without NVM errors
+- [ ] Confirm deployment is stable
 
-### KEY BENEFITS
-✓ No Dockerfile maintenance needed
-✓ startup.sh is single source of truth
-✓ Can be called directly from GitHub in docker-compose
-✓ All updates happen at runtime (no image rebuild)
-✓ nginx routing configured before services start
-✓ Desktop starts without waiting for background installs
-✓ System is idempotent - can restart safely
+## Root Causes Found and Fixed
 
-### REMOVED FILES/LOGIC
-- docker/custom_startup.sh (logic merged into startup.sh)
-- Most Dockerfile RUN commands (logic merged into startup.sh)
-- docker/install.sh (logic merged into startup.sh)
-- custom-cont-init.d setup (using docker-compose command instead)
+### Issue 1: Node.js binary not in PATH
+supervisor.log shows: `stdbuf: failed to run command '/usr/local/bin/node': No such file or directory`
+**Fix:** Source NVM in start.sh before running `which node`
+
+### Issue 2: NPM_CONFIG_PREFIX conflicts with NVM
+When opening terminals, repeated error: `nvm is not compatible with the "NPM_CONFIG_PREFIX" environment variable`
+**Fix:** 
+- Unset NPM_CONFIG_PREFIX in start.sh (early, before NVM loads)
+- Unset NPM_CONFIG_PREFIX in custom_startup.sh
+- Remove NPM_CONFIG_PREFIX from webssh2 shell environment
+- Clean stale NPM_CONFIG_PREFIX from persistent .profile
+
+## Files Modified
+
+- startup/start.sh: Added NVM source + NPM_CONFIG_PREFIX unset
+- docker/custom_startup.sh: Unset NPM_CONFIG_PREFIX early, clean from .profile
+- startup/services/webssh2.js: Remove NPM_CONFIG_PREFIX from spawned bash environment
+
+## Deployment Reference
+URL: https://coolify.acc.l-inc.co.za/project/vwocgo84c0gwkg0gwc8sck8w/environment/z4gwo0ggg4o8ck0c4484wso4/application/zkc880sc40wgkssw44840g88

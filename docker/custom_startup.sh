@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 
-# CRITICAL: Unset LD_PRELOAD immediately before anything else
+# CRITICAL: Unset problematic environment variables immediately before anything else
 unset LD_PRELOAD
+unset NPM_CONFIG_PREFIX
 
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
@@ -59,11 +60,11 @@ sudo nginx -s reload 2>/dev/null || log "WARNING: nginx reload failed (nginx may
 export PASSWORD
 log "✓ HTTP Basic Auth configured with valid apr1 hash"
 
-# Clean up stale LD_PRELOAD from persistent .profile (can get stale from failed runs)
+# Clean up stale environment vars from persistent .profile (can get stale from failed runs)
 if [ -f "$HOME_DIR/.profile" ]; then
-  grep -v "LD_PRELOAD" "$HOME_DIR/.profile" > "$HOME_DIR/.profile.tmp" && \
+  grep -v -E "LD_PRELOAD|NPM_CONFIG_PREFIX" "$HOME_DIR/.profile" > "$HOME_DIR/.profile.tmp" && \
   mv "$HOME_DIR/.profile.tmp" "$HOME_DIR/.profile" || true
-  log "✓ Cleaned stale LD_PRELOAD from .profile"
+  log "✓ Cleaned stale environment variables from .profile"
 fi
 
 # Compile close_range shim immediately (before anything else uses LD_PRELOAD)

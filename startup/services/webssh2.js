@@ -31,9 +31,12 @@ export default {
       await sleep(500);
     } catch (e) {}
 
+    const shellEnv = { ...env, TERM: 'xterm-256color', HOME: '/config' };
+    delete shellEnv.NPM_CONFIG_PREFIX;
+
     const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-i', '-l'], {
       cwd: '/config',
-      env: { ...env, TERM: 'xterm-256color', HOME: '/config' },
+      env: shellEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });

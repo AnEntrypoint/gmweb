@@ -7,6 +7,8 @@ HOME_DIR="${HOME:-/config}"
 LOG_DIR="$HOME_DIR/logs"
 NVM_DIR="${NVM_DIR:-$HOME_DIR/nvm}"
 
+unset NPM_CONFIG_PREFIX
+
 # Source NVM to load node/npm into PATH
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
