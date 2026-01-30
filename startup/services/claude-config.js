@@ -99,10 +99,17 @@ function createClaudeCodeAcpBridge(nodePath) {
 const { spawn } = require('child_process');
 
 const claude = spawn('claude', process.argv.slice(2), {
-  stdio: 'inherit'
+  stdio: ['pipe', 'pipe', 'pipe']
 });
 
-claude.on('exit', (code) => process.exit(code));
+process.stdin.pipe(claude.stdin);
+claude.stdout.pipe(process.stdout);
+claude.stderr.pipe(process.stderr);
+
+claude.on('exit', (code) => {
+  process.stdin.unpipe(claude.stdin);
+  process.exit(code);
+});
 `;
 
     writeFileSync(join(acpDir, 'package.json'), JSON.stringify(packageJson, null, 2));
