@@ -201,6 +201,22 @@ log "✓ Nginx config updated from git"
 [ -d "$HOME_DIR/.npm" ] && chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || mkdir -p "$HOME_DIR/.npm" && chown -R abc:abc "$HOME_DIR/.npm"
 [ -f /opt/proxypilot-config.yaml ] && [ ! -f "$HOME_DIR/config.yaml" ] && cp /opt/proxypilot-config.yaml "$HOME_DIR/config.yaml" && chown abc:abc "$HOME_DIR/config.yaml"
 
+PROFILE_MARKER="$HOME_DIR/.gmweb-profile-setup"
+if [ ! -f "$PROFILE_MARKER" ]; then
+  # Set up .profile once with all necessary environment variables
+  cat > "$HOME_DIR/.profile" << 'PROFILE_EOF'
+export TMPDIR="${HOME}/.tmp"
+export TMP="${HOME}/.tmp"
+export TEMP="${HOME}/.tmp"
+mkdir -p "${TMPDIR}" 2>/dev/null || true
+
+export NVM_DIR="/config/nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+PROFILE_EOF
+  touch "$PROFILE_MARKER"
+  log "✓ Cleaned stale environment variables from .profile"
+fi
+
 BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
 if [ ! -f "$BASHRC_MARKER" ]; then
   cat >> "$HOME_DIR/.bashrc" << 'EOF'
@@ -209,23 +225,6 @@ export NVM_DIR="/config/nvm"
 EOF
   touch "$BASHRC_MARKER"
 fi
-
-grep -q 'NVM_DIR=/config/nvm' "$HOME_DIR/.profile" || \
-  cat >> "$HOME_DIR/.profile" << 'PROFILE_EOF'
-export NVM_DIR="/config/nvm"
-export LD_PRELOAD=/opt/lib/libshim_close_range.so
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-PROFILE_EOF
-
-# Add temp directory configuration to profile (prevents EXDEV errors in Claude plugin installation)
-grep -q 'export TMPDIR=' "$HOME_DIR/.profile" || {
-  cat >> "$HOME_DIR/.profile" << 'TMPDIR_EOF'
-export TMPDIR="${HOME}/.tmp"
-export TMP="${HOME}/.tmp"
-export TEMP="${HOME}/.tmp"
-mkdir -p "${TMPDIR}" 2>/dev/null || true
-TMPDIR_EOF
-}
 
 log "Phase 1 complete"
 
