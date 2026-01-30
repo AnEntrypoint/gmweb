@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, chmodSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 
@@ -132,7 +132,7 @@ export default {
     const nvmDir = env.NVM_DIR || join(env.HOME || '/config', 'nvm');
     const nodeVersionsDir = join(nvmDir, 'versions', 'node');
     if (existsSync(nodeVersionsDir)) {
-      const versions = require('fs').readdirSync(nodeVersionsDir).sort().reverse();
+      const versions = readdirSync(nodeVersionsDir).sort().reverse();
       if (versions.length > 0) {
         const latestNode = join(nodeVersionsDir, versions[0]);
         createClaudeCodeAcpBridge(latestNode);
