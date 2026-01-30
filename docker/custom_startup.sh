@@ -220,6 +220,13 @@ fi
 export NPM_CONFIG_PREFIX=/config/usr/local
 export PATH="$NVM_DIR/versions/node/$(nvm current)/bin:/config/usr/local/bin:$PATH"
 
+# Configure npm globally
+echo 'prefix = /config/usr/local' > /etc/npmrc
+
+# Set npm environment in /etc/environment for all shell sessions
+grep -q 'NVM_DIR=/config/nvm' /etc/environment || echo 'NVM_DIR=/config/nvm' >> /etc/environment
+grep -q 'NPM_CONFIG_PREFIX' /etc/environment || echo 'NPM_CONFIG_PREFIX=/config/usr/local' >> /etc/environment
+
 NODE_VERSION=$(node -v | tr -d 'v')
 NODE_BIN_DIR="$NVM_DIR/versions/node/v$NODE_VERSION/bin"
 log "Node.js $NODE_VERSION (NVM_DIR=$NVM_DIR)"
