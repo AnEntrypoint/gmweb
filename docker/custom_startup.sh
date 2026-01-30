@@ -17,32 +17,14 @@ log() {
 BOOT_ID="$(date '+%s')-$$"
 log "===== GMWEB STARTUP (boot: $BOOT_ID) ====="
 
-# Compile close_range shim IMMEDIATELY - required before any child processes spawn
-log "Compiling close_range shim..."
-mkdir -p /opt/lib
+# Verify close_range shim exists (compiled at build time in Dockerfile)
 if [ ! -f /opt/lib/libshim_close_range.so ]; then
-  cat > /tmp/shim_close_range.c << 'SHIMEOF'
-#define _GNU_SOURCE
-#include <errno.h>
-
-int close_range(unsigned int first, unsigned int last, int flags) {
-    errno = 38;
-    return -1;
-}
-SHIMEOF
-  gcc -fPIC -shared /tmp/shim_close_range.c -o /opt/lib/libshim_close_range.so 2>&1 | grep -v "^$" || true
-  rm -f /tmp/shim_close_range.c
-  if [ ! -f /opt/lib/libshim_close_range.so ]; then
-    log "ERROR: Failed to compile shim to /opt/lib"
-    exit 1
-  fi
-  log "✓ Shim compiled to /opt/lib/libshim_close_range.so"
-else
-  log "✓ Shim already exists at /opt/lib/libshim_close_range.so"
+  log "ERROR: close_range shim not found at /opt/lib/libshim_close_range.so"
+  log "ERROR: Shim must be compiled at build time in Dockerfile"
+  exit 1
 fi
-
-# Set LD_PRELOAD NOW - verified to exist
-export LD_PRELOAD=/opt/lib/libshim_close_range.so
+log "✓ close_range shim verified: /opt/lib/libshim_close_range.so"
+# LD_PRELOAD already set by Dockerfile ENV directive
 
 ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
 ABC_GID=$(id -g abc 2>/dev/null || echo 1000)
