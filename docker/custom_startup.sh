@@ -199,7 +199,6 @@ sudo nginx -s reload 2>/dev/null || true
 log "✓ Nginx config updated from git"
 
 [ -d "$HOME_DIR/.npm" ] && chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || mkdir -p "$HOME_DIR/.npm" && chown -R abc:abc "$HOME_DIR/.npm"
-[ -f /opt/proxypilot-config.yaml ] && [ ! -f "$HOME_DIR/config.yaml" ] && cp /opt/proxypilot-config.yaml "$HOME_DIR/config.yaml" && chown abc:abc "$HOME_DIR/config.yaml"
 
 PROFILE_MARKER="$HOME_DIR/.gmweb-profile-setup"
 if [ ! -f "$PROFILE_MARKER" ]; then

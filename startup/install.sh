@@ -133,13 +133,8 @@ else
   log "WARNING: ProxyPilot download failed - service will be unavailable"
 fi
 
-# Download ProxyPilot config.yaml to /opt (user home not available at build time)
-log "Downloading ProxyPilot config..."
-if curl -fL -o /opt/proxypilot-config.yaml https://raw.githubusercontent.com/Finesssee/ProxyPilot/refs/heads/main/config.example.yaml 2>/dev/null; then
-  log "✓ ProxyPilot config.yaml downloaded to /opt (copied to user home at boot)"
-else
-  log "WARNING: ProxyPilot config.yaml download failed"
-fi
+# ProxyPilot config is downloaded and configured at runtime by the proxypilot service
+log "ProxyPilot configuration will be set up at runtime"
 
 # ============================================================================
 # 10b. CHROMIUM EXTENSION POLICIES
