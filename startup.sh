@@ -145,8 +145,9 @@ log "✓ System packages installed"
 
 log "Phase 4: Initialize D-Bus and environment"
 
-rm -rf /config/.npm 2>/dev/null || true
-rm -rf /config/node_modules/.bin/* 2>/dev/null || true
+# Clean npm cache and artifacts - use sudo to handle root-owned files from previous runs
+sudo rm -rf /config/.npm 2>/dev/null || true
+sudo rm -rf /config/node_modules/.bin/* 2>/dev/null || true
 npm cache clean --force 2>/dev/null || true
 
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
@@ -180,7 +181,8 @@ done
 
 log "Phase 5: Node.js and supervisor setup"
 
-[ -d "$HOME_DIR/.npm" ] && chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || mkdir -p "$HOME_DIR/.npm" && chown -R abc:abc "$HOME_DIR/.npm"
+# Set up npm cache directory with proper permissions - use sudo to handle any root-owned files
+sudo mkdir -p "$HOME_DIR/.npm" 2>/dev/null && sudo chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || true
 
 BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
 if [ ! -f "$BASHRC_MARKER" ]; then
