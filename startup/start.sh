@@ -12,9 +12,22 @@ unset NPM_CONFIG_PREFIX
 # Source NVM to load node/npm into PATH
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
+# If nvm.sh didn't load node, add it to PATH manually
 NODE_BIN="$(which node 2>/dev/null)"
-if [ -z "$NODE_BIN" ]; then
+if [ -z "$NODE_BIN" ] && [ -d "$NVM_DIR/versions/node" ]; then
+  LATEST_NODE=$(ls -1 "$NVM_DIR/versions/node" | sort -V | tail -1)
+  if [ -n "$LATEST_NODE" ]; then
+    NODE_BIN="$NVM_DIR/versions/node/$LATEST_NODE/bin/node"
+    PATH="$NVM_DIR/versions/node/$LATEST_NODE/bin:$PATH"
+    export PATH
+  fi
+fi
+
+if [ -z "$NODE_BIN" ] || [ ! -f "$NODE_BIN" ]; then
   echo "ERROR: Node.js not found in PATH or NVM. NVM_DIR=$NVM_DIR"
+  echo "DEBUG: Checked for $NODE_BIN"
+  echo "DEBUG: ls -l $NVM_DIR/versions/node/*/bin/node:"
+  ls -l "$NVM_DIR/versions/node/*/bin/node" 2>&1 || echo "No node binaries found"
   exit 1
 fi
 SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
