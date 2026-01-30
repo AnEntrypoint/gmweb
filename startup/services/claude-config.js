@@ -81,6 +81,7 @@ function createClaudeCodeAcpBridge(nodePath) {
   try {
     const nodeModulesDir = join(nodePath, 'lib', 'node_modules');
     const acpDir = join(nodeModulesDir, '@zed-industries', 'claude-code-acp');
+    const binDir = join(nodePath, 'bin');
 
     ensureDir(acpDir);
 
@@ -107,6 +108,13 @@ claude.on('exit', (code) => process.exit(code));
     writeFileSync(join(acpDir, 'package.json'), JSON.stringify(packageJson, null, 2));
     writeFileSync(join(acpDir, 'index.js'), indexJs);
     chmodSync(join(acpDir, 'index.js'), 0o755);
+
+    const binPath = join(binDir, 'claude-code-acp');
+    try {
+      execSync(`rm -f "${binPath}"`, { stdio: 'pipe' });
+    } catch (e) {}
+    execSync(`ln -s ../lib/node_modules/@zed-industries/claude-code-acp/index.js "${binPath}"`, { stdio: 'pipe' });
+    chmodSync(binPath, 0o755);
 
     console.log('[claude-config] ✓ Created @zed-industries/claude-code-acp bridge');
   } catch (e) {
