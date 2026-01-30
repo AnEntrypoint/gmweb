@@ -73,7 +73,8 @@ export default {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        execSync('lsof -i :9999 2>/dev/null | grep -q LISTEN', {
+        // Use ss (socket statistics) instead of lsof - more reliable and always available
+        execSync('ss -tlnp 2>/dev/null | grep -q :9999', {
           stdio: 'pipe',
           shell: true,
           timeout: 2000
