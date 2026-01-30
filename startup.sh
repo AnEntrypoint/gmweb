@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-export LD_PRELOAD=/opt/lib/libshim_close_range.so
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 
@@ -55,6 +54,7 @@ SHIMEOF
   log "✓ Shim compiled"
 fi
 
+export LD_PRELOAD=/opt/lib/libshim_close_range.so
 grep -q 'LD_PRELOAD=/opt/lib/libshim_close_range.so' /etc/environment || echo 'LD_PRELOAD=/opt/lib/libshim_close_range.so' >> /etc/environment
 
 log "Phase 2: nginx HTTP Basic Auth + routing (CRITICAL - FIRST)"

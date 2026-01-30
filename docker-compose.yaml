@@ -19,7 +19,7 @@ services:
     volumes:
       - gmweb-config:/config
       - gmweb-local:/usr/local
-      - ./docker/init-gmweb.sh:/custom-cont-init.d/01-gmweb-startup:ro
+      - ./docker/custom_startup.sh:/custom-cont-init.d/01-gmweb-startup:ro
     shm_size: "1gb"
     restart: unless-stopped
     labels:
