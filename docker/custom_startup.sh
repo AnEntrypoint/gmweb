@@ -408,7 +408,7 @@ log "XFCE component launcher started (PID: $!)"
 
 {
   apt-get update
-  apt-get install -y --no-install-recommends git curl lsof sudo gh 2>&1 | tail -3 || apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
+  apt-get install -y --no-install-recommends git curl lsof sudo gh google-cloud-cli 2>&1 | tail -3 || apt-get install -y --no-install-recommends git curl lsof sudo gh 2>&1 | tail -3
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
 
@@ -417,6 +417,10 @@ log "XFCE component launcher started (PID: $!)"
   npm install -g @openai/codex 2>&1 | tail -3 && log "codex installed" || log "WARNING: codex install failed"
   curl -fsSL https://cursor.com/install 2>/dev/null | bash 2>&1 | tail -5 && log "cursor CLI installed" || log "WARNING: cursor CLI install failed"
   log "CLI coding tools installation complete"
+
+  log "Installing cloud and deployment tools (wrangler)..."
+  npm install -g wrangler 2>&1 | tail -3 && log "wrangler installed" || log "WARNING: wrangler install failed"
+  log "Cloud and deployment tools installation complete"
 
   touch /tmp/gmweb-installs-complete
   log "Installation marker file created"
