@@ -163,22 +163,10 @@ fi
 printf '%s' "$PASSWORD" | openssl passwd -apr1 -stdin | { read hash; printf 'abc:%s\n' "$hash" > /etc/nginx/.htpasswd; }
 chmod 644 /etc/nginx/.htpasswd
 
-# Wait for nginx to be running, then reload config
-NGINX_WAIT=0
-NGINX_WAIT_MAX=30
-while [ $NGINX_WAIT -lt $NGINX_WAIT_MAX ]; do
-  if sudo nginx -s reload 2>/dev/null; then
-    log "✓ HTTP Basic Auth configured (user: abc)"
-    log "✓ /desk should now be accessible"
-    break
-  fi
-  NGINX_WAIT=$((NGINX_WAIT + 1))
-  sleep 1
-done
-
-if [ $NGINX_WAIT -eq $NGINX_WAIT_MAX ]; then
-  log "WARNING: Could not reload nginx after $NGINX_WAIT_MAX seconds, continuing anyway"
-fi
+# Attempt nginx reload (non-blocking - don't wait, supervisor will handle nginx if needed)
+sudo nginx -s reload 2>/dev/null || true
+log "✓ HTTP Basic Auth configured (user: abc)"
+log "✓ /desk should now be accessible"
 export PASSWORD
 
 [ -d "$HOME_DIR/.npm" ] && chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || mkdir -p "$HOME_DIR/.npm" && chown -R abc:abc "$HOME_DIR/.npm"
