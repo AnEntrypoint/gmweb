@@ -218,8 +218,15 @@ PROFILE_EOF
 fi
 
 BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
-if [ ! -f "$BASHRC_MARKER" ]; then
-  # Create or append to bashrc if it doesn't exist
+# Clean stale bashrc entries from previous failed/broken setups
+if [ -f "$HOME_DIR/.bashrc" ]; then
+  # Remove old broken NVM_DIR entries (e.g., /usr/local/local/nvm)
+  grep -v "export NVM_DIR=" "$HOME_DIR/.bashrc" > "$HOME_DIR/.bashrc.tmp" && \
+  mv "$HOME_DIR/.bashrc.tmp" "$HOME_DIR/.bashrc" || true
+fi
+
+if [ ! -f "$BASHRC_MARKER" ] || ! grep -q 'export NVM_DIR="/config/nvm"' "$HOME_DIR/.bashrc"; then
+  # Ensure correct NVM setup is in bashrc
   cat >> "$HOME_DIR/.bashrc" << 'EOF'
 
 # gmweb NVM setup - ensures Node.js is available in non-login shells
@@ -229,18 +236,7 @@ export NVM_DIR="/config/nvm"
 [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
 EOF
   touch "$BASHRC_MARKER"
-  log "✓ bashrc updated with NVM configuration"
-else
-  # Even if marker exists, ensure bashrc has the NVM setup (in case it got lost)
-  if ! grep -q "NVM_DIR" "$HOME_DIR/.bashrc"; then
-    cat >> "$HOME_DIR/.bashrc" << 'EOF'
-
-# gmweb NVM setup - ensures Node.js is available in non-login shells
-export NVM_DIR="/config/nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-EOF
-    log "✓ bashrc re-updated with missing NVM configuration"
-  fi
+  log "✓ bashrc updated with correct NVM configuration"
 fi
 
 log "Phase 1 complete"
@@ -395,8 +391,9 @@ log "✓ Critical modules installed"
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
-  # Explicitly pass NVM_DIR and other critical env vars to ensure Node.js is available
-  NVM_DIR=/config/nvm NODE_OPTIONS="--no-warnings" sudo -u abc -H -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
+  # Explicitly pass NVM_DIR and HOME to ensure Node.js is available
+  # Use -E to preserve environment, but don't use -H (which breaks HOME for abc user)
+  NVM_DIR=/config/nvm HOME=/config NODE_OPTIONS="--no-warnings" sudo -u abc -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
   SUPERVISOR_PID=$!
   sleep 2
   kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"
