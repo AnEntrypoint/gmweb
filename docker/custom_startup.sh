@@ -602,15 +602,16 @@ log "XFCE component launcher started (PID: $!)"
 
 {
   # CRITICAL: Source NVM in subshell so npm/node commands work
+  # Must use NVM compat shim to hide NPM_CONFIG_PREFIX before sourcing NVM
   export NVM_DIR=/config/nvm
   export HOME=/config
   export GMWEB_DIR=/config/.gmweb
-  # Force npm to use centralized cache
-  export npm_config_cache="/config/.gmweb/npm-cache"
-  export npm_config_prefix="/config/.gmweb/npm-global"
-  export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
-  export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
+
+  # Hide NPM_CONFIG_PREFIX before NVM (NVM refuses to load with it set)
+  . /config/.nvm_compat.sh
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+  # Restore npm config after NVM is loaded
+  . /config/.nvm_restore.sh
   
   # Install base packages
   apt-get update
