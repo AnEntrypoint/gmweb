@@ -106,6 +106,16 @@ function createClaudeCodeAcpBridge(nodePath) {
     execSync(`ln -s ../lib/node_modules/@zed-industries/claude-code-acp/dist/index.js "${binPath}"`, { stdio: 'pipe' });
     chmodSync(binPath, 0o755);
 
+    // Also create symlink in /usr/local/bin for easier discovery by apps like AionUI
+    try {
+      execSync('mkdir -p /usr/local/bin', { stdio: 'pipe' });
+      execSync(`rm -f /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
+      execSync(`ln -s "${binPath}" /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
+      console.log('[claude-config] ✓ Created /usr/local/bin symlink for ACP bridge');
+    } catch (e) {
+      console.log(`[claude-config] Warning: Could not create /usr/local/bin symlink: ${e.message}`);
+    }
+
     console.log('[claude-config] ✓ Installed and linked @zed-industries/claude-code-acp');
   } catch (e) {
     console.log(`[claude-config] Warning: Could not setup ACP bridge: ${e.message}`);
