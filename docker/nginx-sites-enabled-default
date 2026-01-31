@@ -2,26 +2,42 @@ server {
   listen 80 default_server;
   listen [::]:80 default_server;
 
-  auth_basic "Login Required";
-  auth_basic_user_file /etc/nginx/.htpasswd;
+  location = /proxypilot.html {
+    proxy_pass http://127.0.0.1:8317/management.html;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+  }
 
   location = /desk {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     return 301 /desk/;
   }
 
   location = /ssh {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     return 301 /ssh/;
   }
 
   location = /files {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     return 301 /files/;
   }
 
   location = /molt {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     return 301 /molt/;
   }
 
   location /_next/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:9998/files/_next/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -32,12 +48,16 @@ server {
   }
 
   location /desk {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     alias /usr/share/selkies/web/;
     index index.html index.htm;
     try_files $uri $uri/ =404;
   }
 
   location /devmode {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
@@ -54,6 +74,8 @@ server {
   }
 
   location ~ /desk/websockets? {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     rewrite ^/desk/(.*) /$1 break;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -71,6 +93,8 @@ server {
   }
 
   location /desk/files {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     fancyindex on;
     fancyindex_footer /desk/nginx/footer.html;
     fancyindex_header /desk/nginx/header.html;
@@ -82,6 +106,8 @@ server {
   }
 
   location /ssh/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:9999/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -96,6 +122,8 @@ server {
   }
 
   location /files/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:9998/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -107,13 +135,14 @@ server {
   }
 
   location /logs/ {
-    auth_basic off;
     alias /config/logs/;
     autoindex on;
     add_header Content-Type text/plain;
   }
 
   location /molt/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:7890/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -128,7 +157,18 @@ server {
     client_max_body_size 10M;
   }
 
+  location /api/v1/ {
+    proxy_pass http://127.0.0.1:8317/v1/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+  }
+
   location / {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:25808;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -156,26 +196,42 @@ server {
   ssl_certificate /config/ssl/cert.pem;
   ssl_certificate_key /config/ssl/cert.key;
 
-  auth_basic "Login Required";
-  auth_basic_user_file /etc/nginx/.htpasswd;
+  location = /proxypilot.html {
+    proxy_pass http://127.0.0.1:8317/management.html;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+  }
 
   location = /desk {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     return 301 /desk/;
   }
 
   location = /ssh {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     return 301 /ssh/;
   }
 
   location = /files {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     return 301 /files/;
   }
 
   location = /molt {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     return 301 /molt/;
   }
 
   location /_next/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:9998/files/_next/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -186,12 +242,16 @@ server {
   }
 
   location /desk {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     alias /usr/share/selkies/web/;
     index index.html index.htm;
     try_files $uri $uri/ =404;
   }
 
   location /devmode {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
@@ -208,6 +268,8 @@ server {
   }
 
   location ~ /desk/websockets? {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     rewrite ^/desk/(.*) /$1 break;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -225,6 +287,8 @@ server {
   }
 
   location /desk/files {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     fancyindex on;
     fancyindex_footer /desk/nginx/footer.html;
     fancyindex_header /desk/nginx/header.html;
@@ -236,6 +300,8 @@ server {
   }
 
   location /ssh/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:9999/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -250,6 +316,8 @@ server {
   }
 
   location /files/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:9998/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -261,13 +329,14 @@ server {
   }
 
   location /logs/ {
-    auth_basic off;
     alias /config/logs/;
     autoindex on;
     add_header Content-Type text/plain;
   }
 
   location /molt/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:7890/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -282,7 +351,18 @@ server {
     client_max_body_size 10M;
   }
 
+  location /api/v1/ {
+    proxy_pass http://127.0.0.1:8317/v1/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+  }
+
   location / {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:25808;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
