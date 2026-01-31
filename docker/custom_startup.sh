@@ -268,11 +268,12 @@ chown -R abc:abc /config 2>/dev/null || true
 log "✓ /config ownership set to abc"
 
 log "Phase 1: Git clone - get startup files and nginx config (minimal history)"
-rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
+# CRITICAL: Use sudo to clean up root-owned files from previous boots (persistent volumes)
+sudo rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
        /opt/gmweb-startup/services /opt/gmweb-startup/package* \
        /opt/gmweb-startup/*.js /opt/gmweb-startup/*.json /opt/gmweb-startup/*.sh 2>/dev/null || true
 
-mkdir -p /opt/gmweb-startup
+sudo mkdir -p /opt/gmweb-startup
 
 # Clone with minimal history and data - much faster
 # --depth 1: no history
