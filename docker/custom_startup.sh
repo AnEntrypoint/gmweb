@@ -506,5 +506,10 @@ log "Background installs started (PID: $!)"
 # Final ownership pass - ensure all files are owned by abc
 chown -R abc:abc "$HOME_DIR" 2>/dev/null || true
 log "✓ Final /config ownership set to abc"
+
+# Set working directory to /config for any subsequent processes
+cd /config
+log "✓ Working directory set to /config"
+
 log "===== GMWEB STARTUP COMPLETE ====="
 exit 0
