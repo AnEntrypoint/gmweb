@@ -457,34 +457,13 @@ cd /opt/gmweb-startup && \
 nginx -s reload 2>/dev/null || true
 log "Supervisor ready (fresh from git)"
 
-ARCH=$(uname -m)
-TTYD_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x86_64" || echo "aarch64")
-TTYD_URL="https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.${TTYD_ARCH}"
-
 if [ ! -f /usr/bin/ttyd ]; then
   log "Installing ttyd for webssh2..."
-  # Try GitHub releases first
-  TTYD_RETRY=2
-  while [ $TTYD_RETRY -gt 0 ]; do
-    if timeout 60 curl -fL --max-redirs 5 -o /tmp/ttyd "$TTYD_URL" 2>/dev/null && [ -f /tmp/ttyd ] && [ -s /tmp/ttyd ]; then
-      sudo mv /tmp/ttyd /usr/bin/ttyd
-      sudo chmod +x /usr/bin/ttyd
-      log "✓ ttyd installed from GitHub"
-      break
-    else
-      TTYD_RETRY=$((TTYD_RETRY - 1))
-      [ $TTYD_RETRY -gt 0 ] && sleep 2
-    fi
-  done
-
-  # Fallback to apt-get if GitHub download failed
-  if [ ! -f /usr/bin/ttyd ]; then
-    log "GitHub download failed, trying apt-get..."
-    sudo apt-get update -qq 2>/dev/null && \
-    sudo apt-get install -y ttyd 2>/dev/null && \
-    log "✓ ttyd installed from apt-get" || \
-    log "WARNING: ttyd installation failed from both GitHub and apt-get"
-  fi
+  # Use apt-get for reliable, compatible binaries across all architectures
+  sudo apt-get update -qq 2>/dev/null && \
+  sudo apt-get install -y ttyd 2>/dev/null && \
+  log "✓ ttyd installed from apt-get" || \
+  log "WARNING: ttyd installation failed - webssh2 will be unavailable"
 fi
 
 cat > /tmp/launch_xfce_components.sh << 'XFCE_LAUNCHER_EOF'
