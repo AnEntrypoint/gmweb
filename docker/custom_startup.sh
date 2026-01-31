@@ -67,58 +67,49 @@ if [ -f "$HOME_DIR/.profile" ]; then
 fi
 
 # MIGRATION: Move legacy installations to centralized directory and clean pollution
-MIGRATION_MARKER="$HOME_DIR/.gmweb-migrated-v2"
-if [ ! -f "$MIGRATION_MARKER" ]; then
-  log "MIGRATION: Centralizing installations and cleaning /config pollution..."
-  
-  # Create centralized directory
-  mkdir -p /config/.gmweb/{npm-cache,npm-global,tools,deps,cache}
-  
-  # Migrate opencode if it exists in old location
-  if [ -d /config/.opencode ]; then
-    log "  Moving /config/.opencode -> /config/.gmweb/tools/opencode"
-    mv /config/.opencode /config/.gmweb/tools/opencode 2>/dev/null || true
-  fi
-  
-  # Migrate old npm cache
-  if [ -d /config/.npm ]; then
-    log "  Moving /config/.npm -> /config/.gmweb/npm-cache"
-    mv /config/.npm/* /config/.gmweb/npm-cache/ 2>/dev/null || true
-    rm -rf /config/.npm
-  fi
-  
-  # Migrate generic cache directories to centralized location
-  for cache_dir in .cache .bun .docker .config; do
-    if [ -d "/config/$cache_dir" ]; then
-      log "  Moving /config/$cache_dir -> /config/.gmweb/cache/$cache_dir"
-      mv "/config/$cache_dir" "/config/.gmweb/cache/$cache_dir" 2>/dev/null || true
-    fi
-  done
-  
-  # Clean up old installation/config directories (NOT user data like .claude, .agents)
-  sudo rm -rf /config/usr /config/.gmweb-deps /config/.gmweb-bashrc-setup 2>/dev/null || true
-  
-  # Clean up old Node versions (v23.x is deprecated, we use v24 LTS)
-  if [ -d /config/nvm/versions/node/v23.11.1 ]; then
-    log "  Removing old Node v23.11.1"
-    rm -rf /config/nvm/versions/node/v23.11.1 2>/dev/null || true
-  fi
-  
-  # Clean NVM cache to prevent corrupted installations
-  if [ -d /config/nvm/.cache ]; then
-    log "  Clearing NVM cache to prevent corruption"
-    rm -rf /config/nvm/.cache/* 2>/dev/null || true
-  fi
-  
-  # Fix permissions
-  chown -R abc:abc /config/.gmweb 2>/dev/null || true
-  chmod -R 755 /config/.gmweb 2>/dev/null || true
-  
-  touch "$MIGRATION_MARKER"
-  log "✓ Migration complete - installations centralized to /config/.gmweb/"
-else
-  log "✓ Migration already completed (marker exists)"
+# ALWAYS clean up and migrate on every boot (no markers - persistent volumes need verification)
+log "Cleaning up legacy installations and ensuring clean state..."
+
+# Create centralized directory
+mkdir -p /config/.gmweb/{npm-cache,npm-global,tools,deps,cache}
+
+# Migrate opencode if it exists in old location
+if [ -d /config/.opencode ]; then
+  log "  Moving /config/.opencode -> /config/.gmweb/tools/opencode"
+  mv /config/.opencode /config/.gmweb/tools/opencode 2>/dev/null || true
 fi
+
+# Migrate old npm cache
+if [ -d /config/.npm ]; then
+  log "  Moving /config/.npm -> /config/.gmweb/npm-cache"
+  mv /config/.npm/* /config/.gmweb/npm-cache/ 2>/dev/null || true
+  rm -rf /config/.npm
+fi
+
+# Migrate generic cache directories to centralized location
+for cache_dir in .cache .bun .docker .config; do
+  if [ -d "/config/$cache_dir" ]; then
+    log "  Moving /config/$cache_dir -> /config/.gmweb/cache/$cache_dir"
+    mv "/config/$cache_dir" "/config/.gmweb/cache/$cache_dir" 2>/dev/null || true
+  fi
+done
+
+# Clean up old installation/config directories (NOT user data like .claude, .agents)
+sudo rm -rf /config/usr /config/.gmweb-deps /config/.gmweb-bashrc-setup /config/.gmweb-bashrc-setup-v2 /config/.gmweb-migrated-v2 2>/dev/null || true
+
+# Clean up old Node versions that aren't v24 LTS
+for node_dir in /config/nvm/versions/node/v*; do
+  if [ -d "$node_dir" ] && [[ ! "$node_dir" =~ v24\. ]]; then
+    log "  Removing old Node $(basename $node_dir)"
+    rm -rf "$node_dir" 2>/dev/null || true
+  fi
+done
+
+# Fix permissions
+chown -R abc:abc /config/.gmweb 2>/dev/null || true
+chmod -R 755 /config/.gmweb 2>/dev/null || true
+
+log "✓ Cleanup complete - installations centralized to /config/.gmweb/"
 
 # Compile close_range shim immediately (before anything else uses LD_PRELOAD)
 mkdir -p /opt/lib
@@ -297,10 +288,8 @@ log "✓ Nginx config updated from git"
 # Ensure gmweb directory exists and has correct permissions
 mkdir -p "$GMWEB_DIR" && chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || true
 
-PROFILE_MARKER="$HOME_DIR/.gmweb-profile-setup"
-if [ ! -f "$PROFILE_MARKER" ]; then
-  # Set up .profile once with all necessary environment variables
-  cat > "$HOME_DIR/.profile" << 'PROFILE_EOF'
+# ALWAYS regenerate .profile on every boot (no markers - persistent volumes need verification)
+cat > "$HOME_DIR/.profile" << 'PROFILE_EOF'
 export TMPDIR="${HOME}/.tmp"
 export TMP="${HOME}/.tmp"
 export TEMP="${HOME}/.tmp"
@@ -309,23 +298,17 @@ mkdir -p "${TMPDIR}" 2>/dev/null || true
 export NVM_DIR="/config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 PROFILE_EOF
-  touch "$PROFILE_MARKER"
-  log "✓ Cleaned stale environment variables from .profile"
+log "✓ .profile configured"
+
+# ALWAYS regenerate .bashrc on every boot (no markers - persistent volumes need verification)
+# Clean existing bashrc from any gmweb entries first
+if [ -f "$HOME_DIR/.bashrc" ]; then
+  grep -v -E "NVM_DIR|nvm.sh|bash_completion|gmweb|opencode" "$HOME_DIR/.bashrc" > "$HOME_DIR/.bashrc.tmp" && \
+  mv "$HOME_DIR/.bashrc.tmp" "$HOME_DIR/.bashrc" || true
 fi
 
-BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup-v2"
-# Only set up bashrc once per version (marker prevents duplicates)
-if [ ! -f "$BASHRC_MARKER" ]; then
-  # Clean existing bashrc from any gmweb entries first
-  if [ -f "$HOME_DIR/.bashrc" ]; then
-    # Remove old gmweb markers and reset
-    rm -f "$HOME_DIR/.gmweb-bashrc-setup" 2>/dev/null || true
-    grep -v -E "NVM_DIR|nvm.sh|bash_completion|gmweb|opencode" "$HOME_DIR/.bashrc" > "$HOME_DIR/.bashrc.tmp" && \
-    mv "$HOME_DIR/.bashrc.tmp" "$HOME_DIR/.bashrc" || true
-  fi
-  
-  # Add fresh setup with centralized paths (one time only per version)
-  cat >> "$HOME_DIR/.bashrc" << 'EOF'
+# Add fresh setup with centralized paths
+cat >> "$HOME_DIR/.bashrc" << 'EOF'
 
 # gmweb NVM setup - ensures Node.js is available in non-login shells
 export NVM_DIR="/config/nvm"
@@ -336,11 +319,7 @@ export NVM_DIR="/config/nvm"
 # gmweb tools - centralized directory (/config/.gmweb keeps root clean)
 export PATH="/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH"
 EOF
-  touch "$BASHRC_MARKER"
-  log "✓ bashrc configured with centralized paths (v2)"
-else
-  log "✓ bashrc already configured (v2 marker exists)"
-fi
+log "✓ .bashrc configured with centralized paths"
 
 log "Phase 1 complete"
 
@@ -355,49 +334,49 @@ log "Persistent paths ready: NVM_DIR=$NVM_DIR"
 # Always source NVM if available
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-# Check if Node 24 (LTS) is installed and npm is working
-NEED_NODE_INSTALL=false
-if ! command -v node &>/dev/null || ! node -v | grep -q "^v24\."; then
-  NEED_NODE_INSTALL=true
-  log "Node 24 not found, will install"
-elif ! command -v npm &>/dev/null; then
-  NEED_NODE_INSTALL=true
-  log "Node 24 exists but npm missing, will reinstall"
+# ALWAYS verify Node 24 and npm on every boot (persistent volumes can be corrupted)
+mkdir -p "$NVM_DIR"
+
+# Install NVM if not present
+if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+  log "Installing NVM..."
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
+  . "$NVM_DIR/nvm.sh"
 fi
 
-if [ "$NEED_NODE_INSTALL" = true ]; then
-  mkdir -p "$NVM_DIR"
-  
-  # Install NVM if not present
-  if [ ! -s "$NVM_DIR/nvm.sh" ]; then
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
-    . "$NVM_DIR/nvm.sh"
-  fi
-  
-  # Reinstall Node.js 24 (forces fresh npm installation)
-  log "Installing Node.js 24 (LTS) with npm..."
+# Check if Node 24 exists and npm is working
+if ! command -v node &>/dev/null || ! node -v | grep -q "^v24\." || ! command -v npm &>/dev/null; then
+  # Node or npm missing/broken - reinstall
+  log "Installing/repairing Node.js 24 (LTS) with npm..."
   nvm install 24 --reinstall-packages-from=24 2>&1 | tail -5
   nvm alias default 24 2>&1 | tail -2
   nvm alias stable 24 2>&1 | tail -2
   nvm use 24 2>&1 | tail -2
   
-  # Verify npm is installed
+  # Verify npm is installed, fallback to manual install
   if ! command -v npm &>/dev/null; then
-    log "WARNING: npm not found after install, installing manually..."
+    log "WARNING: npm not found after nvm install, installing manually..."
     curl -qL https://www.npmjs.com/install.sh | sh 2>&1 | tail -3
   fi
   
   log "✓ Node.js 24 (LTS) installed with npm $(npm -v 2>/dev/null || echo 'ERROR')"
 else
-  # Node 24 already installed, just make sure it's active and aliased
+  # Node 24 and npm exist - ensure they're active
   nvm use 24 2>&1 | tail -2 || true
   nvm alias default 24 2>&1 | tail -2 || true
   nvm alias stable 24 2>&1 | tail -2 || true
-  log "✓ Node.js 24 (LTS) already installed with npm $(npm -v 2>/dev/null || echo 'ERROR')"
+  log "✓ Node.js 24 (LTS) verified with npm $(npm -v 2>/dev/null || echo 'ERROR')"
+fi
+
+# Final verification - fail hard if npm still missing
+if ! command -v npm &>/dev/null; then
+  log "ERROR: npm still not available after installation attempts"
+  exit 1
 fi
 
 NODE_VERSION=$(node -v | tr -d 'v')
-log "Node.js $NODE_VERSION (NVM_DIR=$NVM_DIR)"
+NPM_VERSION=$(npm -v)
+log "Node.js $NODE_VERSION, npm $NPM_VERSION (NVM_DIR=$NVM_DIR)"
 
 log "Setting up supervisor..."
 # Clean up temp clone dir
