@@ -143,7 +143,7 @@ export default {
   name: 'aion-ui',
   type: 'web',
   requiresDesktop: true,
-  dependencies: [],
+  dependencies: ['claude-config'],
 
   async start(env) {
     console.log(`[aion-ui] Starting on port ${PORT}`);
