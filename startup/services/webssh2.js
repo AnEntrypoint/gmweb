@@ -31,10 +31,18 @@ export default {
       await sleep(500);
     } catch (e) {}
 
-    const shellEnv = { ...env, TERM: 'xterm-256color', HOME: '/config' };
+    const shellEnv = { 
+      ...env, 
+      TERM: 'xterm-256color', 
+      HOME: '/config',
+      USER: 'abc',
+      SHELL: '/bin/bash'
+    };
     delete shellEnv.NPM_CONFIG_PREFIX;
 
-    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', 'bash', '-i', '-l'], {
+    // Start bash as login shell (-l) and interactive (-i) to load .bashrc and .profile
+    // This ensures NVM, PATH, and all user configurations are loaded
+    const ps = spawn(binaryPath, ['-p', '9999', '-W', '-T', 'xterm-256color', '/bin/bash', '-l', '-i'], {
       cwd: '/config',
       env: shellEnv,
       stdio: ['ignore', 'pipe', 'pipe'],

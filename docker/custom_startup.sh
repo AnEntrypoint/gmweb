@@ -184,6 +184,19 @@ else
   log "WARNING: D-Bus socket not ready"
 fi
 
+log "Phase 0.5: Install jq (required for JSON processing)"
+if ! command -v jq &>/dev/null; then
+  apt-get update -qq 2>/dev/null || true
+  apt-get install -y --no-install-recommends jq 2>&1 | tail -3
+  log "✓ jq installed"
+else
+  log "✓ jq already installed"
+fi
+
+# Ensure /config ownership is set to abc at the start
+chown -R abc:abc /config 2>/dev/null || true
+log "✓ /config ownership set to abc"
+
 log "Phase 1: Git clone - get startup files and nginx config (minimal history)"
 rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
        /opt/gmweb-startup/services /opt/gmweb-startup/package* \
@@ -279,19 +292,33 @@ chmod 755 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
 NVM_DIR=/config/nvm
 export NVM_DIR
 log "Persistent paths ready: NVM_DIR=$NVM_DIR"
-if ! command -v node &>/dev/null; then
-  mkdir -p "$NVM_DIR"
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
-  . "$NVM_DIR/nvm.sh"
-  nvm install --lts 2>&1 | tail -5
-  nvm use default 2>&1 | tail -2
-  log "Node.js installed"
-else
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  log "Node.js already installed"
-fi
 
-. "$NVM_DIR/nvm.sh"
+# Always source NVM if available
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+# Check if Node 23 is installed, if not install it
+if ! command -v node &>/dev/null || ! node -v | grep -q "^v23\."; then
+  mkdir -p "$NVM_DIR"
+  
+  # Install NVM if not present
+  if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
+    . "$NVM_DIR/nvm.sh"
+  fi
+  
+  # Install Node.js 23 (latest stable in v23.x line)
+  nvm install 23 2>&1 | tail -5
+  nvm alias default 23 2>&1 | tail -2
+  nvm alias stable 23 2>&1 | tail -2
+  nvm use 23 2>&1 | tail -2
+  log "✓ Node.js 23 installed and set as default"
+else
+  # Node 23 already installed, just make sure it's active and aliased
+  nvm use 23 2>&1 | tail -2 || true
+  nvm alias default 23 2>&1 | tail -2 || true
+  nvm alias stable 23 2>&1 | tail -2 || true
+  log "✓ Node.js 23 already installed"
+fi
 
 NODE_VERSION=$(node -v | tr -d 'v')
 log "Node.js $NODE_VERSION (NVM_DIR=$NVM_DIR)"
@@ -476,6 +503,8 @@ log "Background installs started (PID: $!)"
 
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
+# Final ownership pass - ensure all files are owned by abc
 chown -R abc:abc "$HOME_DIR" 2>/dev/null || true
+log "✓ Final /config ownership set to abc"
 log "===== GMWEB STARTUP COMPLETE ====="
 exit 0
