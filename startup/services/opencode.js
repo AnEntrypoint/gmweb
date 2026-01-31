@@ -10,7 +10,7 @@ export default {
   name: NAME,
   type: 'install',
   requiresDesktop: false,
-  dependencies: [],
+  dependencies: ['opencode-config'],
 
   async start(env) {
     const binPath = `${dirname(process.execPath)}/${NAME}`;

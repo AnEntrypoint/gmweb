@@ -118,7 +118,7 @@ function createClaudeCodeAcpBridge(nodePath) {
       
       // Write wrapper script to temp file first, then move with sudo
       const tmpPath = '/tmp/claude-code-acp-wrapper';
-      require('fs').writeFileSync(tmpPath, wrapperScript);
+      writeFileSync(tmpPath, wrapperScript);
       execSync(`sudo mv "${tmpPath}" /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
       execSync('sudo chmod 755 /usr/local/bin/claude-code-acp', { stdio: 'pipe' });
       
