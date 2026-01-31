@@ -177,7 +177,20 @@ export default {
 
     try { execSync('rm -rf /config/.config/AionUi/Singleton* 2>/dev/null || true'); } catch (e) {}
     try { execSync('pkill -f AionUi || true'); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
-    const serviceEnv = { ...env, DISPLAY: ':1', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus', AIONUI_PORT: String(PORT), AIONUI_ALLOWED_ORIGINS: '*' };
+    
+    // Ensure NVM bin directory is in PATH so AionUI can find claude-code-acp
+    const nvmBinPath = dirname(process.execPath);
+    const envPath = env.PATH || process.env.PATH || '';
+    const pathWithNvm = envPath.includes(nvmBinPath) ? envPath : `${nvmBinPath}:${envPath}`;
+    
+    const serviceEnv = { 
+      ...env, 
+      DISPLAY: ':1', 
+      DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus', 
+      AIONUI_PORT: String(PORT), 
+      AIONUI_ALLOWED_ORIGINS: '*',
+      PATH: pathWithNvm
+    };
     // Source bash profile to ensure AionUI has full CLI context (opencode, npm packages, etc.)
     // Start in /config directory so AionUI treats it as home for file access
     const command = `cd /config && source /config/.profile && source /config/.bashrc 2>/dev/null || true && ${AIONUI_BINARY} --no-sandbox --webui --remote --port ${PORT}`;
