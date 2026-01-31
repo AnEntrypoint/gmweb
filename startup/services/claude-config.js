@@ -124,6 +124,46 @@ function installClaudeCodeAcp() {
   }
 }
 
+function patchAcpDefaultModel(model) {
+  // PATCH: The ACP bridge's getAvailableModels() always picks models[0] (opus) as default.
+  // It ignores settings.json model preference. We patch the installed JS to respect it.
+  // This runs every boot so it survives npm updates (fresh install → re-patch).
+  const acpAgentFile = '/config/.gmweb/npm-global/lib/node_modules/@zed-industries/claude-code-acp/dist/acp-agent.js';
+  if (!existsSync(acpAgentFile)) return;
+
+  try {
+    let content = readFileSync(acpAgentFile, 'utf8');
+
+    // The original code:
+    //   const currentModel = models[0];
+    //   await query.setModel(currentModel.value);
+    // We replace with: find model matching settings, fall back to first
+    const original = 'const currentModel = models[0];\n    await query.setModel(currentModel.value);';
+    const patched = `const _preferredModel = "${model}";\n    const currentModel = models.find(m => m.value === _preferredModel) || models[0];\n    await query.setModel(currentModel.value);`;
+
+    if (content.includes(patched)) {
+      console.log(`[claude-config] ✓ ACP bridge already patched for model: ${model}`);
+      return;
+    }
+
+    if (content.includes(original)) {
+      content = content.replace(original, patched);
+      writeFileSync(acpAgentFile, content);
+      console.log(`[claude-config] ✓ ACP bridge patched: default model → ${model}`);
+    } else if (content.includes('const _preferredModel =')) {
+      // Re-patch with updated model (e.g. haiku → sonnet change)
+      content = content.replace(/const _preferredModel = "[^"]*";\n    const currentModel = models\.find\(m => m\.value === _preferredModel\) \|\| models\[0\];\n    await query\.setModel\(currentModel\.value\);/,
+        patched);
+      writeFileSync(acpAgentFile, content);
+      console.log(`[claude-config] ✓ ACP bridge re-patched: default model → ${model}`);
+    } else {
+      console.log('[claude-config] Warning: ACP bridge code structure changed, cannot patch model default');
+    }
+  } catch (e) {
+    console.log(`[claude-config] Warning: Could not patch ACP bridge: ${e.message}`);
+  }
+}
+
 export default {
   name: 'claude-config',
   type: 'install',
@@ -161,6 +201,9 @@ export default {
     const mergedSettings = mergeSettings(existingSettings, DEFAULT_SETTINGS);
     writeFileSync(settingsFile, JSON.stringify(mergedSettings, null, 2));
     console.log('[claude-config] ✓ Settings configured:', Object.keys(mergedSettings.enabledPlugins).join(', '));
+
+    // Patch ACP bridge to use the configured model as default (not opus)
+    patchAcpDefaultModel(mergedSettings.model);
 
     let existingMarketplaces = {};
     if (existsSync(marketplacesFile)) {

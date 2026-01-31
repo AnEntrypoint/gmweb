@@ -39,6 +39,7 @@ async function main() {
         'file-manager',
         'log-viewer',
         'tmux',
+        'opencode-config',
         'opencode',
         'proxypilot',
         'aion-ui',
