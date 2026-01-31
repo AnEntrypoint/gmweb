@@ -192,8 +192,9 @@ export default {
       PATH: pathWithNvm
     };
     // Source bash profile to ensure AionUI has full CLI context (opencode, npm packages, etc.)
+    // Explicitly export PATH after sourcing to ensure it includes NVM bin
     // Start in /config directory so AionUI treats it as home for file access
-    const command = `cd /config && source /config/.profile && source /config/.bashrc 2>/dev/null || true && ${AIONUI_BINARY} --no-sandbox --webui --remote --port ${PORT}`;
+    const command = `cd /config && source /config/.profile && source /config/.bashrc 2>/dev/null || true && export PATH="${pathWithNvm}" && ${AIONUI_BINARY} --no-sandbox --webui --remote --port ${PORT}`;
     const ps = spawnAsAbcUser(command, serviceEnv);
     ps.stdout?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation')) console.log(`[aion-ui] ${m}`); });
     ps.stderr?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation') && !m.includes('GPU process')) console.log(`[aion-ui:err] ${m}`); });
