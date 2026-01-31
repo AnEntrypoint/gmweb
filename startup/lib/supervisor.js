@@ -167,9 +167,17 @@ export class Supervisor {
     const NVM_BIN = path.dirname(process.execPath);
     const NVM_LIB = path.join(NVM_BIN, '..', 'lib', 'node_modules');
     const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
-    env.PATH = `${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
+    const GMWEB_BIN = '/config/.gmweb/npm-global/bin';
+    const OPENCODE_BIN = '/config/.gmweb/tools/opencode/bin';
+    env.PATH = `${GMWEB_BIN}:${OPENCODE_BIN}:${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
     env.NODE_PATH = `${NVM_LIB}:${env.NODE_PATH || ''}`;
     if (!env.PASSWORD) { env.PASSWORD = 'password'; }
+    
+    // CRITICAL: Force all services to use centralized npm cache (prevents /config pollution)
+    env.npm_config_cache = env.npm_config_cache || '/config/.gmweb/npm-cache';
+    env.npm_config_prefix = env.npm_config_prefix || '/config/.gmweb/npm-global';
+    env.NPM_CONFIG_CACHE = env.NPM_CONFIG_CACHE || '/config/.gmweb/npm-cache';
+    env.NPM_CONFIG_PREFIX = env.NPM_CONFIG_PREFIX || '/config/.gmweb/npm-global';
 
     const uid = process.getuid?.() || 1000;
 

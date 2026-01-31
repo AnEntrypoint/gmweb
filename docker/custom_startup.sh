@@ -105,9 +105,17 @@ for node_dir in /config/nvm/versions/node/v*; do
   fi
 done
 
-# Fix permissions
+# Fix permissions on centralized directory
 chown -R abc:abc /config/.gmweb 2>/dev/null || true
 chmod -R 755 /config/.gmweb 2>/dev/null || true
+
+# CRITICAL: Fix permissions on npm cache (in case root processes created files)
+# This prevents EACCES errors when npm tries to write to cache
+if [ -d /config/.gmweb/npm-cache ]; then
+  chown -R abc:abc /config/.gmweb/npm-cache 2>/dev/null || true
+  chmod -R 777 /config/.gmweb/npm-cache 2>/dev/null || true
+  log "  Fixed npm cache permissions"
+fi
 
 log "✓ Cleanup complete - installations centralized to /config/.gmweb/"
 
@@ -156,7 +164,11 @@ fi
 log "Cleaning persistent volume artifacts..."
 sudo rm -rf /config/.npm 2>/dev/null || true
 sudo rm -rf /config/node_modules/.bin/* 2>/dev/null || true
-npm cache clean --force 2>/dev/null || true
+
+# Clean existing npm cache if it exists (will be recreated in centralized location)
+if command -v npm &>/dev/null; then
+  npm cache clean --force 2>/dev/null || true
+fi
 
 # Create centralized directory for all gmweb tools and installations
 # This keeps /config clean and user-friendly
@@ -165,18 +177,34 @@ mkdir -p "$GMWEB_DIR"/{npm-cache,npm-global,opencode,tools}
 sudo chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || true
 sudo chmod -R 755 "$GMWEB_DIR" 2>/dev/null || true
 
-# Configure npm to use centralized directory
+# Configure npm to use centralized directory at ALL levels (black magic for bulletproof setup)
+
+# 1. System-wide npmrc (/etc/npmrc) - read by all npm processes
 cat > /tmp/npmrc << 'NPMRC_EOF'
 cache=/config/.gmweb/npm-cache
 prefix=/config/.gmweb/npm-global
 NPMRC_EOF
 sudo cp /tmp/npmrc /etc/npmrc 2>/dev/null || true
+
+# 2. User-level npmrc (/config/.npmrc) - highest priority for user 'abc'
+cat > /tmp/npmrc << 'NPMRC_EOF'
+cache=/config/.gmweb/npm-cache
+prefix=/config/.gmweb/npm-global
+NPMRC_EOF
+sudo cp /tmp/npmrc /config/.npmrc 2>/dev/null || true
+sudo chown abc:abc /config/.npmrc 2>/dev/null || true
 rm -f /tmp/npmrc
 
-# Add npm global binaries to PATH
+# 3. Environment variables - override everything, highest priority
+export npm_config_cache="/config/.gmweb/npm-cache"
+export npm_config_prefix="/config/.gmweb/npm-global"
+export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
+export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
+
+# 4. Add npm global binaries to PATH
 export PATH="/config/.gmweb/npm-global/bin:$PATH"
 
-log "✓ Centralized gmweb directory configured at $GMWEB_DIR"
+log "✓ Centralized gmweb directory configured at $GMWEB_DIR (system + user + env)"
 
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
@@ -297,6 +325,12 @@ mkdir -p "${TMPDIR}" 2>/dev/null || true
 
 export NVM_DIR="/config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+# Force npm to use centralized cache (prevents /config pollution)
+export npm_config_cache="/config/.gmweb/npm-cache"
+export npm_config_prefix="/config/.gmweb/npm-global"
+export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
+export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
 PROFILE_EOF
 log "✓ .profile configured"
 
@@ -318,6 +352,12 @@ export NVM_DIR="/config/nvm"
 
 # gmweb tools - centralized directory (/config/.gmweb keeps root clean)
 export PATH="/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH"
+
+# Force npm to use centralized cache (prevents /config pollution)
+export npm_config_cache="/config/.gmweb/npm-cache"
+export npm_config_prefix="/config/.gmweb/npm-global"
+export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
+export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
 EOF
 log "✓ .bashrc configured with centralized paths"
 
@@ -505,11 +545,16 @@ log "✓ Critical modules installed"
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
   # Explicitly pass all required environment variables to supervisor
+  # CRITICAL: npm config vars ensure all child processes use centralized cache
   NVM_DIR=/config/nvm \
   HOME=/config \
   GMWEB_DIR="$GMWEB_DIR" \
   PATH="/config/.gmweb/npm-global/bin:$PATH" \
   NODE_OPTIONS="--no-warnings" \
+  npm_config_cache="/config/.gmweb/npm-cache" \
+  npm_config_prefix="/config/.gmweb/npm-global" \
+  NPM_CONFIG_CACHE="/config/.gmweb/npm-cache" \
+  NPM_CONFIG_PREFIX="/config/.gmweb/npm-global" \
   sudo -u abc -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
   SUPERVISOR_PID=$!
   sleep 2
@@ -528,6 +573,11 @@ log "XFCE component launcher started (PID: $!)"
   export NVM_DIR=/config/nvm
   export HOME=/config
   export GMWEB_DIR=/config/.gmweb
+  # Force npm to use centralized cache
+  export npm_config_cache="/config/.gmweb/npm-cache"
+  export npm_config_prefix="/config/.gmweb/npm-global"
+  export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
+  export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
   
   # Install base packages
