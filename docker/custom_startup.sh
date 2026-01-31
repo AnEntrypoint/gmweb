@@ -334,14 +334,18 @@ export TMP="${HOME}/.tmp"
 export TEMP="${HOME}/.tmp"
 mkdir -p "${TMPDIR}" 2>/dev/null || true
 
+# NVM Compatibility: hide npm config before loading NVM
+if [ -f "${HOME}/.nvm_compat.sh" ]; then
+  . "${HOME}/.nvm_compat.sh"
+fi
+
 export NVM_DIR="/config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-# Force npm to use centralized cache (prevents /config pollution)
-export npm_config_cache="/config/.gmweb/npm-cache"
-export npm_config_prefix="/config/.gmweb/npm-global"
-export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
-export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
+# NVM Restore: restore npm config after NVM is loaded
+if [ -f "${HOME}/.nvm_restore.sh" ]; then
+  . "${HOME}/.nvm_restore.sh"
+fi
 PROFILE_EOF
 log "✓ .profile configured"
 
@@ -352,23 +356,27 @@ if [ -f "$HOME_DIR/.bashrc" ]; then
   mv "$HOME_DIR/.bashrc.tmp" "$HOME_DIR/.bashrc" || true
 fi
 
-# Add fresh setup with centralized paths
+# Add fresh setup with centralized paths and NVM compatibility
 cat >> "$HOME_DIR/.bashrc" << 'EOF'
 
 # gmweb NVM setup - ensures Node.js is available in non-login shells
+# NVM Compatibility: hide npm config before loading NVM
+if [ -f "${HOME}/.nvm_compat.sh" ]; then
+  . "${HOME}/.nvm_compat.sh"
+fi
+
 export NVM_DIR="/config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 # nvm bash completion (optional)
 [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
 
+# NVM Restore: restore npm config after NVM is loaded
+if [ -f "${HOME}/.nvm_restore.sh" ]; then
+  . "${HOME}/.nvm_restore.sh"
+fi
+
 # gmweb tools - centralized directory (/config/.gmweb keeps root clean)
 export PATH="/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH"
-
-# Force npm to use centralized cache (prevents /config pollution)
-export npm_config_cache="/config/.gmweb/npm-cache"
-export npm_config_prefix="/config/.gmweb/npm-global"
-export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
-export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
 EOF
 log "✓ .bashrc configured with centralized paths"
 
