@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, chmodSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 
@@ -77,59 +77,50 @@ function cloneMarketplace(name, repo, installLocation) {
   }
 }
 
-function createClaudeCodeAcpBridge(nodePath) {
+function installClaudeCode() {
+  // Install Claude Code via native installer (not npm - npm method is deprecated)
+  // Native binary goes to ~/.local/bin/claude with auto-updates
+  const claudeBin = join(process.env.HOME || '/config', '.local', 'bin', 'claude');
   try {
-    const nodeModulesDir = join(nodePath, 'lib', 'node_modules');
-    const acpDir = join(nodeModulesDir, '@zed-industries', 'claude-code-acp');
-    const binDir = join(nodePath, 'bin');
-
-    try {
-      execSync(`rm -rf "${acpDir}"`, { stdio: 'pipe' });
-    } catch (e) {}
-
-    try {
-      execSync(`npm install --prefix "${nodeModulesDir}/.." @zed-industries/claude-code-acp@latest`, {
+    if (!existsSync(claudeBin)) {
+      console.log('[claude-config] Installing Claude Code via native installer...');
+      execSync('curl -fsSL https://claude.ai/install.sh | bash', {
         stdio: 'pipe',
-        timeout: 120000,
-        env: { ...process.env, NPM_CONFIG_FETCH_TIMEOUT: '120000' }
+        timeout: 120000
       });
-    } catch (e) {
-      console.log(`[claude-config] Warning: npm install failed, will retry: ${e.message}`);
-      return;
     }
-
-    const binPath = join(binDir, 'claude-code-acp');
-    try {
-      execSync(`rm -f "${binPath}"`, { stdio: 'pipe' });
-    } catch (e) {}
-
-    execSync(`ln -s ../lib/node_modules/@zed-industries/claude-code-acp/dist/index.js "${binPath}"`, { stdio: 'pipe' });
-    chmodSync(binPath, 0o755);
-
-    // Create wrapper script in /usr/local/bin with explicit node path
-    // This is needed because AionUI subprocess won't have node in PATH
-    try {
-      const nodeBin = join(nodePath, 'bin', 'node');
-      const acpScript = join(nodeModulesDir, '@zed-industries', 'claude-code-acp', 'dist', 'index.js');
-      const wrapperScript = `#!/bin/bash\nexec "${nodeBin}" "${acpScript}" "$@"\n`;
-      
-      execSync('sudo mkdir -p /usr/local/bin', { stdio: 'pipe' });
-      execSync(`sudo rm -f /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
-      
-      // Write wrapper script to temp file first, then move with sudo
-      const tmpPath = '/tmp/claude-code-acp-wrapper';
-      writeFileSync(tmpPath, wrapperScript);
-      execSync(`sudo mv "${tmpPath}" /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
-      execSync('sudo chmod 755 /usr/local/bin/claude-code-acp', { stdio: 'pipe' });
-      
-      console.log('[claude-config] ✓ Created /usr/local/bin wrapper script for ACP bridge');
-    } catch (e) {
-      console.log(`[claude-config] Warning: Could not create /usr/local/bin wrapper: ${e.message}`);
+    if (existsSync(claudeBin)) {
+      console.log('[claude-config] ✓ Claude Code installed natively');
     }
-
-    console.log('[claude-config] ✓ Installed and linked @zed-industries/claude-code-acp');
   } catch (e) {
-    console.log(`[claude-config] Warning: Could not setup ACP bridge: ${e.message}`);
+    console.log(`[claude-config] Warning: Claude Code native install failed: ${e.message}`);
+  }
+}
+
+function installClaudeCodeAcp() {
+  // Install @zed-industries/claude-code-acp globally via npm install -g
+  // This is the ACP bridge that AionUI uses to communicate with Claude Code
+  // npm install -g puts it in NPM_CONFIG_PREFIX (/config/.gmweb/npm-global) which is in PATH
+  // NEVER use --prefix into the NVM node dir - that nukes npm itself
+  try {
+    const globalBin = '/config/.gmweb/npm-global/bin/claude-code-acp';
+    const globalLib = '/config/.gmweb/npm-global/lib/node_modules/@zed-industries/claude-code-acp/dist/index.js';
+
+    if (!existsSync(globalLib)) {
+      console.log('[claude-config] Installing @zed-industries/claude-code-acp globally...');
+      execSync('npm install -g @zed-industries/claude-code-acp@latest', {
+        stdio: 'pipe',
+        timeout: 120000
+      });
+    }
+
+    if (existsSync(globalBin)) {
+      console.log('[claude-config] ✓ claude-code-acp ACP bridge installed');
+    } else {
+      console.log('[claude-config] Warning: claude-code-acp binary not found after install');
+    }
+  } catch (e) {
+    console.log(`[claude-config] Warning: Could not install claude-code-acp: ${e.message}`);
   }
 }
 
@@ -148,15 +139,11 @@ export default {
 
     console.log('[claude-config] Ensuring Claude Code configuration...');
 
-    const nvmDir = env.NVM_DIR || join(env.HOME || '/config', 'nvm');
-    const nodeVersionsDir = join(nvmDir, 'versions', 'node');
-    if (existsSync(nodeVersionsDir)) {
-      const versions = readdirSync(nodeVersionsDir).sort().reverse();
-      if (versions.length > 0) {
-        const latestNode = join(nodeVersionsDir, versions[0]);
-        createClaudeCodeAcpBridge(latestNode);
-      }
-    }
+    // Install Claude Code native binary (curl installer, auto-updates)
+    installClaudeCode();
+
+    // Install ACP bridge for AionUI (npm install -g → /config/.gmweb/npm-global/)
+    installClaudeCodeAcp();
 
     ensureDir(claudeDir);
     ensureDir(pluginsDir);

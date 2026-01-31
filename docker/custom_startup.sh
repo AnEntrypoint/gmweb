@@ -412,33 +412,21 @@ if [ ! -s "$NVM_DIR/nvm.sh" ]; then
   . "$NVM_DIR/nvm.sh"
 fi
 
-# Check if Node 24 exists and npm is working
-if ! command -v node &>/dev/null || ! node -v | grep -q "^v24\." || ! command -v npm &>/dev/null; then
-  # Node or npm missing/broken - reinstall
-  log "Installing/repairing Node.js 24 (LTS) with npm..."
-  nvm install 24 --reinstall-packages-from=24 2>&1 | tail -5
-  nvm alias default 24 2>&1 | tail -2
-  nvm alias stable 24 2>&1 | tail -2
-  nvm use 24 2>&1 | tail -2
-  
-  # Verify npm is installed, fallback to manual install
-  if ! command -v npm &>/dev/null; then
-    log "WARNING: npm not found after nvm install, installing manually..."
-    curl -qL https://www.npmjs.com/install.sh | sh 2>&1 | tail -3
-  fi
-  
-  log "✓ Node.js 24 (LTS) installed with npm $(npm -v 2>/dev/null || echo 'ERROR')"
-else
-  # Node 24 and npm exist - ensure they're active
-  nvm use 24 2>&1 | tail -2 || true
-  nvm alias default 24 2>&1 | tail -2 || true
-  nvm alias stable 24 2>&1 | tail -2 || true
-  log "✓ Node.js 24 (LTS) verified with npm $(npm -v 2>/dev/null || echo 'ERROR')"
-fi
+# ALWAYS reinstall Node 24 on every boot to guarantee npm/npx integrity
+# Persistent /config volume may have corrupted NVM node_modules (e.g. npm deleted
+# by a bad --prefix install). nvm uninstall + install is fast (~2s from cache)
+# and guarantees a clean npm/npx every time.
+log "Reinstalling Node.js 24 (LTS) to guarantee clean npm/npx..."
+nvm deactivate 2>/dev/null || true
+nvm uninstall 24 2>&1 | tail -3 || true
+nvm install 24 2>&1 | tail -5
+nvm alias default 24 2>&1 | tail -2
+nvm alias stable 24 2>&1 | tail -2
+nvm use 24 2>&1 | tail -2
 
 # Final verification - fail hard if npm still missing
 if ! command -v npm &>/dev/null; then
-  log "ERROR: npm still not available after installation attempts"
+  log "ERROR: npm not available after fresh nvm install"
   exit 1
 fi
 
