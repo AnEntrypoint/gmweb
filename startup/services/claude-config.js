@@ -106,14 +106,25 @@ function createClaudeCodeAcpBridge(nodePath) {
     execSync(`ln -s ../lib/node_modules/@zed-industries/claude-code-acp/dist/index.js "${binPath}"`, { stdio: 'pipe' });
     chmodSync(binPath, 0o755);
 
-    // Also create symlink in /usr/local/bin for easier discovery by apps like AionUI
+    // Create wrapper script in /usr/local/bin with explicit node path
+    // This is needed because AionUI subprocess won't have node in PATH
     try {
-      execSync('mkdir -p /usr/local/bin', { stdio: 'pipe' });
-      execSync(`rm -f /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
-      execSync(`ln -s "${binPath}" /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
-      console.log('[claude-config] ✓ Created /usr/local/bin symlink for ACP bridge');
+      const nodeBin = join(nodePath, 'bin', 'node');
+      const acpScript = join(nodeModulesDir, '@zed-industries', 'claude-code-acp', 'dist', 'index.js');
+      const wrapperScript = `#!/bin/bash\nexec "${nodeBin}" "${acpScript}" "$@"\n`;
+      
+      execSync('sudo mkdir -p /usr/local/bin', { stdio: 'pipe' });
+      execSync(`sudo rm -f /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
+      
+      // Write wrapper script to temp file first, then move with sudo
+      const tmpPath = '/tmp/claude-code-acp-wrapper';
+      require('fs').writeFileSync(tmpPath, wrapperScript);
+      execSync(`sudo mv "${tmpPath}" /usr/local/bin/claude-code-acp`, { stdio: 'pipe' });
+      execSync('sudo chmod 755 /usr/local/bin/claude-code-acp', { stdio: 'pipe' });
+      
+      console.log('[claude-config] ✓ Created /usr/local/bin wrapper script for ACP bridge');
     } catch (e) {
-      console.log(`[claude-config] Warning: Could not create /usr/local/bin symlink: ${e.message}`);
+      console.log(`[claude-config] Warning: Could not create /usr/local/bin wrapper: ${e.message}`);
     }
 
     console.log('[claude-config] ✓ Installed and linked @zed-industries/claude-code-acp');
