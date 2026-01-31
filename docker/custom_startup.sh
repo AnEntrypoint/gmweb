@@ -60,11 +60,52 @@ sudo nginx -s reload 2>/dev/null || log "WARNING: nginx reload failed (nginx may
 export PASSWORD
 log "✓ HTTP Basic Auth configured with valid apr1 hash"
 
-# Clean up stale environment vars from persistent .profile (can get stale from failed runs)
+# Clean up stale environment vars from persistent .profile
 if [ -f "$HOME_DIR/.profile" ]; then
   grep -v -E "LD_PRELOAD|NPM_CONFIG_PREFIX" "$HOME_DIR/.profile" > "$HOME_DIR/.profile.tmp" && \
   mv "$HOME_DIR/.profile.tmp" "$HOME_DIR/.profile" || true
-  log "✓ Cleaned stale environment variables from .profile"
+fi
+
+# MIGRATION: Move legacy installations to centralized directory and clean pollution
+MIGRATION_MARKER="$HOME_DIR/.gmweb-migrated-v2"
+if [ ! -f "$MIGRATION_MARKER" ]; then
+  log "MIGRATION: Centralizing installations and cleaning /config pollution..."
+  
+  # Create centralized directory
+  mkdir -p /config/.gmweb/{npm-cache,npm-global,tools,deps,cache}
+  
+  # Migrate opencode if it exists in old location
+  if [ -d /config/.opencode ]; then
+    log "  Moving /config/.opencode -> /config/.gmweb/tools/opencode"
+    mv /config/.opencode /config/.gmweb/tools/opencode 2>/dev/null || true
+  fi
+  
+  # Migrate old npm cache
+  if [ -d /config/.npm ]; then
+    log "  Moving /config/.npm -> /config/.gmweb/npm-cache"
+    mv /config/.npm/* /config/.gmweb/npm-cache/ 2>/dev/null || true
+    rm -rf /config/.npm
+  fi
+  
+  # Migrate generic cache directories to centralized location
+  for cache_dir in .cache .bun .docker .config; do
+    if [ -d "/config/$cache_dir" ]; then
+      log "  Moving /config/$cache_dir -> /config/.gmweb/cache/$cache_dir"
+      mv "/config/$cache_dir" "/config/.gmweb/cache/$cache_dir" 2>/dev/null || true
+    fi
+  done
+  
+  # Clean up old installation/config directories (NOT user data like .claude, .agents)
+  sudo rm -rf /config/usr /config/.gmweb-deps /config/.gmweb-bashrc-setup 2>/dev/null || true
+  
+  # Fix permissions
+  chown -R abc:abc /config/.gmweb 2>/dev/null || true
+  chmod -R 755 /config/.gmweb 2>/dev/null || true
+  
+  touch "$MIGRATION_MARKER"
+  log "✓ Migration complete - installations centralized to /config/.gmweb/"
+else
+  log "✓ Migration already completed (marker exists)"
 fi
 
 # Compile close_range shim immediately (before anything else uses LD_PRELOAD)
@@ -114,36 +155,25 @@ sudo rm -rf /config/.npm 2>/dev/null || true
 sudo rm -rf /config/node_modules/.bin/* 2>/dev/null || true
 npm cache clean --force 2>/dev/null || true
 
-# Create global npm configuration to prevent permission issues
-# Use a cache directory and set proper permissions
-mkdir -p /config/.npm
-sudo chown -R abc:abc /config/.npm 2>/dev/null || true
-sudo chmod -R 755 /config/.npm 2>/dev/null || true
+# Create centralized directory for all gmweb tools and installations
+# This keeps /config clean and user-friendly
+GMWEB_DIR="/config/.gmweb"
+mkdir -p "$GMWEB_DIR"/{npm-cache,npm-global,opencode,tools}
+sudo chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || true
+sudo chmod -R 755 "$GMWEB_DIR" 2>/dev/null || true
 
+# Configure npm to use centralized directory
 cat > /tmp/npmrc << 'NPMRC_EOF'
-cache=/config/.npm
-prefix=/config/usr/local
+cache=/config/.gmweb/npm-cache
+prefix=/config/.gmweb/npm-global
 NPMRC_EOF
 sudo cp /tmp/npmrc /etc/npmrc 2>/dev/null || true
 rm -f /tmp/npmrc
 
-# Create npm wrapper script that ensures cache consistency
-mkdir -p /config/usr/local/bin
-cat > /config/usr/local/bin/npm-wrapper << 'WRAPPER_EOF'
-#!/bin/bash
-# NPM wrapper - ensures cache permissions before running npm
-sudo chown -R abc:abc /config/.npm 2>/dev/null || true
-exec /config/usr/local/bin/npm.real "$@"
-WRAPPER_EOF
-chmod +x /config/usr/local/bin/npm-wrapper
+# Add npm global binaries to PATH
+export PATH="/config/.gmweb/npm-global/bin:$PATH"
 
-# Backup original npm and create wrapper
-if [ -f /config/usr/local/bin/npm ] && [ ! -f /config/usr/local/bin/npm.real ]; then
-  sudo mv /config/usr/local/bin/npm /config/usr/local/bin/npm.real 2>/dev/null || true
-  sudo ln -sf /config/usr/local/bin/npm-wrapper /config/usr/local/bin/npm 2>/dev/null || true
-fi
-
-log "✓ npm configuration and wrapper set"
+log "✓ Centralized gmweb directory configured at $GMWEB_DIR"
 
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
@@ -158,6 +188,15 @@ export TMPDIR="$SAFE_TMPDIR"
 export TMP="$SAFE_TMPDIR"
 export TEMP="$SAFE_TMPDIR"
 log "Configured temp directory: $TMPDIR (prevents cross-filesystem rename errors)"
+
+# Prevent tools from polluting /config with cache/config directories
+export XDG_CACHE_HOME="/config/.gmweb/cache"
+export XDG_CONFIG_HOME="/config/.gmweb/cache/.config"
+export XDG_DATA_HOME="/config/.gmweb/cache/.local/share"
+export DOCKER_CONFIG="/config/.gmweb/cache/.docker"
+export BUN_INSTALL="/config/.gmweb/cache/.bun"
+mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$DOCKER_CONFIG" "$BUN_INSTALL"
+log "Configured XDG directories to prevent /config pollution"
 
 # Clean up old temp files (older than 7 days) to prevent unbounded growth
 find "$SAFE_TMPDIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
@@ -243,7 +282,8 @@ sudo cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-availabl
 sudo nginx -s reload 2>/dev/null || true
 log "✓ Nginx config updated from git"
 
-sudo mkdir -p "$HOME_DIR/.npm" 2>/dev/null && sudo chown -R abc:abc "$HOME_DIR/.npm" 2>/dev/null || true
+# Ensure gmweb directory exists and has correct permissions
+mkdir -p "$GMWEB_DIR" && chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || true
 
 PROFILE_MARKER="$HOME_DIR/.gmweb-profile-setup"
 if [ ! -f "$PROFILE_MARKER" ]; then
@@ -261,16 +301,18 @@ PROFILE_EOF
   log "✓ Cleaned stale environment variables from .profile"
 fi
 
-BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup"
-# Clean stale bashrc entries from previous failed/broken setups
-if [ -f "$HOME_DIR/.bashrc" ]; then
-  # Remove old broken NVM_DIR entries (e.g., /usr/local/local/nvm)
-  grep -v "export NVM_DIR=" "$HOME_DIR/.bashrc" > "$HOME_DIR/.bashrc.tmp" && \
-  mv "$HOME_DIR/.bashrc.tmp" "$HOME_DIR/.bashrc" || true
-fi
-
-if [ ! -f "$BASHRC_MARKER" ] || ! grep -q 'export NVM_DIR="/config/nvm"' "$HOME_DIR/.bashrc"; then
-  # Ensure correct NVM setup is in bashrc
+BASHRC_MARKER="$HOME_DIR/.gmweb-bashrc-setup-v2"
+# Only set up bashrc once per version (marker prevents duplicates)
+if [ ! -f "$BASHRC_MARKER" ]; then
+  # Clean existing bashrc from any gmweb entries first
+  if [ -f "$HOME_DIR/.bashrc" ]; then
+    # Remove old gmweb markers and reset
+    rm -f "$HOME_DIR/.gmweb-bashrc-setup" 2>/dev/null || true
+    grep -v -E "NVM_DIR|nvm.sh|bash_completion|gmweb|opencode" "$HOME_DIR/.bashrc" > "$HOME_DIR/.bashrc.tmp" && \
+    mv "$HOME_DIR/.bashrc.tmp" "$HOME_DIR/.bashrc" || true
+  fi
+  
+  # Add fresh setup with centralized paths (one time only per version)
   cat >> "$HOME_DIR/.bashrc" << 'EOF'
 
 # gmweb NVM setup - ensures Node.js is available in non-login shells
@@ -278,9 +320,14 @@ export NVM_DIR="/config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 # nvm bash completion (optional)
 [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
+
+# gmweb tools - centralized directory (/config/.gmweb keeps root clean)
+export PATH="/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH"
 EOF
   touch "$BASHRC_MARKER"
-  log "✓ bashrc updated with correct NVM configuration"
+  log "✓ bashrc configured with centralized paths (v2)"
+else
+  log "✓ bashrc already configured (v2 marker exists)"
 fi
 
 log "Phase 1 complete"
@@ -296,8 +343,8 @@ log "Persistent paths ready: NVM_DIR=$NVM_DIR"
 # Always source NVM if available
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-# Check if Node 23 is installed, if not install it
-if ! command -v node &>/dev/null || ! node -v | grep -q "^v23\."; then
+# Check if Node 24 (LTS) is installed, if not install it
+if ! command -v node &>/dev/null || ! node -v | grep -q "^v24\."; then
   mkdir -p "$NVM_DIR"
   
   # Install NVM if not present
@@ -306,18 +353,18 @@ if ! command -v node &>/dev/null || ! node -v | grep -q "^v23\."; then
     . "$NVM_DIR/nvm.sh"
   fi
   
-  # Install Node.js 23 (latest stable in v23.x line)
-  nvm install 23 2>&1 | tail -5
-  nvm alias default 23 2>&1 | tail -2
-  nvm alias stable 23 2>&1 | tail -2
-  nvm use 23 2>&1 | tail -2
-  log "✓ Node.js 23 installed and set as default"
+  # Install Node.js 24 (LTS - stable and reliable)
+  nvm install 24 2>&1 | tail -5
+  nvm alias default 24 2>&1 | tail -2
+  nvm alias stable 24 2>&1 | tail -2
+  nvm use 24 2>&1 | tail -2
+  log "✓ Node.js 24 (LTS) installed and set as default"
 else
-  # Node 23 already installed, just make sure it's active and aliased
-  nvm use 23 2>&1 | tail -2 || true
-  nvm alias default 23 2>&1 | tail -2 || true
-  nvm alias stable 23 2>&1 | tail -2 || true
-  log "✓ Node.js 23 already installed"
+  # Node 24 already installed, just make sure it's active and aliased
+  nvm use 24 2>&1 | tail -2 || true
+  nvm alias default 24 2>&1 | tail -2 || true
+  nvm alias stable 24 2>&1 | tail -2 || true
+  log "✓ Node.js 24 (LTS) already installed"
 fi
 
 NODE_VERSION=$(node -v | tr -d 'v')
@@ -431,7 +478,7 @@ chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
 log "Installing critical Node modules for AionUI..."
-mkdir -p /config/.gmweb-deps
+mkdir -p "$GMWEB_DIR/deps"
 
 # Install with timeout - fail hard if anything goes wrong
 timeout 30 npm install -g better-sqlite3 2>&1 | tail -2 || {
@@ -439,19 +486,23 @@ timeout 30 npm install -g better-sqlite3 2>&1 | tail -2 || {
   exit 1
 }
 
-cd /config/.gmweb-deps && timeout 30 npm install bcrypt 2>&1 | tail -2 || {
+cd "$GMWEB_DIR/deps" && timeout 30 npm install bcrypt 2>&1 | tail -2 || {
   log "ERROR: bcrypt installation failed"
   exit 1
 }
 
-chown -R abc:abc /config/.gmweb-deps 2>/dev/null || true
+chown -R abc:abc "$GMWEB_DIR/deps" 2>/dev/null || true
 log "✓ Critical modules installed"
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
-  # Explicitly pass NVM_DIR and HOME to ensure Node.js is available
-  # Use -E to preserve environment, but don't use -H (which breaks HOME for abc user)
-  NVM_DIR=/config/nvm HOME=/config NODE_OPTIONS="--no-warnings" sudo -u abc -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
+  # Explicitly pass all required environment variables to supervisor
+  NVM_DIR=/config/nvm \
+  HOME=/config \
+  GMWEB_DIR="$GMWEB_DIR" \
+  PATH="/config/.gmweb/npm-global/bin:$PATH" \
+  NODE_OPTIONS="--no-warnings" \
+  sudo -u abc -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
   SUPERVISOR_PID=$!
   sleep 2
   kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"
@@ -465,6 +516,12 @@ bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1 &
 log "XFCE component launcher started (PID: $!)"
 
 {
+  # CRITICAL: Source NVM in subshell so npm/node commands work
+  export NVM_DIR=/config/nvm
+  export HOME=/config
+  export GMWEB_DIR=/config/.gmweb
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+  
   # Install base packages
   apt-get update
   apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
@@ -486,10 +543,15 @@ log "XFCE component launcher started (PID: $!)"
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
 
-  log "Installing CLI coding tools (qwen-code, codex, cursor)..."
-  npm install -g @qwen-code/qwen-code@latest 2>&1 | tail -3 && log "qwen-code installed" || log "WARNING: qwen-code install failed"
-  npm install -g @openai/codex 2>&1 | tail -3 && log "codex installed" || log "WARNING: codex install failed"
-  curl -fsSL https://cursor.com/install 2>/dev/null | bash 2>&1 | tail -5 && log "cursor CLI installed" || log "WARNING: cursor CLI install failed"
+  log "Installing CLI coding tools (opencode)..."
+  # Install opencode to centralized directory
+  export OPENCODE_INSTALL_DIR="$GMWEB_DIR/tools"
+  if ! command -v opencode &>/dev/null; then
+    mkdir -p "$OPENCODE_INSTALL_DIR"
+    curl -fsSL https://opencode.ai/install | bash 2>&1 | tail -5 && log "opencode installed" || log "WARNING: opencode install failed"
+  else
+    log "opencode already installed"
+  fi
   log "CLI coding tools installation complete"
 
   log "Installing cloud and deployment tools (wrangler)..."
