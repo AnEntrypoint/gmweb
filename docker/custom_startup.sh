@@ -544,17 +544,28 @@ log "✓ Critical modules installed"
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
-  # Explicitly pass all required environment variables to supervisor
-  # CRITICAL: npm config vars ensure all child processes use centralized cache
+  # CRITICAL: Pass ALL environment variables to supervisor so all services share the same environment
+  # This ensures no service has settings that others don't have
   NVM_DIR=/config/nvm \
   HOME=/config \
   GMWEB_DIR="$GMWEB_DIR" \
-  PATH="/config/.gmweb/npm-global/bin:$PATH" \
+  PATH="/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH" \
   NODE_OPTIONS="--no-warnings" \
   npm_config_cache="/config/.gmweb/npm-cache" \
   npm_config_prefix="/config/.gmweb/npm-global" \
   NPM_CONFIG_CACHE="/config/.gmweb/npm-cache" \
   NPM_CONFIG_PREFIX="/config/.gmweb/npm-global" \
+  TMPDIR="/config/.tmp" \
+  TMP="/config/.tmp" \
+  TEMP="/config/.tmp" \
+  XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+  XDG_CACHE_HOME="/config/.gmweb/cache" \
+  XDG_CONFIG_HOME="/config/.gmweb/cache/.config" \
+  XDG_DATA_HOME="/config/.gmweb/cache/.local/share" \
+  DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
+  DOCKER_CONFIG="/config/.gmweb/cache/.docker" \
+  BUN_INSTALL="/config/.gmweb/cache/.bun" \
+  PASSWORD="$PASSWORD" \
   sudo -u abc -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
   SUPERVISOR_PID=$!
   sleep 2

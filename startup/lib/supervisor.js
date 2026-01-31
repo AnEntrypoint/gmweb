@@ -181,6 +181,17 @@ export class Supervisor {
 
     const uid = process.getuid?.() || 1000;
 
+    // Ensure all services get the same environment (black magic consistency)
+    if (!env.TMPDIR) { env.TMPDIR = '/config/.tmp'; }
+    if (!env.TMP) { env.TMP = '/config/.tmp'; }
+    if (!env.TEMP) { env.TEMP = '/config/.tmp'; }
+    
+    if (!env.XDG_CACHE_HOME) { env.XDG_CACHE_HOME = '/config/.gmweb/cache'; }
+    if (!env.XDG_CONFIG_HOME) { env.XDG_CONFIG_HOME = '/config/.gmweb/cache/.config'; }
+    if (!env.XDG_DATA_HOME) { env.XDG_DATA_HOME = '/config/.gmweb/cache/.local/share'; }
+    if (!env.DOCKER_CONFIG) { env.DOCKER_CONFIG = '/config/.gmweb/cache/.docker'; }
+    if (!env.BUN_INSTALL) { env.BUN_INSTALL = '/config/.gmweb/cache/.bun'; }
+
     if (!env.DBUS_SESSION_BUS_ADDRESS) {
       env.DBUS_SESSION_BUS_ADDRESS = `unix:path=/run/user/${uid}/bus`;
       this.logger.log('INFO', `D-Bus session configured: ${env.DBUS_SESSION_BUS_ADDRESS}`);

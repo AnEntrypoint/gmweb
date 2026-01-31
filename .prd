@@ -1,0 +1,11 @@
+# gmweb Node 23 + ProxyPilot Boot Analysis
+
+## Work Items
+- [ ] Verify NVM is installed and can select Node 23
+- [ ] Check Node 23 is globally available on PATH after boot
+- [ ] Verify Node 23 is default/active node version
+- [ ] Confirm ProxyPilot service starts on boot
+- [ ] Ensure all boot-time folders created are in /opt/gmweb-startup/
+- [ ] Audit volume mount not masking issues
+- [ ] Test live system execution end-to-end
+- [ ] Fix any issues discovered
