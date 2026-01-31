@@ -98,6 +98,18 @@ if [ ! -f "$MIGRATION_MARKER" ]; then
   # Clean up old installation/config directories (NOT user data like .claude, .agents)
   sudo rm -rf /config/usr /config/.gmweb-deps /config/.gmweb-bashrc-setup 2>/dev/null || true
   
+  # Clean up old Node versions (v23.x is deprecated, we use v24 LTS)
+  if [ -d /config/nvm/versions/node/v23.11.1 ]; then
+    log "  Removing old Node v23.11.1"
+    rm -rf /config/nvm/versions/node/v23.11.1 2>/dev/null || true
+  fi
+  
+  # Clean NVM cache to prevent corrupted installations
+  if [ -d /config/nvm/.cache ]; then
+    log "  Clearing NVM cache to prevent corruption"
+    rm -rf /config/nvm/.cache/* 2>/dev/null || true
+  fi
+  
   # Fix permissions
   chown -R abc:abc /config/.gmweb 2>/dev/null || true
   chmod -R 755 /config/.gmweb 2>/dev/null || true
@@ -343,8 +355,17 @@ log "Persistent paths ready: NVM_DIR=$NVM_DIR"
 # Always source NVM if available
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-# Check if Node 24 (LTS) is installed, if not install it
+# Check if Node 24 (LTS) is installed and npm is working
+NEED_NODE_INSTALL=false
 if ! command -v node &>/dev/null || ! node -v | grep -q "^v24\."; then
+  NEED_NODE_INSTALL=true
+  log "Node 24 not found, will install"
+elif ! command -v npm &>/dev/null; then
+  NEED_NODE_INSTALL=true
+  log "Node 24 exists but npm missing, will reinstall"
+fi
+
+if [ "$NEED_NODE_INSTALL" = true ]; then
   mkdir -p "$NVM_DIR"
   
   # Install NVM if not present
@@ -353,18 +374,26 @@ if ! command -v node &>/dev/null || ! node -v | grep -q "^v24\."; then
     . "$NVM_DIR/nvm.sh"
   fi
   
-  # Install Node.js 24 (LTS - stable and reliable)
-  nvm install 24 2>&1 | tail -5
+  # Reinstall Node.js 24 (forces fresh npm installation)
+  log "Installing Node.js 24 (LTS) with npm..."
+  nvm install 24 --reinstall-packages-from=24 2>&1 | tail -5
   nvm alias default 24 2>&1 | tail -2
   nvm alias stable 24 2>&1 | tail -2
   nvm use 24 2>&1 | tail -2
-  log "✓ Node.js 24 (LTS) installed and set as default"
+  
+  # Verify npm is installed
+  if ! command -v npm &>/dev/null; then
+    log "WARNING: npm not found after install, installing manually..."
+    curl -qL https://www.npmjs.com/install.sh | sh 2>&1 | tail -3
+  fi
+  
+  log "✓ Node.js 24 (LTS) installed with npm $(npm -v 2>/dev/null || echo 'ERROR')"
 else
   # Node 24 already installed, just make sure it's active and aliased
   nvm use 24 2>&1 | tail -2 || true
   nvm alias default 24 2>&1 | tail -2 || true
   nvm alias stable 24 2>&1 | tail -2 || true
-  log "✓ Node.js 24 (LTS) already installed"
+  log "✓ Node.js 24 (LTS) already installed with npm $(npm -v 2>/dev/null || echo 'ERROR')"
 fi
 
 NODE_VERSION=$(node -v | tr -d 'v')
