@@ -372,6 +372,14 @@ NVM_DIR=/config/nvm
 export NVM_DIR
 log "Persistent paths ready: NVM_DIR=$NVM_DIR"
 
+# CRITICAL: NVM is incompatible with NPM_CONFIG_PREFIX
+# Temporarily unset npm config vars, then restore after NVM setup
+_NPM_CONFIG_CACHE="$NPM_CONFIG_CACHE"
+_NPM_CONFIG_PREFIX="$NPM_CONFIG_PREFIX"
+_npm_config_cache="$npm_config_cache"
+_npm_config_prefix="$npm_config_prefix"
+unset NPM_CONFIG_PREFIX npm_config_prefix NPM_CONFIG_CACHE npm_config_cache
+
 # Always source NVM if available
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
@@ -414,6 +422,12 @@ if ! command -v npm &>/dev/null; then
   log "ERROR: npm still not available after installation attempts"
   exit 1
 fi
+
+# Restore npm config vars that we unset for NVM compatibility
+export NPM_CONFIG_CACHE="$_NPM_CONFIG_CACHE"
+export NPM_CONFIG_PREFIX="$_NPM_CONFIG_PREFIX"
+export npm_config_cache="$_npm_config_cache"
+export npm_config_prefix="$_npm_config_prefix"
 
 NODE_VERSION=$(node -v | tr -d 'v')
 NPM_VERSION=$(npm -v)
