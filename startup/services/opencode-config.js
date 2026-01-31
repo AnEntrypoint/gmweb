@@ -5,6 +5,7 @@ import { join } from 'path';
 import { execSync } from 'child_process';
 
 const OPENCODE_CONFIG_DIR = '/config/.config/opencode';
+const OPENCODE_STORAGE_DIR = '/config/.local/share/opencode/storage';
 const GLOOTIE_REPO = 'https://github.com/AnEntrypoint/glootie-oc.git';
 const GLOOTIE_DIR = join(OPENCODE_CONFIG_DIR, 'glootie-oc');
 
@@ -94,6 +95,47 @@ function installGlootieOc() {
   }
 }
 
+function configureOpenCodeDatabase() {
+  console.log('[opencode-config] Configuring OpenCode database for permissive access...');
+  
+  try {
+    // OpenCode stores settings in SQLite database
+    // We need to set all tool permissions to "always" allow
+    const dbPath = join(OPENCODE_STORAGE_DIR, '../opencode.db');
+    
+    if (!existsSync(OPENCODE_STORAGE_DIR)) {
+      console.log('[opencode-config] OpenCode storage not initialized yet, will configure on first run');
+      return;
+    }
+    
+    // Use sqlite3 to update settings
+    const sqlCommands = `
+      -- Enable all tool permissions without prompting
+      UPDATE settings SET value = 'always' WHERE key LIKE 'toolPermission.%';
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.bash', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.computer', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.text_editor', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.read', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.write', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.glob', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.grep', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.list_dir', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('toolPermission.mcp', 'always');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('autoApprove', 'true');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('alwaysAllowReadOnly', 'true');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('alwaysAllowWrite', 'true');
+      INSERT OR REPLACE INTO settings (key, value) VALUES ('alwaysAllowExecute', 'true');
+    `;
+    
+    if (existsSync(dbPath)) {
+      execSync(`sqlite3 "${dbPath}" "${sqlCommands}"`, { stdio: 'pipe' });
+      console.log('[opencode-config] ✓ Database configured for permissive access');
+    }
+  } catch (e) {
+    console.log(`[opencode-config] Note: Database config will apply on first OpenCode run: ${e.message}`);
+  }
+}
+
 function configureOpenCode() {
   console.log('[opencode-config] Configuring OpenCode settings...');
   
@@ -120,6 +162,9 @@ function configureOpenCode() {
   
   writeFileSync(settingsFile, JSON.stringify(mergedSettings, null, 2));
   console.log('[opencode-config] ✓ OpenCode configured with permissive settings');
+  
+  // Also configure database if it exists
+  configureOpenCodeDatabase();
 }
 
 function setupGlootieConfig() {
@@ -182,6 +227,19 @@ export default {
     console.log('[opencode-config] Configuring OpenCode and installing glootie-oc...');
     
     ensureDir(OPENCODE_CONFIG_DIR);
+    ensureDir(OPENCODE_STORAGE_DIR);
+    
+    // Create environment file for OpenCode to read on startup
+    const envFile = join(OPENCODE_CONFIG_DIR, '.env');
+    const envContent = `# OpenCode Environment - Auto-configured for permissive access
+OPENCODE_AUTO_APPROVE=true
+OPENCODE_ALWAYS_ALLOW_READ=true
+OPENCODE_ALWAYS_ALLOW_WRITE=true
+OPENCODE_ALWAYS_ALLOW_EXECUTE=true
+OPENCODE_DEFAULT_AGENT=gm
+OPENCODE_WORKSPACE=/config/workspace
+`;
+    writeFileSync(envFile, envContent);
     
     // Install glootie-oc extension
     installGlootieOc();
@@ -195,6 +253,7 @@ export default {
     // Set ownership
     try {
       execSync(`chown -R abc:abc "${OPENCODE_CONFIG_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`chown -R abc:abc "${OPENCODE_STORAGE_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
     } catch (e) {}
     
     console.log('[opencode-config] ✓ OpenCode configuration complete');
