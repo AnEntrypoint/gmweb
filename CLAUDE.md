@@ -118,6 +118,25 @@ location ~ /desk/websockets? {
 
 **Fix:** Run as fire-and-forget background task using `Promise.resolve(monitorHealth())`. Use `await new Promise(() => {})` to block startup properly without awaiting infinite loop.
 
+### Docker Persistent Volume Process Persistence
+
+**CRITICAL:** On persistent volumes (`/config` and `/opt`), processes from previous container boots keep running after container restart. This causes port conflicts and stale service instances.
+
+**Symptom:** After redeploy, multiple supervisor instances run simultaneously. Services fail with `EADDRINUSE` errors. Health checks fail because old processes hold ports.
+
+**Root cause:** Container restart doesn't kill processes. When the container restarts, PID namespace is preserved if using `--pid=host` or similar configurations.
+
+**Fix:** Phase 0 of `custom_startup.sh` kills ALL old gmweb processes before starting new ones:
+```bash
+sudo pkill -f "node.*supervisor.js"
+sudo pkill -f "node.*/opt/gmweb-startup"
+sudo pkill -f "ttyd.*9999"
+sudo fuser -k 9997/tcp 9998/tcp 9999/tcp 25808/tcp
+sleep 2
+```
+
+**Why this matters:** Without this, every redeploy compounds the problem - old services never die, new ones can't start, system degrades until manual intervention.
+
 ### Docker Persistent Volume Log Caching
 
 **Caveat:** Old logs in `/config/logs` persist across container restarts. Reading logs shows stale data from previous boot.
@@ -137,6 +156,22 @@ location ~ /desk/websockets? {
 **Issue:** Supervisor runs as `abc` user. NVM bin directory owned by dockremap with 755 (not writable).
 
 **Fix:** After NVM install, run `chmod 777 $NVM_DIR/versions/node/vX.X.X/bin`
+
+### ttyd Installation: apt-get vs GitHub Static Binaries
+
+**Issue:** GitHub ARM64 static binary (ttyd.aarch64) segfaults on some systems. Binary is statically linked and may be incompatible with specific kernels or libc versions.
+
+**Symptom:** webssh2 service starts but immediately crashes. `ttyd --version` causes segmentation fault. Health checks continuously fail.
+
+**Fix:** Use apt-get for ttyd on all architectures instead of GitHub releases. Apt version (1.7.4) is dynamically linked with proper dependencies and is architecture-tested.
+
+**Why apt-get is better:**
+- Dynamically linked binaries compatible with host system
+- No external download failures or GitHub API issues
+- Architecture-specific packages tested by distribution maintainers
+- Consistent behavior across x86_64 and ARM64
+
+**Code:** `sudo apt-get install -y ttyd`
 
 ### close_range Syscall Shim (Oracle Kernels)
 

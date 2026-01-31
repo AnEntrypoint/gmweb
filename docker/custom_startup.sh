@@ -267,6 +267,16 @@ fi
 chown -R abc:abc /config 2>/dev/null || true
 log "✓ /config ownership set to abc"
 
+log "Phase 0: Kill all old gmweb processes from previous boots"
+# CRITICAL: On persistent volumes, old processes keep running after container restart
+# Kill all node processes running supervisor, services, or gmweb-related scripts
+sudo pkill -f "node.*supervisor.js" 2>/dev/null || true
+sudo pkill -f "node.*/opt/gmweb-startup" 2>/dev/null || true
+sudo pkill -f "ttyd.*9999" 2>/dev/null || true
+sudo fuser -k 9997/tcp 9998/tcp 9999/tcp 25808/tcp 2>/dev/null || true
+sleep 2
+log "✓ Old processes killed"
+
 log "Phase 1: Git clone - get startup files and nginx config (minimal history)"
 # CRITICAL: Use sudo to clean up root-owned files from previous boots (persistent volumes)
 sudo rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
