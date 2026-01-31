@@ -35,13 +35,12 @@
       "type": "system"
     },
     "opencode-config": {
-      "enabled": true,
+      "enabled": false,
       "type": "install"
     },
     "opencode": {
       "enabled": true,
-      "type": "install",
-      "dependencies": ["opencode-config"]
+      "type": "install"
     },
     "aion-ui": {
       "enabled": true,
