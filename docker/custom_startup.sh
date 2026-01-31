@@ -412,21 +412,44 @@ if [ ! -s "$NVM_DIR/nvm.sh" ]; then
   . "$NVM_DIR/nvm.sh"
 fi
 
-# ALWAYS reinstall Node 24 on every boot to guarantee npm/npx integrity
+# ALWAYS guarantee clean npm/npx on every boot
 # Persistent /config volume may have corrupted NVM node_modules (e.g. npm deleted
-# by a bad --prefix install). nvm uninstall + install is fast (~2s from cache)
-# and guarantees a clean npm/npx every time.
-log "Reinstalling Node.js 24 (LTS) to guarantee clean npm/npx..."
-nvm deactivate 2>/dev/null || true
-nvm uninstall 24 2>&1 | tail -3 || true
-nvm install 24 2>&1 | tail -5
-nvm alias default 24 2>&1 | tail -2
-nvm alias stable 24 2>&1 | tail -2
-nvm use 24 2>&1 | tail -2
+# by a bad --prefix install into the NVM node dir)
+# Strategy: check if npm module exists, if not do a clean reinstall
+NODE_DIR="$NVM_DIR/versions/node"
+LATEST_NODE=$(ls -1 "$NODE_DIR" 2>/dev/null | sort -V | tail -1)
 
-# Final verification - fail hard if npm still missing
+if [ -z "$LATEST_NODE" ]; then
+  log "No Node.js found, installing Node 24..."
+  nvm install 24 2>&1 | tail -5
+else
+  NPM_MODULE="$NODE_DIR/$LATEST_NODE/lib/node_modules/npm"
+  if [ ! -d "$NPM_MODULE" ]; then
+    log "npm missing from $LATEST_NODE, reinstalling Node 24..."
+    # Fix ownership first (may be root-owned from previous boot)
+    chown -R abc:abc "$NODE_DIR/$LATEST_NODE" 2>/dev/null || true
+    # Remove and reinstall to get clean npm
+    nvm deactivate 2>/dev/null || true
+    rm -rf "$NODE_DIR/$LATEST_NODE"
+    nvm install 24 2>&1 | tail -5
+  else
+    log "Node $LATEST_NODE with npm verified"
+  fi
+fi
+
+# Ensure node 24 is active and in PATH
+nvm use 24 2>&1 | tail -2
+nvm alias default 24 2>&1 | tail -2
+
+# Fix ownership (nvm install as root creates root-owned files)
+ACTIVE_NODE=$(nvm which current 2>/dev/null | sed 's|/bin/node||')
+[ -d "$ACTIVE_NODE" ] && chown -R abc:abc "$ACTIVE_NODE" 2>/dev/null || true
+
+# Final verification
 if ! command -v npm &>/dev/null; then
-  log "ERROR: npm not available after fresh nvm install"
+  log "ERROR: npm not available after nvm setup"
+  log "DEBUG: PATH=$PATH"
+  log "DEBUG: node=$(which node 2>&1)"
   exit 1
 fi
 
