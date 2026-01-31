@@ -1,0 +1,212 @@
+// OpenCode Configuration Service
+// Sets up glootie-oc extension and configures permissive settings
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { execSync } from 'child_process';
+
+const OPENCODE_CONFIG_DIR = '/config/.config/opencode';
+const GLOOTIE_REPO = 'https://github.com/AnEntrypoint/glootie-oc.git';
+const GLOOTIE_DIR = join(OPENCODE_CONFIG_DIR, 'glootie-oc');
+
+// OpenCode settings that allow everything without prompting
+const PERMISSIVE_SETTINGS = {
+  // Disable all prompts
+  "autoApprove": true,
+  "autoApproveAll": true,
+  "alwaysAllowReadOnly": true,
+  "alwaysAllowWrite": true,
+  "alwaysAllowExecute": true,
+  
+  // Tool permissions
+  "toolPermissions": {
+    "bash": "always",
+    "computer": "always",
+    "text_editor": "always",
+    "read": "always",
+    "write": "always",
+    "glob": "always",
+    "grep": "always",
+    "list_dir": "always",
+    "mcp": "always"
+  },
+  
+  // API settings
+  "apiProvider": "anthropic",
+  "model": "claude-sonnet-4",
+  
+  // Workspace settings
+  "workspaceRoot": "/config/workspace",
+  "defaultAgent": "gm"
+};
+
+function ensureDir(dir) {
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+}
+
+function installGlootieOc() {
+  console.log('[opencode-config] Installing glootie-oc extension...');
+  
+  try {
+    // Clone or update glootie-oc
+    if (existsSync(GLOOTIE_DIR)) {
+      console.log('[opencode-config] glootie-oc exists, pulling updates...');
+      execSync(`cd "${GLOOTIE_DIR}" && git pull origin main`, {
+        timeout: 30000,
+        stdio: 'pipe'
+      });
+    } else {
+      console.log('[opencode-config] Cloning glootie-oc...');
+      execSync(`git clone --depth 1 "${GLOOTIE_REPO}" "${GLOOTIE_DIR}"`, {
+        timeout: 60000,
+        stdio: 'pipe'
+      });
+    }
+    
+    // Install glootie-oc as a dependency in opencode config
+    const packageJsonPath = join(OPENCODE_CONFIG_DIR, 'package.json');
+    let packageJson = { dependencies: {} };
+    
+    if (existsSync(packageJsonPath)) {
+      try {
+        packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+      } catch (e) {}
+    }
+    
+    // Add glootie-oc as file: dependency
+    if (!packageJson.dependencies) packageJson.dependencies = {};
+    packageJson.dependencies['@opencode-ai/plugin'] = packageJson.dependencies['@opencode-ai/plugin'] || '1.1.47';
+    packageJson.dependencies['glootie-oc'] = `file:${GLOOTIE_DIR}`;
+    
+    writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+    
+    // Run npm install to link glootie-oc
+    console.log('[opencode-config] Installing dependencies...');
+    execSync(`cd "${OPENCODE_CONFIG_DIR}" && npm install --no-save 2>&1 | tail -5`, {
+      timeout: 120000,
+      stdio: 'pipe'
+    });
+    
+    console.log('[opencode-config] ✓ glootie-oc installed');
+  } catch (e) {
+    console.log(`[opencode-config] Warning: Could not install glootie-oc: ${e.message}`);
+  }
+}
+
+function configureOpenCode() {
+  console.log('[opencode-config] Configuring OpenCode settings...');
+  
+  const settingsFile = join(OPENCODE_CONFIG_DIR, 'settings.json');
+  
+  let existingSettings = {};
+  if (existsSync(settingsFile)) {
+    try {
+      existingSettings = JSON.parse(readFileSync(settingsFile, 'utf8'));
+    } catch (e) {
+      console.log('[opencode-config] Could not parse existing settings, using defaults');
+    }
+  }
+  
+  // Merge with permissive settings (permissive settings take precedence)
+  const mergedSettings = {
+    ...existingSettings,
+    ...PERMISSIVE_SETTINGS,
+    toolPermissions: {
+      ...(existingSettings.toolPermissions || {}),
+      ...PERMISSIVE_SETTINGS.toolPermissions
+    }
+  };
+  
+  writeFileSync(settingsFile, JSON.stringify(mergedSettings, null, 2));
+  console.log('[opencode-config] ✓ OpenCode configured with permissive settings');
+}
+
+function setupGlootieConfig() {
+  console.log('[opencode-config] Setting up glootie-oc configuration...');
+  
+  try {
+    // Copy opencode.json from glootie-oc if it exists
+    const glootieConfigSrc = join(GLOOTIE_DIR, 'opencode.json');
+    const glootieConfigDest = join(OPENCODE_CONFIG_DIR, 'opencode.json');
+    
+    if (existsSync(glootieConfigSrc)) {
+      const glootieConfig = JSON.parse(readFileSync(glootieConfigSrc, 'utf8'));
+      
+      let existingConfig = {};
+      if (existsSync(glootieConfigDest)) {
+        try {
+          existingConfig = JSON.parse(readFileSync(glootieConfigDest, 'utf8'));
+        } catch (e) {}
+      }
+      
+      // Merge MCP servers
+      const mergedConfig = {
+        ...existingConfig,
+        default_agent: glootieConfig.default_agent || existingConfig.default_agent,
+        plugin: glootieConfig.plugin,
+        mcp: {
+          ...(existingConfig.mcp || {}),
+          ...(glootieConfig.mcp || {})
+        }
+      };
+      
+      writeFileSync(glootieConfigDest, JSON.stringify(mergedConfig, null, 2));
+      console.log('[opencode-config] ✓ glootie-oc configuration merged');
+    }
+    
+    // Copy agents
+    const agentsSrcDir = join(GLOOTIE_DIR, 'agents');
+    const agentsDestDir = join(OPENCODE_CONFIG_DIR, 'agents');
+    
+    if (existsSync(agentsSrcDir)) {
+      ensureDir(agentsDestDir);
+      execSync(`cp -r "${agentsSrcDir}"/* "${agentsDestDir}/" 2>/dev/null || true`, {
+        stdio: 'pipe'
+      });
+      console.log('[opencode-config] ✓ glootie agents copied');
+    }
+    
+  } catch (e) {
+    console.log(`[opencode-config] Warning: Could not setup glootie config: ${e.message}`);
+  }
+}
+
+export default {
+  name: 'opencode-config',
+  type: 'install',
+  requiresDesktop: false,
+  dependencies: [],
+
+  async start(env) {
+    console.log('[opencode-config] Configuring OpenCode and installing glootie-oc...');
+    
+    ensureDir(OPENCODE_CONFIG_DIR);
+    
+    // Install glootie-oc extension
+    installGlootieOc();
+    
+    // Configure OpenCode with permissive settings
+    configureOpenCode();
+    
+    // Setup glootie-oc configuration
+    setupGlootieConfig();
+    
+    // Set ownership
+    try {
+      execSync(`chown -R abc:abc "${OPENCODE_CONFIG_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
+    } catch (e) {}
+    
+    console.log('[opencode-config] ✓ OpenCode configuration complete');
+    
+    return {
+      pid: process.pid,
+      process: null,
+      cleanup: async () => {}
+    };
+  },
+
+  async health() {
+    return true;
+  }
+};

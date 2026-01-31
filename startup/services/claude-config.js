@@ -103,7 +103,7 @@ function createClaudeCodeAcpBridge(nodePath) {
       execSync(`rm -f "${binPath}"`, { stdio: 'pipe' });
     } catch (e) {}
 
-    execSync(`ln -s ../lib/node_modules/@zed-industries/claude-code-acp/lib/index.js "${binPath}"`, { stdio: 'pipe' });
+    execSync(`ln -s ../lib/node_modules/@zed-industries/claude-code-acp/dist/index.js "${binPath}"`, { stdio: 'pipe' });
     chmodSync(binPath, 0o755);
 
     console.log('[claude-config] ✓ Installed and linked @zed-industries/claude-code-acp');

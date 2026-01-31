@@ -378,22 +378,18 @@ log "Verifying persistent path structure..."
 mkdir -p /config/nvm /config/.tmp /config/logs
 chmod 755 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
 
+# Copy NVM compatibility shims to /config (shared across all shells and scripts)
+cp /tmp/gmweb/startup/.nvm_compat.sh /config/.nvm_compat.sh
+cp /tmp/gmweb/startup/.nvm_restore.sh /config/.nvm_restore.sh
+chmod +x /config/.nvm_compat.sh /config/.nvm_restore.sh
+
 NVM_DIR=/config/nvm
 export NVM_DIR
 log "Persistent paths ready: NVM_DIR=$NVM_DIR"
 
-# CRITICAL: NVM is incompatible with NPM_CONFIG_PREFIX and .npmrc prefix setting
-# Temporarily unset env vars AND rename .npmrc, then restore after NVM setup
-_NPM_CONFIG_CACHE="$NPM_CONFIG_CACHE"
-_NPM_CONFIG_PREFIX="$NPM_CONFIG_PREFIX"
-_npm_config_cache="$npm_config_cache"
-_npm_config_prefix="$npm_config_prefix"
-unset NPM_CONFIG_PREFIX npm_config_prefix NPM_CONFIG_CACHE npm_config_cache
-
-# Temporarily hide .npmrc from NVM
-if [ -f /config/.npmrc ]; then
-  mv /config/.npmrc /config/.npmrc.nvmbackup 2>/dev/null || true
-fi
+# CRITICAL: Use shared NVM compatibility shim
+# This ensures all environments (startup, shells, services) handle NVM the same way
+. /config/.nvm_compat.sh
 
 # Always source NVM if available
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
@@ -439,15 +435,7 @@ if ! command -v npm &>/dev/null; then
 fi
 
 # Restore npm config vars and .npmrc that we hid for NVM compatibility
-export NPM_CONFIG_CACHE="$_NPM_CONFIG_CACHE"
-export NPM_CONFIG_PREFIX="$_NPM_CONFIG_PREFIX"
-export npm_config_cache="$_npm_config_cache"
-export npm_config_prefix="$_npm_config_prefix"
-
-# Restore .npmrc
-if [ -f /config/.npmrc.nvmbackup ]; then
-  mv /config/.npmrc.nvmbackup /config/.npmrc 2>/dev/null || true
-fi
+. /config/.nvm_restore.sh
 
 NODE_VERSION=$(node -v | tr -d 'v')
 NPM_VERSION=$(npm -v)

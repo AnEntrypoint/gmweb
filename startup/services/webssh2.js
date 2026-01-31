@@ -38,7 +38,11 @@ export default {
       USER: 'abc',
       SHELL: '/bin/bash'
     };
+    // NVM is incompatible with npm config environment variables - remove all variants
     delete shellEnv.NPM_CONFIG_PREFIX;
+    delete shellEnv.npm_config_prefix;
+    delete shellEnv.NPM_CONFIG_CACHE;
+    delete shellEnv.npm_config_cache;
 
     // Start bash as login shell (-l) and interactive (-i) to load .bashrc and .profile
     // This ensures NVM, PATH, and all user configurations are loaded
