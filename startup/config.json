@@ -35,7 +35,7 @@
       "type": "system"
     },
     "opencode-config": {
-      "enabled": false,
+      "enabled": true,
       "type": "install"
     },
     "opencode": {
