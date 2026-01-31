@@ -57,10 +57,12 @@ export async function gitCloneOrUpdate(repoUrl, targetDir, env) {
 }
 
 export function spawnAsAbcUser(command, env) {
-  return spawn('sudo', ['-u', 'abc', '-E', 'bash', '-c', command], {
+  // Use bash -l (login shell) to ensure .profile and .bashrc are sourced,
+  // which sets up PATH with NVM bin directory and other tools
+  return spawn('sudo', ['-u', 'abc', '-E', 'bash', '-l', '-c', command], {
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: true,
-    env: { ...env }
+    env: { ...process.env, ...env }
   });
 }
 
