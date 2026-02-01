@@ -228,3 +228,31 @@ Moltbot (molt.bot workspace UI) disabled by default. To enable:
 4. Restart container
 
 Runs on port 7890, proxied to `/molt/`. See https://docs.molt.bot/ for configuration.
+
+## PASSWORD Deployment Requirement
+
+**CRITICAL:** The PASSWORD environment variable controls all system authentication. It MUST be set during container deployment.
+
+**Default behavior:** If PASSWORD is not set, system defaults to literal string `"password"`.
+
+**Deployment:**
+```bash
+# docker-compose: Set PASSWORD in environment
+docker-compose -e PASSWORD=MySecurePassword up -d
+
+# Or in docker-compose.yaml
+environment:
+  - PASSWORD=MySecurePassword
+
+# Or docker run
+docker run -e PASSWORD=MySecurePassword gmweb:latest
+```
+
+**Password hash generation:** During startup, PASSWORD is hashed with `openssl passwd -apr1` and written to `/etc/nginx/.htpasswd`. This protects all HTTP routes with HTTP Basic Auth before any application layer runs.
+
+**Verification:** After deployment with new PASSWORD:
+```bash
+curl -u abc:MySecurePassword https://your-domain.com/files/  # Should succeed (200)
+```
+
+Without proper PASSWORD deployment, users will fail to authenticate even if services are running correctly.
