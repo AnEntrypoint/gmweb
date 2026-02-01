@@ -281,7 +281,8 @@ log "Phase 1: Git clone - get startup files and nginx config (minimal history)"
 # CRITICAL: Use sudo to clean up root-owned files from previous boots (persistent volumes)
 sudo rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
        /opt/gmweb-startup/services /opt/gmweb-startup/package* \
-       /opt/gmweb-startup/*.js /opt/gmweb-startup/*.json /opt/gmweb-startup/*.sh 2>/dev/null || true
+       /opt/gmweb-startup/*.js /opt/gmweb-startup/*.json /opt/gmweb-startup/*.sh \
+       /opt/gmweb-startup/.git 2>/dev/null || true
 
 sudo mkdir -p /opt/gmweb-startup
 
@@ -570,6 +571,9 @@ log "✓ GitHub CLI installed"
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
+  # CRITICAL: Unset NPM_CONFIG_PREFIX before invoking supervisor
+  # NVM refuses to load when NPM_CONFIG_PREFIX is set (causes path conflicts)
+  unset NPM_CONFIG_PREFIX
   # CRITICAL: Pass ALL environment variables to supervisor so all services share the same environment
   # This ensures no service has settings that others don't have
   NVM_DIR=/config/nvm \
@@ -592,7 +596,7 @@ if [ -f /opt/gmweb-startup/start.sh ]; then
   DOCKER_CONFIG="/config/.gmweb/cache/.docker" \
   BUN_INSTALL="/config/.gmweb/cache/.bun" \
   PASSWORD="$PASSWORD" \
-  sudo -u abc -E bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
+  sudo -u abc bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
   SUPERVISOR_PID=$!
   sleep 2
   kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"

@@ -20,6 +20,10 @@ if [ -f "$HOME_DIR/.bashrc" ]; then
   . "$HOME_DIR/.bashrc" 2>/dev/null || true
 fi
 
+# CRITICAL: Unset NPM_CONFIG_PREFIX after .bashrc before NVM sourcing
+# NVM refuses to load when NPM_CONFIG_PREFIX is set (causes path conflicts)
+unset NPM_CONFIG_PREFIX
+
 # Source NVM to load node/npm into PATH
 if [ -s "$NVM_DIR/nvm.sh" ]; then
   . "$NVM_DIR/nvm.sh"
