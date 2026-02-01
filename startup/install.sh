@@ -32,7 +32,7 @@ sudo apt update
 sudo apt-get install -y --no-install-recommends \
   curl bash git build-essential ca-certificates jq wget \
   software-properties-common apt-transport-https gnupg openssh-server \
-  openssh-client tmux lsof chromium chromium-sandbox \
+  openssh-client tmux lsof \
   scrot xclip \
   libgbm1 libgtk-3-0 libnss3 libxss1 libasound2 libatk-bridge2.0-0 \
   libdrm2 libxcomposite1 libxdamage1 libxrandr2
@@ -106,7 +106,7 @@ log "✓ Global tmux configured (user config at boot time)"
 # User-specific files should be created by supervisor on second boot
 
 # ============================================================================
-# 10. PROXYPILOT DOWNLOAD
+# 8. PROXYPILOT DOWNLOAD
 # ============================================================================
 
 log "Downloading ProxyPilot..."
@@ -137,87 +137,7 @@ fi
 log "ProxyPilot configuration will be set up at runtime"
 
 # ============================================================================
-# 10b. CHROMIUM EXTENSION POLICIES
-# ============================================================================
-
-log "Setting up Chromium extension policies..."
-
-sudo mkdir -p /etc/chromium/policies/managed
-echo '{"ExtensionInstallForcelist": ["jfeammnjpkecdekppnclgkkffahnhfhe;https://clients2.google.com/service/update2/crx"]}' | sudo tee /etc/chromium/policies/managed/extension_install_forcelist.json > /dev/null
-sudo mkdir -p /opt/google/chrome/extensions
-sudo chmod 777 /opt/google/chrome/extensions
-
-log "✓ Chromium extension policies configured"
-
-# ============================================================================
-# 10c. CHROMIUM EXTENSION ENABLER SCRIPT
-# ============================================================================
-
-log "Creating Chromium extension enabler script..."
-
-sudo tee /usr/local/bin/enable_chromium_extension.py > /dev/null << 'PYEOF'
-#!/usr/bin/env python3
-import json, os, sys
-prefs_file = os.path.expanduser("~/.config/chromium/Default/Preferences")
-os.makedirs(os.path.dirname(prefs_file), exist_ok=True)
-try:
-    if os.path.exists(prefs_file):
-        with open(prefs_file) as f: prefs = json.load(f)
-    else:
-        prefs = {}
-    prefs.setdefault("extensions", {}).setdefault("settings", {}).setdefault("jfeammnjpkecdekppnclgkkffahnhfhe", {})["active_bit"] = True
-    with open(prefs_file, "w") as f: json.dump(prefs, f)
-except Exception as e: 
-    print(f"Error: {e}", file=sys.stderr)
-PYEOF
-sudo chmod +x /usr/local/bin/enable_chromium_extension.py
-
-log "✓ Chromium extension enabler script created"
-
-# ============================================================================
-# 10d. CHROMIUM NO-SANDBOX WRAPPER
-# ============================================================================
-
-log "Creating Chromium no-sandbox wrapper..."
-
-# Backup original chromium binary
-sudo mv /usr/bin/chromium /usr/bin/chromium.real
-
-# Create wrapper script that adds --no-sandbox flag
-sudo tee /usr/bin/chromium > /dev/null << 'CHROMIUM_WRAPPER'
-#!/bin/sh
-# Chromium wrapper to add --no-sandbox flag for Docker/container environments
-# This is necessary because unprivileged user namespaces are disabled
-exec /usr/bin/chromium.real --no-sandbox "$@"
-CHROMIUM_WRAPPER
-
-sudo chmod +x /usr/bin/chromium
-
-log "✓ Chromium no-sandbox wrapper created"
-
-# ============================================================================
-# 10e. CHROMIUM AUTOSTART ENTRY
-# ============================================================================
-
-log "Creating Chromium autostart desktop entry..."
-
-# Note: Desktop entry will be created at first boot when user directories exist
-# Store the entry content in a file for later creation
-cat > /opt/gmweb-startup/chromium-autostart.desktop << 'AUTOSTART_EOF'
-[Desktop Entry]
-Type=Application
-Name=Chromium
-Comment=Open Chromium with Playwriter Extension Debugger
-Icon=chromium
-Exec=chromium --app="chrome-extension://jfeammnjpkecdekppnclgkkffahnhfhe/index.html" --window-size=800,600 http://localhost/
-Categories=Network;WebBrowser;
-X-GNOME-Autostart-enabled=true
-AUTOSTART_EOF
-
-log "✓ Chromium autostart entry template stored (will be installed on first boot)"
-
-# ============================================================================
-# 11. TTYD WEB TERMINAL
+# 9. TTYD WEB TERMINAL
 # ============================================================================
 
 log "Downloading ttyd (web terminal)..."
@@ -252,20 +172,20 @@ else
 fi
 
 # ============================================================================
-# 12. PERMISSIONS (moved to custom_startup.sh)
+# 10. PERMISSIONS (moved to custom_startup.sh)
 # ============================================================================
 
 log "Permissions are set at boot time by custom_startup.sh"
 
 # ============================================================================
-# 14. NHFS PRE-BUILDING
+# 11. NHFS PRE-BUILDING
 # ============================================================================
 
 log "NHFS will be run via npx at startup (no pre-build needed)"
 log "✓ NHFS HTTP file server ready to launch"
 
 # ============================================================================
-# 15. INSTALL NPM PACKAGES FOR GLOBAL USE
+# 12. INSTALL NPM PACKAGES FOR GLOBAL USE
 # ============================================================================
 
 log "Installing global npm packages..."

@@ -34,7 +34,6 @@ async function main() {
         'wrangler',
         'gcloud',
         'scrot',
-        'chromium-ext',
         'webssh2',
         'file-manager',
         'log-viewer',

@@ -112,9 +112,15 @@ chmod -R 755 /config/.gmweb 2>/dev/null || true
 # CRITICAL: Fix permissions on npm cache (in case root processes created files)
 # This prevents EACCES errors when npm tries to write to cache
 if [ -d /config/.gmweb/npm-cache ]; then
-  chown -R abc:abc /config/.gmweb/npm-cache 2>/dev/null || true
-  chmod -R 777 /config/.gmweb/npm-cache 2>/dev/null || true
-  log "  Fixed npm cache permissions"
+  # Use sudo for aggressive cleanup if needed
+  sudo chown -R abc:abc /config/.gmweb/npm-cache 2>/dev/null || true
+  sudo chmod -R 777 /config/.gmweb/npm-cache 2>/dev/null || true
+  # Also clean npm cache completely (may be corrupted from previous boots)
+  sudo rm -rf /config/.gmweb/npm-cache/* 2>/dev/null || true
+  mkdir -p /config/.gmweb/npm-cache
+  chown abc:abc /config/.gmweb/npm-cache
+  chmod 777 /config/.gmweb/npm-cache
+  log "  Cleaned and fixed npm cache permissions"
 fi
 
 log "✓ Cleanup complete - installations centralized to /config/.gmweb/"
@@ -270,12 +276,20 @@ log "✓ /config ownership set to abc"
 log "Phase 0: Kill all old gmweb processes from previous boots"
 # CRITICAL: On persistent volumes, old processes keep running after container restart
 # Kill all node processes running supervisor, services, or gmweb-related scripts
-sudo pkill -f "node.*supervisor.js" 2>/dev/null || true
-sudo pkill -f "node.*/opt/gmweb-startup" 2>/dev/null || true
-sudo pkill -f "ttyd.*9999" 2>/dev/null || true
-sudo fuser -k 9997/tcp 9998/tcp 9999/tcp 25808/tcp 2>/dev/null || true
-sleep 2
-log "✓ Old processes killed"
+# Use stronger kill signals and verify cleanup
+sudo pkill -9 -f "node.*supervisor.js" 2>/dev/null || true
+sudo pkill -9 -f "node.*/opt/gmweb-startup" 2>/dev/null || true
+sudo pkill -9 -f "ttyd.*9999" 2>/dev/null || true
+# Kill any lingering processes on critical ports (use sudo for fuser)
+sudo fuser -k -9 9997/tcp 9998/tcp 9999/tcp 25808/tcp 8317/tcp 2>/dev/null || true
+# Wait for processes to fully die
+sleep 3
+# Verify no old processes remain
+if sudo lsof -i :9997 :9998 :9999 :25808 :8317 2>/dev/null | grep -q LISTEN; then
+  log "WARNING: Some ports still in use, waiting additional 2s..."
+  sleep 2
+fi
+log "✓ Old processes killed and ports cleared"
 
 log "Phase 1: Git clone - get startup files and nginx config (minimal history)"
 # CRITICAL: Use sudo to clean up root-owned files from previous boots (persistent volumes)
@@ -550,16 +564,47 @@ log "XFCE launcher script prepared"
 log "Installing critical Node modules for AionUI..."
 mkdir -p "$GMWEB_DIR/deps"
 
-# Install with timeout - fail hard if anything goes wrong
-timeout 30 npm install -g better-sqlite3 2>&1 | tail -2 || {
-  log "ERROR: better-sqlite3 installation failed"
-  exit 1
-}
+# Ensure npm cache is clean before critical installs
+npm cache clean --force 2>&1 | tail -1 || log "WARNING: npm cache clean had issues"
 
-cd "$GMWEB_DIR/deps" && timeout 30 npm install bcrypt 2>&1 | tail -2 || {
-  log "ERROR: bcrypt installation failed"
+# Install with timeout and retry logic
+log "  Installing better-sqlite3 (3 retries)..."
+RETRY=0
+while [ $RETRY -lt 3 ]; do
+  if timeout 30 npm install -g better-sqlite3 2>&1 | tail -2; then
+    log "  ✓ better-sqlite3 installed"
+    break
+  fi
+  RETRY=$((RETRY + 1))
+  if [ $RETRY -lt 3 ]; then
+    log "  WARNING: better-sqlite3 install failed, retry $RETRY/3..."
+    sleep 2
+  fi
+done
+
+if [ $RETRY -ge 3 ]; then
+  log "ERROR: better-sqlite3 installation failed after 3 retries"
   exit 1
-}
+fi
+
+log "  Installing bcrypt (3 retries)..."
+RETRY=0
+while [ $RETRY -lt 3 ]; do
+  if cd "$GMWEB_DIR/deps" && timeout 30 npm install bcrypt 2>&1 | tail -2; then
+    log "  ✓ bcrypt installed"
+    break
+  fi
+  RETRY=$((RETRY + 1))
+  if [ $RETRY -lt 3 ]; then
+    log "  WARNING: bcrypt install failed, retry $RETRY/3..."
+    sleep 2
+  fi
+done
+
+if [ $RETRY -ge 3 ]; then
+  log "ERROR: bcrypt installation failed after 3 retries"
+  exit 1
+fi
 
 chown -R abc:abc "$GMWEB_DIR/deps" 2>/dev/null || true
 log "✓ Critical modules installed"
@@ -571,20 +616,16 @@ log "✓ GitHub CLI installed"
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
-  # CRITICAL: Unset NPM_CONFIG_PREFIX before invoking supervisor
-  # NVM refuses to load when NPM_CONFIG_PREFIX is set (causes path conflicts)
-  unset NPM_CONFIG_PREFIX
-  # CRITICAL: Pass ALL environment variables to supervisor so all services share the same environment
-  # This ensures no service has settings that others don't have
+  # CRITICAL: Do NOT pass npm_config_prefix/NPM_CONFIG_PREFIX to supervisor
+  # start.sh will set these AFTER sourcing NVM (using .nvm_restore.sh)
+  # Passing them in environment causes NVM to fail to load
+  # CRITICAL: Pass essential environment variables to supervisor
+  # start.sh handles npm config vars after loading NVM safely
   NVM_DIR=/config/nvm \
   HOME=/config \
   GMWEB_DIR="$GMWEB_DIR" \
   PATH="/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH" \
   NODE_OPTIONS="--no-warnings" \
-  npm_config_cache="/config/.gmweb/npm-cache" \
-  npm_config_prefix="/config/.gmweb/npm-global" \
-  NPM_CONFIG_CACHE="/config/.gmweb/npm-cache" \
-  NPM_CONFIG_PREFIX="/config/.gmweb/npm-global" \
   TMPDIR="/config/.tmp" \
   TMP="/config/.tmp" \
   TEMP="/config/.tmp" \
