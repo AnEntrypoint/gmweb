@@ -15,7 +15,7 @@
       "type": "system"
     },
     "chromium-ext": {
-      "enabled": false,
+      "enabled": true,
       "type": "system"
     },
     "webssh2": {
