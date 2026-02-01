@@ -152,7 +152,14 @@ export class Supervisor {
   }
 
   async ensureNginxAuth() {
-    const pw = this.env.PASSWORD || 'password';
+    // CRITICAL: Never override PASSWORD here - it's already set correctly in custom_startup.sh
+    // Only regenerate htpasswd if PASSWORD has changed, otherwise nginx reload is unnecessary
+    // This prevents the race condition where supervisor overwrites a correct htpasswd
+    const pw = this.env.PASSWORD;
+    if (!pw) {
+      this.logger.log('WARN', 'PASSWORD not set in supervisor env, skipping nginx auth regeneration');
+      return;
+    }
     try {
       const hash = execSync('openssl passwd -apr1 -stdin', { input: pw, encoding: 'utf8' }).trim();
       const escaped = hash.replace(/\$/g, '\\$');
@@ -171,8 +178,7 @@ export class Supervisor {
     const OPENCODE_BIN = '/config/.gmweb/tools/opencode/bin';
     env.PATH = `${GMWEB_BIN}:${OPENCODE_BIN}:${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
     env.NODE_PATH = `${NVM_LIB}:${env.NODE_PATH || ''}`;
-    if (!env.PASSWORD) { env.PASSWORD = 'password'; }
-    
+
     // CRITICAL: Force all services to use centralized npm cache (prevents /config pollution)
     // BUT: Services that use NVM (webssh2, aion-ui) need NPM_CONFIG_PREFIX unset
     // Those services will delete it in their own code after inheriting this env
@@ -188,6 +194,10 @@ export class Supervisor {
     if (!env.TMPDIR) { env.TMPDIR = '/config/.tmp'; }
     if (!env.TMP) { env.TMP = '/config/.tmp'; }
     if (!env.TEMP) { env.TEMP = '/config/.tmp'; }
+
+    // CRITICAL: Do NOT set PASSWORD fallback here - it was already set by custom_startup.sh
+    // Setting a fallback here overrides the actual PASSWORD passed during deployment
+    // If PASSWORD is missing, that's a configuration error, not something to hide
     
     if (!env.XDG_CACHE_HOME) { env.XDG_CACHE_HOME = '/config/.gmweb/cache'; }
     if (!env.XDG_CONFIG_HOME) { env.XDG_CONFIG_HOME = '/config/.gmweb/cache/.config'; }
