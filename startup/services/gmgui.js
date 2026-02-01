@@ -5,7 +5,7 @@ import { createNpxWrapper, precacheNpmPackage, waitForPort } from '../lib/servic
 
 const NAME = 'gmgui';
 const PKG = 'gmgui';
-const PORT = 3000;
+const PORT = 9897;
 
 export default {
   name: NAME,
