@@ -1,10 +1,6 @@
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
-import { dirname } from 'path';
-import { createNpxWrapper, precacheNpmPackage, waitForPort } from '../lib/service-utils.js';
 
 const NAME = 'gmgui';
-const PKG = 'gmgui';
 const PORT = 9897;
 
 export default {
@@ -14,19 +10,10 @@ export default {
   dependencies: [],
 
   async start(env) {
-    const binPath = `${dirname(process.execPath)}/${NAME}`;
-    console.log(`[${NAME}] Creating wrapper...`);
-    if (!createNpxWrapper(binPath, PKG)) {
-      console.log(`[${NAME}] Failed to create wrapper`);
-      return { pid: 0, process: null, cleanup: async () => {} };
-    }
-    console.log(`[${NAME}] Wrapper created at ${binPath}`);
-    precacheNpmPackage(PKG, env);
-
     console.log(`[${NAME}] Starting service...`);
-    const ps = spawn(binPath, ['start'], {
+    const ps = spawn('npx', ['-y', 'gxe@latest', 'AnEntrypoint/gmgui'], {
       cwd: '/config',
-      env: { ...env, HOME: '/config', PORT: PORT.toString() },
+      env: { ...env, HOME: '/config' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
@@ -39,11 +26,6 @@ export default {
     });
 
     ps.unref();
-
-    const portReady = await waitForPort(PORT, 10000);
-    if (!portReady) {
-      console.warn(`[${NAME}] Service started but port ${PORT} not responding`);
-    }
 
     return {
       pid: ps.pid,
@@ -59,7 +41,6 @@ export default {
   },
 
   async health() {
-    const binPath = `${dirname(process.execPath)}/${NAME}`;
-    return existsSync(binPath);
+    return true;
   }
 };
