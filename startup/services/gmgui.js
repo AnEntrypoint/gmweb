@@ -13,7 +13,7 @@ const PORT = 9897;
 function findGxeDir(repoUrl) {
   const gxeBaseDir = path.join(process.env.HOME || '/config', '.gxe');
   if (!fs.existsSync(gxeBaseDir)) return null;
-  
+
   try {
     const entries = fs.readdirSync(gxeBaseDir);
     for (const entry of entries) {
@@ -22,7 +22,13 @@ function findGxeDir(repoUrl) {
       if (stat.isDirectory()) {
         const pkgPath = path.join(dirPath, 'package.json');
         if (fs.existsSync(pkgPath)) {
-          return dirPath;
+          // Check if this is the gmgui package
+          try {
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+            if (pkg.name === 'gmgui') {
+              return dirPath;
+            }
+          } catch (e) {}
         }
       }
     }
@@ -70,6 +76,12 @@ export default {
             if (gxeDirPath) {
               console.log(`[${NAME}] Found gxe extraction at ${gxeDirPath}`);
               try {
+                console.log(`[${NAME}] Clearing npm cache...`);
+                execSync('npm cache clean --force', {
+                  cwd: gxeDirPath,
+                  stdio: ['ignore', 'pipe', 'pipe'],
+                  timeout: 30000
+                });
                 console.log(`[${NAME}] Running npm install...`);
                 execSync('npm install --legacy-peer-deps', {
                   cwd: gxeDirPath,
