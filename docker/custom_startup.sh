@@ -563,6 +563,11 @@ cd "$GMWEB_DIR/deps" && timeout 30 npm install bcrypt 2>&1 | tail -2 || {
 chown -R abc:abc "$GMWEB_DIR/deps" 2>/dev/null || true
 log "✓ Critical modules installed"
 
+log "Installing GitHub CLI (gh) in foreground..."
+sudo apt-get update -qq 2>/dev/null || true
+sudo apt-get install -y gh 2>&1 | tail -2 || log "WARNING: gh install had issues"
+log "✓ GitHub CLI installed"
+
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
   # CRITICAL: Pass ALL environment variables to supervisor so all services share the same environment
@@ -617,19 +622,14 @@ log "XFCE component launcher started (PID: $!)"
   apt-get update
   apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
 
-  # Install GitHub CLI (gh) from official repository
-  log "Installing GitHub CLI..."
-  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-
   # Install Google Cloud CLI (gcloud) from official repository
   log "Installing Google Cloud CLI..."
   echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null
   curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
 
-  # Update package lists and install gh + gcloud
+  # Update package lists and install gcloud
   sudo apt-get update -qq 2>/dev/null || true
-  sudo apt-get install -y --no-install-recommends gh google-cloud-cli 2>&1 | tail -3 || log "WARNING: gh or gcloud install had issues"
+  sudo apt-get install -y --no-install-recommends google-cloud-cli 2>&1 | tail -3 || log "WARNING: gcloud install had issues"
 
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
