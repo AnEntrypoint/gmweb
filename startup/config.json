@@ -42,6 +42,10 @@
       "enabled": true,
       "type": "install"
     },
+    "gmgui": {
+      "enabled": true,
+      "type": "system"
+    },
     "aion-ui": {
       "enabled": true,
       "type": "web"
