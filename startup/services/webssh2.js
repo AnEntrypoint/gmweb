@@ -85,14 +85,20 @@ export default {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        // Use ss (socket statistics) instead of lsof - more reliable and always available
-        execSync('ss -tlnp 2>/dev/null | grep -q :9999', {
-          stdio: 'pipe',
+        // Use ss (socket statistics) with explicit grep to detect LISTEN state
+        // ss shows state column, we need to verify port exists AND shows LISTEN
+        const output = execSync('ss -tlnp 2>/dev/null | grep ":9999"', {
+          stdio: ['pipe', 'pipe', 'pipe'],
           shell: true,
-          timeout: 2000
+          timeout: 2000,
+          encoding: 'utf8'
         });
-        return true;
+        // Verify output contains LISTEN keyword (indicates port is actually listening)
+        if (output && output.includes('LISTEN')) {
+          return true;
+        }
       } catch (e) {
+        // Command failed or output was empty
         if (attempt < 2) await sleep(500);
       }
     }

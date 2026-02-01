@@ -43,7 +43,7 @@
       "type": "install"
     },
     "gmgui": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "aion-ui": {

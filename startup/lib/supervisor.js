@@ -174,10 +174,13 @@ export class Supervisor {
     if (!env.PASSWORD) { env.PASSWORD = 'password'; }
     
     // CRITICAL: Force all services to use centralized npm cache (prevents /config pollution)
+    // BUT: Services that use NVM (webssh2, aion-ui) need NPM_CONFIG_PREFIX unset
+    // Those services will delete it in their own code after inheriting this env
     env.npm_config_cache = env.npm_config_cache || '/config/.gmweb/npm-cache';
     env.npm_config_prefix = env.npm_config_prefix || '/config/.gmweb/npm-global';
     env.NPM_CONFIG_CACHE = env.NPM_CONFIG_CACHE || '/config/.gmweb/npm-cache';
-    env.NPM_CONFIG_PREFIX = env.NPM_CONFIG_PREFIX || '/config/.gmweb/npm-global';
+    // DO NOT set NPM_CONFIG_PREFIX here - services that need NVM must delete it
+    // env.NPM_CONFIG_PREFIX is set by custom_startup.sh but services will unset it
 
     const uid = process.getuid?.() || 1000;
 

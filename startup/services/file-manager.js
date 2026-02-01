@@ -35,20 +35,36 @@ export default {
       const checkIfStarted = async () => {
         startCheckCount++;
         try {
-          execSync('ss -tuln 2>/dev/null | grep -q :9998 || netstat -tuln 2>/dev/null | grep -q :9998', { stdio: 'pipe' });
-          clearInterval(startCheckInterval);
-          console.log('[file-manager] ✓ NHFS responding on port 9998');
-          resolve({
-            pid: ps.pid,
-            process: ps,
-            cleanup: async () => {
-              try {
-                ps.kill('SIGTERM');
-                await sleep(1000);
-                ps.kill('SIGKILL');
-              } catch (e) {}
-            }
+          // Use ss to check for listening port 9998
+          // Format: LISTEN 0 ... :9998 ... (ss -tln shows listening ports)
+          const { execSync: exec } = await import('child_process');
+          const output = exec('ss -tln 2>/dev/null | grep ":9998"', {
+            stdio: ['pipe', 'pipe', 'pipe'],
+            shell: true,
+            encoding: 'utf8',
+            timeout: 2000
           });
+          
+          // Verify output shows LISTEN state (not just the port existing)
+          if (output && output.includes('LISTEN')) {
+            clearInterval(startCheckInterval);
+            console.log('[file-manager] ✓ NHFS responding on port 9998');
+            resolve({
+              pid: ps.pid,
+              process: ps,
+              cleanup: async () => {
+                try {
+                  ps.kill('SIGTERM');
+                  await sleep(1000);
+                  ps.kill('SIGKILL');
+                } catch (e) {}
+              }
+            });
+          } else if (startCheckCount > 120) {
+            clearInterval(startCheckInterval);
+            ps.kill('SIGKILL');
+            reject(new Error('NHFS failed to start after 120s'));
+          }
         } catch (e) {
           if (startCheckCount > 120) {
             clearInterval(startCheckInterval);
@@ -84,8 +100,15 @@ export default {
 
   async health() {
     try {
-      execSync('ss -tuln 2>/dev/null | grep -q :9998 || netstat -tuln 2>/dev/null | grep -q :9998', { stdio: 'pipe' });
-      return true;
+      const { execSync: exec } = await import('child_process');
+      const output = exec('ss -tln 2>/dev/null | grep ":9998"', {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true,
+        encoding: 'utf8',
+        timeout: 2000
+      });
+      // Port is healthy if ss output shows LISTEN state
+      return output && output.includes('LISTEN');
     } catch (e) {
       return false;
     }
