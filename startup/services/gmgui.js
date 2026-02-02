@@ -1,13 +1,10 @@
-import { spawn, execSync } from 'child_process';
+import { spawn } from 'child_process';
 import { promisify } from 'util';
-import fs from 'fs';
-import path from 'path';
 
 const sleep = promisify(setTimeout);
 
 const NAME = 'gmgui';
 const PORT = 9897;
-const INSTALL_DIR = '/tmp/gmgui-install';
 
 export default {
   name: NAME,
@@ -16,27 +13,24 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log(`[${NAME}] Starting service via curl install script...`);
+    console.log(`[${NAME}] Starting service via bunx agentgui...`);
     return new Promise((resolve, reject) => {
-      try {
-        if (!fs.existsSync(INSTALL_DIR)) {
-          fs.mkdirSync(INSTALL_DIR, { recursive: true });
-        }
-      } catch (e) {
-        console.error(`[${NAME}] Failed to create install directory: ${e.message}`);
-      }
+      const childEnv = {
+        ...env,
+        HOME: '/tmp',
+        PORT: String(PORT),
+        PATH: (env.PATH ? env.PATH + ':' : '') + '/home/user/.bun/bin:/home/user/.nvm/versions/node/v22.11.0/bin'
+      };
 
-      const childEnv = { ...env, HOME: '/config', PORT: String(PORT) };
-
-      const ps = spawn('bash', ['-c', 'curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmgui/main/install.sh | bash'], {
+      const ps = spawn('/home/user/.bun/bin/bunx', ['agentgui'], {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
-        detached: false,
-        cwd: INSTALL_DIR
+        detached: false
       });
 
       let startCheckCount = 0;
       let startCheckInterval = null;
+      let resolved = false;
 
       const checkIfStarted = async () => {
         startCheckCount++;
@@ -53,6 +47,7 @@ export default {
           if (output && output.includes('LISTEN')) {
             clearInterval(startCheckInterval);
             console.log(`[${NAME}] ✓ Service responding on port ${PORT}`);
+            resolved = true;
             resolve({
               pid: ps.pid,
               process: ps,
@@ -88,12 +83,14 @@ export default {
 
       ps.on('error', (err) => {
         clearInterval(startCheckInterval);
-        reject(new Error(`Failed to spawn ${NAME}: ${err.message}`));
+        if (!resolved) {
+          reject(new Error(`Failed to spawn ${NAME}: ${err.message}`));
+        }
       });
 
       ps.on('exit', (code) => {
         clearInterval(startCheckInterval);
-        if (code !== 0) {
+        if (code !== 0 && !resolved) {
           reject(new Error(`${NAME} exited with code ${code}`));
         }
       });
