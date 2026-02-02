@@ -18,14 +18,14 @@ export default {
       const childEnv = {
         ...env,
         HOME: '/tmp',
-        PORT: String(PORT),
-        PATH: (env.PATH ? env.PATH + ':' : '') + '/home/user/.bun/bin:/home/user/.nvm/versions/node/v22.11.0/bin'
+        PORT: String(PORT)
       };
 
-      const ps = spawn('/home/user/.bun/bin/bunx', ['agentgui@latest'], {
+      const ps = spawn('bunx', ['agentgui@latest'], {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
-        detached: false
+        detached: false,
+        shell: true
       });
 
       let startCheckCount = 0;

@@ -21,7 +21,8 @@ export default {
       const ps = spawn('bunx', ['fsbrowse@latest'], {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
-        detached: false
+        detached: false,
+        shell: true
       });
 
       let startCheckCount = 0;

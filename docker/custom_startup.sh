@@ -614,6 +614,18 @@ sudo apt-get update -qq 2>/dev/null || true
 sudo apt-get install -y gh 2>&1 | tail -2 || log "WARNING: gh install had issues"
 log "✓ GitHub CLI installed"
 
+log "Phase 1.5: Configure Bun environment and prepare installation"
+export BUN_INSTALL="/config/.gmweb/cache/.bun"
+mkdir -p "$BUN_INSTALL"
+log "  BUN_INSTALL=$BUN_INSTALL"
+
+# Check if Bun is already available
+if command -v bun &>/dev/null; then
+  log "✓ Bun already installed: $(bun --version)"
+else
+  log "  Note: Bun not yet available - will install in background"
+fi
+
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
   # CRITICAL: Do NOT pass npm_config_prefix/NPM_CONFIG_PREFIX to supervisor
@@ -624,7 +636,7 @@ if [ -f /opt/gmweb-startup/start.sh ]; then
   NVM_DIR=/config/nvm \
   HOME=/config \
   GMWEB_DIR="$GMWEB_DIR" \
-  PATH="/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH" \
+  PATH="/config/.gmweb/cache/.bun/bin:/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH" \
   NODE_OPTIONS="--no-warnings" \
   TMPDIR="/config/.tmp" \
   TMP="/config/.tmp" \
@@ -693,6 +705,30 @@ log "XFCE component launcher started (PID: $!)"
   log "Installing cloud and deployment tools (wrangler)..."
   npm install -g wrangler 2>&1 | tail -3 && log "wrangler installed" || log "WARNING: wrangler install failed"
   log "Cloud and deployment tools installation complete"
+
+  log "Installing Bun runtime..."
+  export BUN_INSTALL="/config/.gmweb/cache/.bun"
+  if ! command -v bun &>/dev/null; then
+    log "  Downloading and installing Bun (this may take a minute)..."
+    # Try official installer first
+    if timeout 120 curl -fsSL https://bun.sh/install | bash 2>&1 | tail -3; then
+      if command -v bun &>/dev/null; then
+        log "  ✓ Bun installed via official installer: $(bun --version)"
+      else
+        log "  WARNING: Bun installer completed but bun command not found"
+      fi
+    else
+      log "  WARNING: Bun installation via official installer failed"
+    fi
+
+    # Final check
+    if ! command -v bun &>/dev/null; then
+      log "  WARNING: Bun not available - bunx services may fail"
+    fi
+  else
+    log "✓ Bun already available: $(bun --version)"
+  fi
+  log "Bun installation phase complete"
 
   touch /tmp/gmweb-installs-complete
   log "Installation marker file created"
