@@ -633,6 +633,10 @@ NPM_CONFIG_PREFIX= bash << 'BUNINSTALL_EOF'
   export NVM_DIR=/config/nvm
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
+  # CRITICAL: Add Bun bin directory to PATH before installation check
+  # The installer puts bun at $BUN_INSTALL/bin/bun
+  export PATH="/config/.gmweb/cache/.bun/bin:$PATH"
+
   # Install official latest Bun (always fresh)
   if timeout 120 curl -fsSL https://bun.sh/install | bash 2>&1 | tail -3; then
     if command -v bun &>/dev/null; then
