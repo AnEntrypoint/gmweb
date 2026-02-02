@@ -176,7 +176,8 @@ export class Supervisor {
     const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
     const GMWEB_BIN = '/config/.gmweb/npm-global/bin';
     const OPENCODE_BIN = '/config/.gmweb/tools/opencode/bin';
-    env.PATH = `${GMWEB_BIN}:${OPENCODE_BIN}:${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
+    const BUN_BIN = '/config/.gmweb/cache/.bun/bin';
+    env.PATH = `${BUN_BIN}:${GMWEB_BIN}:${OPENCODE_BIN}:${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
     env.NODE_PATH = `${NVM_LIB}:${env.NODE_PATH || ''}`;
 
     // CRITICAL: Force all services to use centralized npm cache (prevents /config pollution)
