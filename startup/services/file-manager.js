@@ -10,19 +10,15 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log('[file-manager] Starting NHFS file server via gxe...');
-    return this.startNHFS(env);
+    console.log('[file-manager] Starting fsbrowse file server via bunx...');
+    return this.startFSBrowse(env);
   },
 
-  async startNHFS(env) {
+  async startFSBrowse(env) {
     return new Promise((resolve, reject) => {
-      try {
-        execSync('git config --global --add safe.directory "*"', { stdio: 'pipe' });
-      } catch (e) {}
-
       const childEnv = { ...env, HOME: '/config', BASE_DIR: '/config', PORT: '9998', BASEPATH: '/files' };
 
-      const ps = spawn('npx', ['-y', 'gxe@latest', 'AnEntrypoint/nhfs'], {
+      const ps = spawn('bunx', ['fsbrowse'], {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,
@@ -35,20 +31,18 @@ export default {
       const checkIfStarted = async () => {
         startCheckCount++;
         try {
-          // Use ss to check for listening port 9998
-          // Format: LISTEN 0 ... :9998 ... (ss -tln shows listening ports)
+          // Use ss to check for listening port 3000 (fsbrowse defaults to 3000 regardless of PORT env var)
           const { execSync: exec } = await import('child_process');
-          const output = exec('ss -tln 2>/dev/null | grep ":9998"', {
+          const output = exec('ss -tln 2>/dev/null | grep ":3000"', {
             stdio: ['pipe', 'pipe', 'pipe'],
             shell: true,
             encoding: 'utf8',
             timeout: 2000
           });
-          
-          // Verify output shows LISTEN state (not just the port existing)
+
           if (output && output.includes('LISTEN')) {
             clearInterval(startCheckInterval);
-            console.log('[file-manager] ✓ NHFS responding on port 9998');
+            console.log('[file-manager] ✓ fsbrowse responding on port 3000');
             resolve({
               pid: ps.pid,
               process: ps,
@@ -63,13 +57,13 @@ export default {
           } else if (startCheckCount > 120) {
             clearInterval(startCheckInterval);
             ps.kill('SIGKILL');
-            reject(new Error('NHFS failed to start after 120s'));
+            reject(new Error('fsbrowse failed to start after 120s'));
           }
         } catch (e) {
           if (startCheckCount > 120) {
             clearInterval(startCheckInterval);
             ps.kill('SIGKILL');
-            reject(new Error('NHFS failed to start after 120s'));
+            reject(new Error('fsbrowse failed to start after 120s'));
           }
         }
       };
@@ -84,13 +78,13 @@ export default {
 
       ps.on('error', (err) => {
         clearInterval(startCheckInterval);
-        reject(new Error(`Failed to spawn NHFS: ${err.message}`));
+        reject(new Error(`Failed to spawn fsbrowse: ${err.message}`));
       });
 
       ps.on('exit', (code) => {
         clearInterval(startCheckInterval);
         if (code !== 0) {
-          reject(new Error(`NHFS exited with code ${code}`));
+          reject(new Error(`fsbrowse exited with code ${code}`));
         }
       });
 
@@ -101,13 +95,12 @@ export default {
   async health() {
     try {
       const { execSync: exec } = await import('child_process');
-      const output = exec('ss -tln 2>/dev/null | grep ":9998"', {
+      const output = exec('ss -tln 2>/dev/null | grep ":3000"', {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true,
         encoding: 'utf8',
         timeout: 2000
       });
-      // Port is healthy if ss output shows LISTEN state
       return output && output.includes('LISTEN');
     } catch (e) {
       return false;
