@@ -10,7 +10,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log('[file-manager] Starting fsbrowse file server via bunx...');
+    console.log('[file-manager] Starting fsbrowse file server via bunx@latest...');
     return this.startFSBrowse(env);
   },
 
@@ -18,7 +18,7 @@ export default {
     return new Promise((resolve, reject) => {
       const childEnv = { ...env, HOME: '/config', BASE_DIR: '/config', PORT: '9998', BASEPATH: '/files' };
 
-      const ps = spawn('bunx', ['fsbrowse'], {
+      const ps = spawn('bunx', ['fsbrowse@latest'], {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,

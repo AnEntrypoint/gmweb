@@ -13,7 +13,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log(`[${NAME}] Starting service via bunx agentgui...`);
+    console.log(`[${NAME}] Starting service via bunx agentgui@latest...`);
     return new Promise((resolve, reject) => {
       const childEnv = {
         ...env,
@@ -22,7 +22,7 @@ export default {
         PATH: (env.PATH ? env.PATH + ':' : '') + '/home/user/.bun/bin:/home/user/.nvm/versions/node/v22.11.0/bin'
       };
 
-      const ps = spawn('/home/user/.bun/bin/bunx', ['agentgui'], {
+      const ps = spawn('/home/user/.bun/bin/bunx', ['agentgui@latest'], {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false
