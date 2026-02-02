@@ -260,13 +260,13 @@ else
   log "WARNING: D-Bus socket not ready"
 fi
 
-log "Phase 0.5: Install jq (required for JSON processing)"
-if ! command -v jq &>/dev/null; then
+log "Phase 0.5: Install jq and unzip (required for JSON processing and Bun installer)"
+if ! command -v jq &>/dev/null || ! command -v unzip &>/dev/null; then
   apt-get update -qq 2>/dev/null || true
-  apt-get install -y --no-install-recommends jq 2>&1 | tail -3
-  log "✓ jq installed"
+  apt-get install -y --no-install-recommends jq unzip 2>&1 | tail -3
+  log "✓ jq and unzip installed"
 else
-  log "✓ jq already installed"
+  log "✓ jq and unzip already installed"
 fi
 
 # Ensure /config ownership is set to abc at the start
