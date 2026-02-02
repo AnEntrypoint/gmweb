@@ -616,33 +616,33 @@ log "✓ GitHub CLI installed"
 
 log "Phase 1.5: Install Bun (BLOCKING - required by file-manager and gmgui services)"
 export BUN_INSTALL="/config/.gmweb/cache/.bun"
-mkdir -p "$BUN_INSTALL"
 log "  BUN_INSTALL=$BUN_INSTALL"
 
-# Check if Bun is already available
-if command -v bun &>/dev/null; then
-  log "✓ Bun already installed: $(bun --version)"
-else
-  log "  Installing Bun (this may take a minute)..."
-  # Source NVM in subshell for Bun installation
-  (
-    export NVM_DIR=/config/nvm
-    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# CRITICAL: Always force fresh Bun installation on every boot
+# Delete existing Bun to prevent stale cached state (gmweb philosophy)
+log "  Removing any existing Bun installation (force fresh state)..."
+rm -rf "$BUN_INSTALL" 2>/dev/null || true
+mkdir -p "$BUN_INSTALL"
 
-    # Try official installer
-    if timeout 120 curl -fsSL https://bun.sh/install | bash 2>&1 | tail -3; then
-      if command -v bun &>/dev/null; then
-        log "  ✓ Bun installed: $(bun --version)"
-      else
-        log "  ERROR: Bun installer completed but bun command not found"
-        exit 1
-      fi
+log "  Installing fresh latest Bun (this may take a minute)..."
+# Source NVM in subshell for Bun installation
+(
+  export NVM_DIR=/config/nvm
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+  # Install official latest Bun (always fresh)
+  if timeout 120 curl -fsSL https://bun.sh/install | bash 2>&1 | tail -3; then
+    if command -v bun &>/dev/null; then
+      log "  ✓ Fresh Bun installed: $(bun --version)"
     else
-      log "  ERROR: Bun installation failed"
+      log "  ERROR: Bun installer completed but bun command not found"
       exit 1
     fi
-  )
-fi
+  else
+    log "  ERROR: Bun installation failed"
+    exit 1
+  fi
+)
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
