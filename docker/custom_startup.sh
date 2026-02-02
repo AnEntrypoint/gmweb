@@ -627,6 +627,10 @@ mkdir -p "$BUN_INSTALL"
 log "  Installing fresh latest Bun (this may take a minute)..."
 # Source NVM in subshell for Bun installation
 (
+  # CRITICAL: Unset NPM_CONFIG_PREFIX before sourcing NVM
+  # NVM refuses to load if NPM_CONFIG_PREFIX is set (LinuxServer base image conflict)
+  unset NPM_CONFIG_PREFIX
+
   export NVM_DIR=/config/nvm
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
