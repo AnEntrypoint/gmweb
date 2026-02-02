@@ -626,27 +626,26 @@ mkdir -p "$BUN_INSTALL"
 
 log "  Installing fresh latest Bun (this may take a minute)..."
 # Source NVM in subshell for Bun installation
-(
-  # CRITICAL: Unset NPM_CONFIG_PREFIX before sourcing NVM
-  # NVM refuses to load if NPM_CONFIG_PREFIX is set (LinuxServer base image conflict)
-  unset NPM_CONFIG_PREFIX
-
+# CRITICAL: Clear NPM_CONFIG_PREFIX in subshell environment
+# NVM refuses to load if NPM_CONFIG_PREFIX is set (LinuxServer base image conflict)
+# Pass it as empty string to override parent shell's export
+NPM_CONFIG_PREFIX= bash << 'BUNINSTALL_EOF'
   export NVM_DIR=/config/nvm
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
   # Install official latest Bun (always fresh)
   if timeout 120 curl -fsSL https://bun.sh/install | bash 2>&1 | tail -3; then
     if command -v bun &>/dev/null; then
-      log "  ✓ Fresh Bun installed: $(bun --version)"
+      echo "  ✓ Fresh Bun installed: $(bun --version)" | tee -a "$HOME/logs/startup.log"
     else
-      log "  ERROR: Bun installer completed but bun command not found"
+      echo "  ERROR: Bun installer completed but bun command not found" | tee -a "$HOME/logs/startup.log"
       exit 1
     fi
   else
-    log "  ERROR: Bun installation failed"
+    echo "  ERROR: Bun installation failed" | tee -a "$HOME/logs/startup.log"
     exit 1
   fi
-)
+BUNINSTALL_EOF
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
