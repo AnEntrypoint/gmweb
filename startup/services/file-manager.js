@@ -1,6 +1,5 @@
-import { spawn, execSync } from 'child_process';
+import { spawn } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'fs';
 
 const sleep = promisify(setTimeout);
 
@@ -11,49 +10,19 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log('[file-manager] Starting fsbrowse file server on port 9998...');
+    console.log('[file-manager] Starting fsbrowse on port 9998...');
     return this.startFSBrowse(env);
   },
 
-  async installFSBrowse() {
-    if (existsSync('/config/node_modules/fsbrowse')) {
-      console.log('[file-manager] fsbrowse already installed');
-      return;
-    }
-    console.log('[file-manager] Installing fsbrowse...');
-    try {
-      execSync('cd /config && npm install fsbrowse@latest', {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 60000
-      });
-      console.log('[file-manager] fsbrowse installed successfully');
-    } catch (e) {
-      console.warn('[file-manager] fsbrowse installation failed, will try bunx fallback');
-    }
-  },
-
   async startFSBrowse(env) {
-    await this.installFSBrowse();
-
     return new Promise((resolve, reject) => {
       const childEnv = { ...env, PORT: '9998', HOSTNAME: 'localhost' };
 
-      let serverPath = '/config/node_modules/fsbrowse/server.js';
-      let isUsingDirect = existsSync(serverPath);
-
-      if (!isUsingDirect) {
-        console.log('[file-manager] Using bunx fallback for fsbrowse...');
-      }
-
-      const ps = spawn('node',
-        isUsingDirect ? [serverPath] : ['node_modules/fsbrowse/server.js'],
-        {
-          env: childEnv,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          detached: false,
-          cwd: isUsingDirect ? '/config/node_modules/fsbrowse' : '/config'
-        }
-      );
+      const ps = spawn('bunx', ['fsbrowse@latest'], {
+        env: childEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: false
+      });
 
       let startCheckCount = 0;
       let startCheckInterval = null;
@@ -61,7 +30,6 @@ export default {
       const checkIfStarted = async () => {
         startCheckCount++;
         try {
-          // Use ss to check for listening port 9998
           const { execSync: exec } = await import('child_process');
           const output = exec('ss -tln 2>/dev/null | grep ":9998"', {
             stdio: ['pipe', 'pipe', 'pipe'],
