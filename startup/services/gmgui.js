@@ -2,41 +2,12 @@ import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 
 const sleep = promisify(setTimeout);
 
 const NAME = 'gmgui';
 const PORT = 9897;
-
-// Utility to find gxe extraction directory
-function findGxeDir(repoUrl) {
-  const gxeBaseDir = path.join(process.env.HOME || '/config', '.gxe');
-  if (!fs.existsSync(gxeBaseDir)) return null;
-
-  try {
-    const entries = fs.readdirSync(gxeBaseDir);
-    for (const entry of entries) {
-      const dirPath = path.join(gxeBaseDir, entry);
-      const stat = fs.statSync(dirPath);
-      if (stat.isDirectory()) {
-        const pkgPath = path.join(dirPath, 'package.json');
-        if (fs.existsSync(pkgPath)) {
-          // Check if this is the gmgui package
-          try {
-            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-            if (pkg.name === 'gmgui') {
-              return dirPath;
-            }
-          } catch (e) {}
-        }
-      }
-    }
-  } catch (e) {
-    console.error(`[${NAME}] Error finding gxe dir:`, e.message);
-  }
-  return null;
-}
+const INSTALL_DIR = '/tmp/gmgui-install';
 
 export default {
   name: NAME,
@@ -45,64 +16,40 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log(`[${NAME}] Starting service via gxe...`);
+    console.log(`[${NAME}] Starting service via curl install script...`);
     return new Promise((resolve, reject) => {
       try {
-        execSync('git config --global --add safe.directory "*"', { stdio: 'pipe' });
-      } catch (e) {}
+        if (!fs.existsSync(INSTALL_DIR)) {
+          fs.mkdirSync(INSTALL_DIR, { recursive: true });
+        }
+      } catch (e) {
+        console.error(`[${NAME}] Failed to create install directory: ${e.message}`);
+      }
 
       const childEnv = { ...env, HOME: '/config', PORT: String(PORT) };
-      let gxeDirPath = null;
 
-      const ps = spawn('npx', ['-y', 'gxe@latest', 'AnEntrypoint/gmgui'], {
+      const ps = spawn('bash', ['-c', 'curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmgui/main/install.sh | bash'], {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,
-        cwd: '/config'
+        cwd: INSTALL_DIR
       });
 
       let startCheckCount = 0;
       let startCheckInterval = null;
-      let npmInstallDone = false;
 
       const checkIfStarted = async () => {
         startCheckCount++;
         try {
           const { execSync: exec } = await import('child_process');
-          
-          // First, try to find and install npm deps if not done
-          if (!npmInstallDone && startCheckCount === 5) {
-            gxeDirPath = findGxeDir('AnEntrypoint/gmgui');
-            if (gxeDirPath) {
-              console.log(`[${NAME}] Found gxe extraction at ${gxeDirPath}`);
-              try {
-                console.log(`[${NAME}] Clearing npm cache...`);
-                execSync('npm cache clean --force', {
-                  cwd: gxeDirPath,
-                  stdio: ['ignore', 'pipe', 'pipe'],
-                  timeout: 30000
-                });
-                console.log(`[${NAME}] Running npm install...`);
-                execSync('npm install --legacy-peer-deps', {
-                  cwd: gxeDirPath,
-                  stdio: ['ignore', 'pipe', 'pipe'],
-                  timeout: 60000
-                });
-                console.log(`[${NAME}] npm install completed`);
-                npmInstallDone = true;
-              } catch (e) {
-                console.log(`[${NAME}] npm install error: ${e.message}`);
-              }
-            }
-          }
-          
+
           const output = exec(`ss -tln 2>/dev/null | grep :${PORT}`, {
             stdio: ['pipe', 'pipe', 'pipe'],
             shell: true,
             encoding: 'utf8',
             timeout: 2000
           });
-          
+
           if (output && output.includes('LISTEN')) {
             clearInterval(startCheckInterval);
             console.log(`[${NAME}] ✓ Service responding on port ${PORT}`);
