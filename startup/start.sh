@@ -39,6 +39,13 @@ fi
 SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
 NODE_BIN="$(which node)"
 
+# CRITICAL: Ensure PASSWORD is exported to supervisor
+# PASSWORD is passed from custom_startup.sh to start.sh
+if [ -z "$PASSWORD" ]; then
+  echo "WARNING: PASSWORD not set, using fallback 'password'"
+  export PASSWORD="password"
+fi
+
 # Ensure log directory exists with proper permissions
 mkdir -p "$LOG_DIR"
 chmod 755 "$LOG_DIR"

@@ -922,7 +922,7 @@ if [ -f /opt/gmweb-startup/start.sh ]; then
   DOCKER_CONFIG="/config/.gmweb/cache/.docker" \
   BUN_INSTALL="/config/.gmweb/cache/.bun" \
   PASSWORD="$PASSWORD" \
-  sudo -u abc bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
+  sudo -E -u abc bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
   SUPERVISOR_PID=$!
   sleep 2
   kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"
