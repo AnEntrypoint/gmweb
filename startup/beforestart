@@ -1,0 +1,64 @@
+#!/bin/bash
+# Environment setup hook - sourced by .bashrc, .profile, start.sh, and custom_startup.sh
+# Single source of truth for all gmweb environment variables
+
+export HOME="${HOME:-/config}"
+export NVM_DIR="/config/nvm"
+export GMWEB_DIR="/config/.gmweb"
+export BUN_INSTALL="/config/.gmweb/cache/.bun"
+
+# Temp directory on same filesystem as /config (prevents EXDEV rename errors)
+export TMPDIR="/config/.tmp"
+export TMP="/config/.tmp"
+export TEMP="/config/.tmp"
+
+# XDG directories (prevent /config pollution)
+export XDG_CACHE_HOME="/config/.gmweb/cache"
+export XDG_CONFIG_HOME="/config/.gmweb/cache/.config"
+export XDG_DATA_HOME="/config/.gmweb/cache/.local/share"
+export DOCKER_CONFIG="/config/.gmweb/cache/.docker"
+
+# Runtime and D-Bus
+ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
+export XDG_RUNTIME_DIR="/run/user/$ABC_UID"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+
+# PATH: Bun, npm-global, opencode (idempotent - only add if not already present)
+case ":$PATH:" in
+  *":$BUN_INSTALL/bin:"*) ;;
+  *) export PATH="$BUN_INSTALL/bin:$PATH" ;;
+esac
+case ":$PATH:" in
+  *":$GMWEB_DIR/npm-global/bin:"*) ;;
+  *) export PATH="$GMWEB_DIR/npm-global/bin:$PATH" ;;
+esac
+case ":$PATH:" in
+  *":$GMWEB_DIR/tools/opencode/bin:"*) ;;
+  *) export PATH="$GMWEB_DIR/tools/opencode/bin:$PATH" ;;
+esac
+
+# Load NVM (hide npm config vars that conflict with NVM)
+if [ -f "$HOME/.nvm_compat.sh" ]; then
+  . "$HOME/.nvm_compat.sh"
+elif [ -f "/config/.nvm_compat.sh" ]; then
+  . "/config/.nvm_compat.sh"
+fi
+
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+fi
+
+# Restore npm config after NVM loaded
+if [ -f "$HOME/.nvm_restore.sh" ]; then
+  . "$HOME/.nvm_restore.sh"
+elif [ -f "/config/.nvm_restore.sh" ]; then
+  . "/config/.nvm_restore.sh"
+fi
+
+# npm config (centralized cache and global prefix)
+export npm_config_cache="$GMWEB_DIR/npm-cache"
+export npm_config_prefix="$GMWEB_DIR/npm-global"
+export NPM_CONFIG_CACHE="$GMWEB_DIR/npm-cache"
+export NPM_CONFIG_PREFIX="$GMWEB_DIR/npm-global"
+
+export NODE_OPTIONS="--no-warnings"
