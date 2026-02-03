@@ -21,6 +21,20 @@ if [ -z "$(command -v node)" ]; then
   exit 1
 fi
 
+# CRITICAL: Verify bunx is available before starting services
+if ! command -v bunx &>/dev/null; then
+  if ! command -v bun &>/dev/null; then
+    echo "ERROR: bunx and bun not available in PATH"
+    echo "ERROR: BUN_INSTALL=$BUN_INSTALL"
+    echo "ERROR: PATH=$PATH"
+    exit 1
+  fi
+  # If bun exists but not bunx, create symlink
+  BUN_PATH=$(command -v bun)
+  BUN_DIR=$(dirname "$BUN_PATH")
+  ln -sf "$BUN_PATH" "$BUN_DIR/bunx" 2>/dev/null || true
+fi
+
 # If nvm.sh didn't load node, add it to PATH manually
 SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
 NODE_BIN="$(which node)"
@@ -42,6 +56,19 @@ echo "[start.sh] NODE_BIN=$NODE_BIN (exists: $([ -f "$NODE_BIN" ] && echo YES ||
 echo "[start.sh] supervisor index.js (exists: $([ -f /opt/gmweb-startup/index.js ] && echo YES || echo NO))"
 echo "[start.sh] nginx status (running: $(pgrep -c nginx >/dev/null && echo YES || echo NO))"
 echo "[start.sh] config.json (exists: $([ -f /opt/gmweb-startup/config.json ] && echo YES || echo NO))"
+
+# CRITICAL: Verify bunx availability
+BUNX_PATH=$(command -v bunx 2>/dev/null || echo "NOT FOUND")
+BUN_PATH=$(command -v bun 2>/dev/null || echo "NOT FOUND")
+echo "[start.sh] bunx=$BUNX_PATH"
+echo "[start.sh] bun=$BUN_PATH"
+if [ "$BUNX_PATH" = "NOT FOUND" ] && [ "$BUN_PATH" = "NOT FOUND" ]; then
+  echo "[start.sh] ERROR: bunx and bun are NOT available!"
+  echo "[start.sh] BUN_INSTALL=$BUN_INSTALL"
+  echo "[start.sh] PATH=$PATH"
+else
+  echo "[start.sh] ✓ bunx/bun available for services"
+fi
 echo "[start.sh] === STARTING SUPERVISOR ==="
 
 # Start supervisor in background with unbuffered output

@@ -14,28 +14,45 @@ export default {
     return this.startFSBrowse(env);
   },
 
-  async startFSBrowse(env) {
-    return new Promise((resolve, reject) => {
-      const childEnv = { ...env, PORT: '9998', HOSTNAME: 'localhost' };
+   async startFSBrowse(env) {
+     return new Promise((resolve, reject) => {
+       const childEnv = { ...env, PORT: '9998', HOSTNAME: 'localhost' };
 
-      // Try bunx first, fall back to npx if Bun is not installed
-      let command = 'bunx';
-      let args = ['fsbrowse@latest'];
-      
-      try {
-        const { execSync: checkCmd } = require('child_process');
-        checkCmd('which bunx', { stdio: 'pipe' });
-      } catch (e) {
-        console.log('[file-manager] Bun not available, using npx instead');
-        command = 'npx';
-        args = ['-y', 'fsbrowse@latest'];
-      }
+       // Try bunx first, fall back to npx if Bun is not installed
+       let command = 'bunx';
+       let args = ['fsbrowse@latest'];
+       let useFallback = false;
+       
+       try {
+         const { execSync: checkCmd } = require('child_process');
+         checkCmd('which bunx', { stdio: 'pipe' });
+         console.log('[file-manager] ✓ bunx available, using Bun package runner');
+       } catch (e) {
+         console.log('[file-manager] ⚠ bunx not available, falling back to npx');
+         console.log(`[file-manager] Error details: ${e.message}`);
+         console.log(`[file-manager] PATH: ${env.PATH}`);
+         useFallback = true;
+         command = 'npx';
+         args = ['-y', 'fsbrowse@latest'];
+       }
 
-      const ps = spawn(command, args, {
-        env: childEnv,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: false
-      });
+       console.log(`[file-manager] Launching: ${command} ${args.join(' ')}`);
+       const ps = spawn(command, args, {
+         env: childEnv,
+         stdio: ['ignore', 'pipe', 'pipe'],
+         detached: false
+       });
+
+       // Log any startup errors
+       ps.on('error', (err) => {
+         console.error(`[file-manager] Failed to spawn process: ${err.message}`);
+         reject(new Error(`Failed to start fsbrowse: ${err.message}`));
+       });
+
+       ps.stderr?.on('data', (data) => {
+         const msg = data.toString().trim();
+         if (msg) console.log(`[file-manager] stderr: ${msg}`);
+       });
 
       let startCheckCount = 0;
       let startCheckInterval = null;

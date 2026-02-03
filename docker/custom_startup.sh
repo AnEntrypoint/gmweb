@@ -676,25 +676,85 @@ rm -rf "$BUN_INSTALL" 2>/dev/null || true
 mkdir -p "$BUN_INSTALL"
 
 log "  Installing fresh latest Bun..."
-# Install via apt-get for reliable, compatible binaries (like ttyd)
-# This is more reliable than curl | bash which can fail silently
+# CRITICAL: Bun must be available before supervisor starts
+# Detect system architecture
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64) BUN_ARCH="x64" ;;
+  aarch64) BUN_ARCH="aarch64" ;;
+  arm64) BUN_ARCH="aarch64" ;;  # macOS
+  *) BUN_ARCH="$ARCH" ;;
+esac
+
+BUN_INSTALLED=false
+
+# Try apt-get first (most reliable for distro compatibility)
 if apt-get update -qq 2>/dev/null && apt-get install -y bun 2>&1 | tail -3; then
-  if command -v bun &>/dev/null; then
+  if BUN_PATH=$(command -v bun 2>/dev/null) && [ -x "$BUN_PATH" ]; then
     log "✓ Bun installed via apt-get"
-    # Get the actual bun binary path and symlink to expected location
-    BUN_PATH=$(command -v bun)
     log "  Bun location: $BUN_PATH"
     mkdir -p "$BUN_INSTALL/bin"
     ln -sf "$BUN_PATH" "$BUN_INSTALL/bin/bun"
+    ln -sf "$BUN_PATH" "$BUN_INSTALL/bin/bunx"
     export PATH="$BUN_INSTALL/bin:$PATH"
-    log "✓ Bun bin directory added to PATH"
-  else
-    log "WARNING: Bun apt-get install completed but bun command not found, continuing anyway"
-    # Don't exit - services that need Bun will fail gracefully
+    # Verify bun is accessible
+    if "$BUN_INSTALL/bin/bun" --version >/dev/null 2>&1; then
+      log "✓ Bun verified: $(${BUN_INSTALL}/bin/bun --version)"
+      BUN_INSTALLED=true
+    else
+      log "WARNING: Bun symlink failed verification, trying direct download"
+    fi
   fi
+fi
+
+# Fallback: Download from official Bun releases
+if [ "$BUN_INSTALLED" = false ]; then
+  log "  Downloading Bun directly from GitHub releases..."
+  
+  # Download latest stable bun binary
+  BUN_URL="https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${BUN_ARCH}.zip"
+  log "  URL: $BUN_URL"
+  
+  if curl -fsSL --connect-timeout 10 --max-time 60 "$BUN_URL" -o "$BUN_INSTALL/bun.zip" 2>/dev/null; then
+    if unzip -q "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>/dev/null; then
+      log "✓ Bun downloaded and extracted"
+      # The zip contains bun-linux-{ARCH}/ directory with the binary
+      if [ -f "$BUN_INSTALL/bun-linux-${BUN_ARCH}/bun" ]; then
+        mkdir -p "$BUN_INSTALL/bin"
+        mv "$BUN_INSTALL/bun-linux-${BUN_ARCH}/bun" "$BUN_INSTALL/bin/bun"
+        chmod +x "$BUN_INSTALL/bin/bun"
+        ln -sf bun "$BUN_INSTALL/bin/bunx"
+        rm -rf "$BUN_INSTALL/bun.zip" "$BUN_INSTALL/bun-linux-${BUN_ARCH}"
+        export PATH="$BUN_INSTALL/bin:$PATH"
+        if "$BUN_INSTALL/bin/bun" --version >/dev/null 2>&1; then
+          log "✓ Bun verified: $(${BUN_INSTALL}/bin/bun --version)"
+          BUN_INSTALLED=true
+        else
+          log "ERROR: Bun binary failed verification"
+        fi
+      else
+        log "ERROR: Expected bun binary not found in extracted archive at $BUN_INSTALL/bun-linux-${BUN_ARCH}/bun"
+      fi
+    else
+      log "ERROR: Failed to unzip bun archive"
+    fi
+  else
+    log "ERROR: Failed to download bun from $BUN_URL"
+  fi
+fi
+
+# CRITICAL: If Bun still not installed, exit with error
+if [ "$BUN_INSTALLED" = false ]; then
+  log "ERROR: Failed to install Bun - this is CRITICAL for gmweb services"
+  log "ERROR: Checked: apt-get install + GitHub direct download"
+  exit 1
 else
-  log "WARNING: Bun apt-get installation failed, continuing anyway"
-  # Don't exit - services that need Bun will fail gracefully
+  log "✓ Bun bin directory added to PATH: $BUN_INSTALL/bin"
+  # Verify bunx is available (symlink to bun)
+  if ! command -v bunx >/dev/null 2>&1; then
+    log "ERROR: bunx symlink not working, creating direct symlink"
+    ln -sf bun "$BUN_INSTALL/bin/bunx"
+  fi
 fi
 
 log "Phase 1.6: Install CLI coding tools (opencode/Claude Code) - BLOCKING (required for services)"
