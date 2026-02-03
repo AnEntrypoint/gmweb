@@ -156,7 +156,8 @@ server {
   }
 
   location /gm/ {
-    auth_basic off;
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:9897/gm/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -170,6 +171,9 @@ server {
     proxy_connect_timeout 3600s;
     proxy_buffering off;
     client_max_body_size 10M;
+    sub_filter 'ws://' 'wss://';
+    sub_filter_types application/javascript text/html;
+    sub_filter_once off;
   }
 
   location /api/v1/ {
@@ -365,7 +369,8 @@ server {
   }
 
   location /gm/ {
-    auth_basic off;
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
     proxy_pass http://127.0.0.1:9897/gm/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -379,6 +384,9 @@ server {
     proxy_connect_timeout 3600s;
     proxy_buffering off;
     client_max_body_size 10M;
+    sub_filter 'ws://' 'wss://';
+    sub_filter_types application/javascript text/html;
+    sub_filter_once off;
   }
 
   location /api/v1/ {
