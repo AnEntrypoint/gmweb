@@ -18,7 +18,20 @@ export default {
     return new Promise((resolve, reject) => {
       const childEnv = { ...env, PORT: '9998', HOSTNAME: 'localhost' };
 
-      const ps = spawn('bunx', ['fsbrowse@latest'], {
+      // Try bunx first, fall back to npx if Bun is not installed
+      let command = 'bunx';
+      let args = ['fsbrowse@latest'];
+      
+      try {
+        const { execSync: checkCmd } = require('child_process');
+        checkCmd('which bunx', { stdio: 'pipe' });
+      } catch (e) {
+        console.log('[file-manager] Bun not available, using npx instead');
+        command = 'npx';
+        args = ['-y', 'fsbrowse@latest'];
+      }
+
+      const ps = spawn(command, args, {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false

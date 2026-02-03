@@ -267,11 +267,14 @@ export class Supervisor {
     const env = { ...process.env };
     const NVM_BIN = path.dirname(process.execPath);
     const NVM_LIB = path.join(NVM_BIN, '..', 'lib', 'node_modules');
-    const LOCAL_BIN = `${process.env.HOME}/.local/bin`;
+    // CRITICAL: Use explicit /config/.local/bin for Claude and other local tools
+    // process.env.HOME may not be set correctly during supervisor startup
+    const LOCAL_BIN = '/config/.local/bin';
     const GMWEB_BIN = '/config/.gmweb/npm-global/bin';
     const OPENCODE_BIN = '/config/.gmweb/tools/opencode/bin';
     const BUN_BIN = '/config/.gmweb/cache/.bun/bin';
-    env.PATH = `${BUN_BIN}:${GMWEB_BIN}:${OPENCODE_BIN}:${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
+    // Ensure LOCAL_BIN (for Claude) is at the front of PATH so it's found first
+    env.PATH = `${LOCAL_BIN}:${BUN_BIN}:${GMWEB_BIN}:${OPENCODE_BIN}:${NVM_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
     env.NODE_PATH = `${NVM_LIB}:${env.NODE_PATH || ''}`;
 
     // CRITICAL: Only services that directly invoke npm should have npm config

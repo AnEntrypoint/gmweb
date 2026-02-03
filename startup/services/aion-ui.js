@@ -2,7 +2,7 @@ import { spawnAsAbcUser, waitForPort } from '../lib/service-utils.js';
 import { execSync } from 'child_process';
 import { createRequire } from 'module';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import os from 'os';
 
 const PORT = 25808;
