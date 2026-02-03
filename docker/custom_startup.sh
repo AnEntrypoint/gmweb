@@ -8,14 +8,17 @@ unset NPM_CONFIG_PREFIX
 HOME_DIR="/config"
 
 # CRITICAL: Set ownership to abc:abc (UID 1000) at startup start
-sudo chown -R 1000:1000 "/config" 2>/dev/null || true
+# Use direct chown without sudo (runs as root from s6-init)
+# This is the FIRST thing to ensure all subsequent operations create abc-owned files
+chown -R 1000:1000 "/config" 2>/dev/null || true
+chmod -R u+rwX,g+rX,o-rwx "/config" 2>/dev/null || true
 LOG_DIR="$HOME_DIR/logs"
 
 # Clear all logs on every boot - fresh start
 rm -rf "$LOG_DIR" 2>/dev/null || true
 mkdir -p "$LOG_DIR"
 chmod 755 "$LOG_DIR"
-chown abc:abc "$LOG_DIR"
+chown 1000:1000 "$LOG_DIR"
 
 log() {
   echo "[gmweb-startup] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "$LOG_DIR/startup.log"
@@ -115,8 +118,10 @@ log "Background installs started in parallel (PID: $BG_INSTALL_PID)"
 # ALWAYS clean up and migrate on every boot (no markers - persistent volumes need verification)
 log "Cleaning up legacy installations and ensuring clean state..."
 
-# Create centralized directory
+# Create centralized directory with proper ownership
 mkdir -p /config/.gmweb/{npm-cache,npm-global,tools,deps,cache}
+chown -R 1000:1000 /config/.gmweb 2>/dev/null || true
+chmod -R u+rwX,g+rX,o-rwx /config/.gmweb 2>/dev/null || true
 
 # Migrate opencode if it exists in old location
 if [ -d /config/.opencode ]; then
@@ -225,8 +230,8 @@ fi
 # This keeps /config clean and user-friendly
 GMWEB_DIR="/config/.gmweb"
 mkdir -p "$GMWEB_DIR"/{npm-cache,npm-global,opencode,tools}
-sudo chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || true
-sudo chmod -R 755 "$GMWEB_DIR" 2>/dev/null || true
+chown -R 1000:1000 "$GMWEB_DIR" 2>/dev/null || true
+chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR" 2>/dev/null || true
 
 # Configure npm to use centralized directory at ALL levels (black magic for bulletproof setup)
 
@@ -469,6 +474,7 @@ log "Phase 1 complete - environment ready (using beforestart hook)"
 
 log "Verifying persistent path structure..."
 mkdir -p /config/nvm /config/.tmp /config/logs
+chown 1000:1000 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
 chmod 755 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
 
 # Copy NVM compatibility shims to /config (shared across all shells and scripts)
@@ -625,6 +631,8 @@ log "XFCE launcher script prepared"
 
 log "Installing critical Node modules for AionUI..."
 mkdir -p "$GMWEB_DIR/deps"
+chown 1000:1000 "$GMWEB_DIR/deps" 2>/dev/null || true
+chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
 
 # Ensure npm cache is clean before critical installs
 npm cache clean --force 2>&1 | tail -1 || log "WARNING: npm cache clean had issues"
@@ -879,9 +887,29 @@ log "Background installs started (PID: $!)"
 
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
-# Final ownership pass - ensure all files are owned by abc:abc (UID 1000)
-sudo chown -R 1000:1000 "/config" 2>/dev/null || true
-log "✓ Final /config ownership set to abc (UID 1000)"
+# CRITICAL: Final comprehensive ownership pass
+# Ensures no root-owned files exist in /config after entire boot process
+# This catches any files created by background processes during startup
+log "Running final ownership and permission fix (catching any root-owned files)..."
+find /config -not -user 1000 2>/dev/null | while read file; do
+  chown 1000:1000 "$file" 2>/dev/null || true
+  log "  Fixed ownership: $file"
+done
+
+# Set proper permissions on /config hierarchy
+chown -R 1000:1000 "/config" 2>/dev/null || true
+chmod -R u+rwX,g+rX,o-rwx "/config" 2>/dev/null || true
+log "✓ Final /config ownership and permissions verified (all abc:abc)"
+
+# Verify no root files remain
+if find /config -maxdepth 3 -not -user 1000 2>/dev/null | head -5 | grep -q .; then
+  log "WARNING: Some root-owned files still exist in /config (may be system symlinks)"
+  find /config -maxdepth 3 -not -user 1000 2>/dev/null | head -5 | while read f; do
+    log "  - $f"
+  done
+else
+  log "✓ Verified: No root-owned files in /config"
+fi
 
 # Set working directory to /config for any subsequent processes
 cd /config
