@@ -68,12 +68,39 @@ async function main() {
         const module = await import(`./services/${name}.js`);
         const service = module.default;
 
+        // CRITICAL: Validate service has required properties before registering
+        if (!service || typeof service !== 'object') {
+          console.error(`[startup] ✗ Service ${name} has no valid default export`);
+          continue;
+        }
+        if (!service.name) {
+          console.error(`[startup] ✗ Service ${name} missing 'name' property`);
+          continue;
+        }
+        if (typeof service.start !== 'function') {
+          console.error(`[startup] ✗ Service ${name} missing 'start' function`);
+          continue;
+        }
+        if (typeof service.health !== 'function') {
+          console.error(`[startup] ✗ Service ${name} missing 'health' function`);
+          continue;
+        }
+        // Ensure dependencies is always an array
+        if (!service.dependencies || !Array.isArray(service.dependencies)) {
+          console.log(`[startup] Service ${name} has no dependencies array, setting to empty`);
+          service.dependencies = [];
+        }
+
         // Inject config for this service
         service.enabled = true;
 
-        supervisor.register(service);
-        console.log(`[startup] ✓ Registered: ${name}`);
-        loadedCount++;
+        const registered = supervisor.register(service);
+        if (registered) {
+          console.log(`[startup] ✓ Registered: ${name}`);
+          loadedCount++;
+        } else {
+          console.error(`[startup] ✗ Failed to register: ${name}`);
+        }
       } catch (err) {
         console.error(`[startup] ✗ Failed to load service ${name}:`, err.message);
       }
