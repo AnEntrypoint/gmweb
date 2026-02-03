@@ -60,11 +60,7 @@ sudo nginx -s reload 2>/dev/null || log "WARNING: nginx reload failed (nginx may
 export PASSWORD
 log "✓ HTTP Basic Auth configured with valid apr1 hash"
 
-# Clean up stale environment vars from persistent .profile
-if [ -f "$HOME_DIR/.profile" ]; then
-  grep -v -E "LD_PRELOAD|NPM_CONFIG_PREFIX" "$HOME_DIR/.profile" > "$HOME_DIR/.profile.tmp" && \
-  mv "$HOME_DIR/.profile.tmp" "$HOME_DIR/.profile" || true
-fi
+# Note: .bashrc and .profile are no longer used - environment is set via beforestart hook
 
 # MIGRATION: Move legacy installations to centralized directory and clean pollution
 # ALWAYS clean up and migrate on every boot (no markers - persistent volumes need verification)
@@ -235,181 +231,7 @@ export BUN_INSTALL="/config/.gmweb/cache/.bun"
 mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$DOCKER_CONFIG" "$BUN_INSTALL"
 log "Configured XDG directories to prevent /config pollution"
 
-# Generate centralized environment setup file (/config/.gmweb-env.sh)
-# This file is sourced by:
-# - /config/.bashrc (interactive shells)
-# - /config/.profile (login shells)
-# - startup/start.sh (supervisor startup)
-# - All service startup scripts
-log "Phase 0.8: Generating centralized environment setup (/config/.gmweb-env.sh)..."
-cat > /config/.gmweb-env.sh << 'ENVEOF'
-#!/bin/bash
-# gmweb centralized environment setup
-# This file is sourced by:
-# - /config/.bashrc (interactive shells)
-# - startup/start.sh (supervisor startup)
-# - service startup scripts
-#
-# Ensures all shells and services have consistent access to:
-# - Bun and Node.js
-# - npm configuration
-# - XDG directories
-# - All development tools
-
-# HOME should already be set, but ensure it's /config
-export HOME="${HOME:-/config}"
-
-# ============================================================================
-# CRITICAL: NVM Setup with npm config management
-# ============================================================================
-# NVM refuses to load if NPM_CONFIG_PREFIX is set (LinuxServer base image)
-# We hide npm config BEFORE sourcing NVM, then restore it after
-
-# Hide problematic npm config before loading NVM
-if [ -f "${HOME}/.nvm_compat.sh" ]; then
-  . "${HOME}/.nvm_compat.sh"
-else
-  unset npm_config_cache npm_config_prefix NPM_CONFIG_CACHE NPM_CONFIG_PREFIX
-fi
-
-# Load NVM - this adds Node.js to PATH
-export NVM_DIR="/config/nvm"
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  . "$NVM_DIR/nvm.sh"
-fi
-if [ -s "$NVM_DIR/bash_completion" ]; then
-  . "$NVM_DIR/bash_completion"
-fi
-
-# Restore npm config after NVM is loaded
-if [ -f "${HOME}/.nvm_restore.sh" ]; then
-  . "${HOME}/.nvm_restore.sh"
-else
-  # Fallback: set centralized npm cache
-  export npm_config_cache="/config/.gmweb/npm-cache"
-  export npm_config_prefix="/config/.gmweb/npm-global"
-  export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
-  export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
-fi
-
-# ============================================================================
-# Bun - installed at /config/.gmweb/cache/.bun
-# ============================================================================
-export BUN_INSTALL="/config/.gmweb/cache/.bun"
-
-# ============================================================================
-# PATH Setup - Tools in priority order
-# ============================================================================
-# 1. Bun bin (bunx, bun commands)
-# 2. npm global packages
-# 3. OpenCode tools
-# 4. Node.js (from NVM, already in PATH)
-# 5. Local user binaries
-# 6. System paths
-
-export PATH="\
-${BUN_INSTALL}/bin:\
-/config/.gmweb/npm-global/bin:\
-/config/.gmweb/tools/opencode/bin:\
-${HOME}/.local/bin:\
-/usr/local/sbin:\
-/usr/local/bin:\
-/usr/sbin:\
-/usr/bin:\
-/sbin:\
-/bin"
-
-# ============================================================================
-# Temporary directories - centralized to keep /config clean
-# ============================================================================
-export TMPDIR="/config/.tmp"
-export TMP="/config/.tmp"
-export TEMP="/config/.tmp"
-
-# ============================================================================
-# XDG Base Directory Specification
-# ============================================================================
-# All tools should respect these instead of littering $HOME with dotfiles
-export XDG_CACHE_HOME="/config/.gmweb/cache"
-export XDG_CONFIG_HOME="/config/.gmweb/cache/.config"
-export XDG_DATA_HOME="/config/.gmweb/cache/.local/share"
-export XDG_RUNTIME_DIR="/run/user/$(id -u 2>/dev/null || echo 1000)"
-
-# ============================================================================
-# Tool-specific configuration
-# ============================================================================
-export NODE_OPTIONS="--no-warnings"
-export DOCKER_CONFIG="/config/.gmweb/cache/.docker"
-
-# ============================================================================
-# D-Bus for GUI applications
-# ============================================================================
-if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
-  UID_NUM=$(id -u 2>/dev/null || echo 1000)
-  export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${UID_NUM}/bus"
-fi
-
-# ============================================================================
-# Ensure critical directories exist
-# ============================================================================
-mkdir -p \
-  /config/.gmweb/cache \
-  /config/.gmweb/cache/.config \
-  /config/.gmweb/cache/.local/share \
-  /config/.gmweb/npm-cache \
-  /config/.gmweb/npm-global \
-  /config/.tmp \
-  2>/dev/null || true
-
-# Export NODE_PATH for npm module loading
-export NODE_PATH="/config/.gmweb/npm-global/lib/node_modules:${NODE_PATH}"
-ENVEOF
-chmod 644 /config/.gmweb-env.sh
-log "✓ Centralized environment setup created at /config/.gmweb-env.sh"
-
-# Update /config/.bashrc to source centralized environment
-log "Phase 0.9: Updating /config/.bashrc..."
-cat > /config/.bashrc << 'BASHEOF'
-# gmweb bash configuration
-# Sources centralized environment setup for all tools and services
-
-# Source gmweb environment (Bun, Node, npm, XDG, paths, etc.)
-if [ -f "${HOME}/.gmweb-env.sh" ]; then
-  . "${HOME}/.gmweb-env.sh"
-fi
-
-# Interactive shell features (only in interactive shells)
-if [ -z "$PS1" ]; then
-  return
-fi
-
-# Bash history configuration
-export HISTSIZE=10000
-export HISTFILESIZE=20000
-export HISTCONTROL=ignoredups:ignorespace
-
-# Shell options
-shopt -s histappend
-shopt -s checkwinsize
-
-# PS1 prompt
-export PS1="\u@\h:\w\$ "
-BASHEOF
-chmod 644 /config/.bashrc
-log "✓ Updated /config/.bashrc"
-
-# Update /config/.profile to source centralized environment
-log "Phase 1.0: Updating /config/.profile..."
-cat > /config/.profile << 'PROFILEEOF'
-# gmweb profile configuration for login shells
-# Sources centralized environment setup for all tools and services
-
-if [ -f "${HOME}/.gmweb-env.sh" ]; then
-  . "${HOME}/.gmweb-env.sh"
-fi
-PROFILEEOF
-chmod 644 /config/.profile
-log "✓ Updated /config/.profile"
+# beforestart hook will be copied after git clone and used as source of truth for environment setup
 
 # Clean up old temp files (older than 7 days) to prevent unbounded growth
 find "$SAFE_TMPDIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
@@ -507,6 +329,71 @@ cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
 cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
 log "✓ Startup files copied to /opt/gmweb-startup"
 
+# Copy beforestart and beforeend hooks to /config/
+log "Phase 1.0a: Setting up beforestart and beforeend hooks..."
+cp /tmp/gmweb/startup/beforestart /config/beforestart
+cp /tmp/gmweb/startup/beforeend /config/beforeend
+chmod +x /config/beforestart /config/beforeend
+chown abc:abc /config/beforestart /config/beforeend
+log "✓ beforestart and beforeend hooks installed to /config/"
+
+# Generate perfect .bashrc file that sources beforestart hook
+# This ensures all interactive shells have consistent environment
+log "Phase 1.0b: Generating perfect .bashrc file..."
+cat > /config/.bashrc << 'BASHRC_EOF'
+#!/bin/bash
+# Auto-generated .bashrc - sources beforestart hook for environment setup
+# This file is regenerated on every boot to ensure perfect consistency
+
+# Source beforestart hook for all environment variables and setup
+if [ -f "${HOME}/.beforestart" ] || [ -f "${HOME}/beforestart" ]; then
+  BEFORESTART_HOOK="${HOME}/beforestart"
+  [ ! -f "$BEFORESTART_HOOK" ] && BEFORESTART_HOOK="${HOME}/.beforestart"
+  if [ -f "$BEFORESTART_HOOK" ]; then
+    . "$BEFORESTART_HOOK"
+  fi
+fi
+
+# Interactive shell features (only in interactive shells)
+if [ -z "$PS1" ]; then
+  return
+fi
+
+# Bash history configuration
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+export HISTCONTROL=ignoredups:ignorespace
+
+# Shell options
+shopt -s histappend 2>/dev/null || true
+shopt -s checkwinsize 2>/dev/null || true
+
+# PS1 prompt
+export PS1="\u@\h:\w\$ "
+BASHRC_EOF
+chmod 644 /config/.bashrc
+log "✓ Perfect .bashrc created"
+
+# Generate perfect .profile file that sources beforestart hook
+# This ensures all login shells have consistent environment
+log "Phase 1.0c: Generating perfect .profile file..."
+cat > /config/.profile << 'PROFILE_EOF'
+#!/bin/bash
+# Auto-generated .profile - sources beforestart hook for environment setup
+# This file is regenerated on every boot to ensure perfect consistency
+
+# Source beforestart hook for all environment variables and setup
+if [ -f "${HOME}/.beforestart" ] || [ -f "${HOME}/beforestart" ]; then
+  BEFORESTART_HOOK="${HOME}/beforestart"
+  [ ! -f "$BEFORESTART_HOOK" ] && BEFORESTART_HOOK="${HOME}/.beforestart"
+  if [ -f "$BEFORESTART_HOOK" ]; then
+    . "$BEFORESTART_HOOK"
+  fi
+fi
+PROFILE_EOF
+chmod 644 /config/.profile
+log "✓ Perfect .profile created"
+
 log "Phase 2: Update nginx routing from git config"
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 # Copy updated nginx config from git (already has Phase 0 auth setup)
@@ -518,60 +405,7 @@ log "✓ Nginx config updated from git"
 # Ensure gmweb directory exists and has correct permissions
 mkdir -p "$GMWEB_DIR" && chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || true
 
-# ALWAYS regenerate .profile on every boot (no markers - persistent volumes need verification)
-cat > "$HOME_DIR/.profile" << 'PROFILE_EOF'
-export TMPDIR="${HOME}/.tmp"
-export TMP="${HOME}/.tmp"
-export TEMP="${HOME}/.tmp"
-mkdir -p "${TMPDIR}" 2>/dev/null || true
-
-# NVM Compatibility: hide npm config before loading NVM
-if [ -f "${HOME}/.nvm_compat.sh" ]; then
-  . "${HOME}/.nvm_compat.sh"
-fi
-
-export NVM_DIR="/config/nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-# NVM Restore: restore npm config after NVM is loaded
-if [ -f "${HOME}/.nvm_restore.sh" ]; then
-  . "${HOME}/.nvm_restore.sh"
-fi
-PROFILE_EOF
-log "✓ .profile configured"
-
-# ALWAYS regenerate .bashrc on every boot (no markers - persistent volumes need verification)
-# Clean existing bashrc from any gmweb entries first
-if [ -f "$HOME_DIR/.bashrc" ]; then
-  grep -v -E "NVM_DIR|nvm.sh|bash_completion|gmweb|opencode" "$HOME_DIR/.bashrc" > "$HOME_DIR/.bashrc.tmp" && \
-  mv "$HOME_DIR/.bashrc.tmp" "$HOME_DIR/.bashrc" || true
-fi
-
-# Add fresh setup with centralized paths and NVM compatibility
-cat >> "$HOME_DIR/.bashrc" << 'EOF'
-
-# gmweb NVM setup - ensures Node.js is available in non-login shells
-# NVM Compatibility: hide npm config before loading NVM
-if [ -f "${HOME}/.nvm_compat.sh" ]; then
-  . "${HOME}/.nvm_compat.sh"
-fi
-
-export NVM_DIR="/config/nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-# nvm bash completion (optional)
-[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
-
-# NVM Restore: restore npm config after NVM is loaded
-if [ -f "${HOME}/.nvm_restore.sh" ]; then
-  . "${HOME}/.nvm_restore.sh"
-fi
-
-# gmweb tools - centralized directory (/config/.gmweb keeps root clean)
-export PATH="/config/.gmweb/npm-global/bin:/config/.gmweb/tools/opencode/bin:$PATH"
-EOF
-log "✓ .bashrc configured with centralized paths"
-
-log "Phase 1 complete"
+log "Phase 1 complete - environment ready (using beforestart hook)"
 
 log "Verifying persistent path structure..."
 mkdir -p /config/nvm /config/.tmp /config/logs
@@ -586,12 +420,14 @@ NVM_DIR=/config/nvm
 export NVM_DIR
 log "Persistent paths ready: NVM_DIR=$NVM_DIR"
 
-# CRITICAL: Use shared NVM compatibility shim
-# This ensures all environments (startup, shells, services) handle NVM the same way
-. /config/.nvm_compat.sh
-
-# Always source NVM if available
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# Source beforestart hook to set up environment
+log "Phase 1: Sourcing beforestart hook for environment setup..."
+if [ -f /config/beforestart ]; then
+  . /config/beforestart
+else
+  log "ERROR: beforestart hook not found at /config/beforestart"
+  exit 1
+fi
 
 # ALWAYS verify Node 24 and npm on every boot (persistent volumes can be corrupted)
 mkdir -p "$NVM_DIR"
@@ -600,12 +436,12 @@ mkdir -p "$NVM_DIR"
 if [ ! -s "$NVM_DIR/nvm.sh" ]; then
   log "Installing NVM..."
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash 2>&1 | tail -3
-  . "$NVM_DIR/nvm.sh"
+  # Re-source beforestart to load the newly installed NVM
+  . /config/beforestart
 fi
 
 # ALWAYS guarantee clean npm/npx on every boot
-# Persistent /config volume may have corrupted NVM node_modules (e.g. npm deleted
-# by a bad --prefix install into the NVM node dir)
+# Persistent /config volume may have corrupted NVM node_modules
 # Strategy: check if npm module exists, if not do a clean reinstall
 NODE_DIR="$NVM_DIR/versions/node"
 LATEST_NODE=$(ls -1 "$NODE_DIR" 2>/dev/null | sort -V | tail -1)
@@ -643,9 +479,6 @@ if ! command -v npm &>/dev/null; then
   log "DEBUG: node=$(which node 2>&1)"
   exit 1
 fi
-
-# Restore npm config vars and .npmrc that we hid for NVM compatibility
-. /config/.nvm_restore.sh
 
 NODE_VERSION=$(node -v | tr -d 'v')
 NPM_VERSION=$(npm -v)

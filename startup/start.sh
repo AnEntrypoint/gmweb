@@ -6,12 +6,12 @@ set -o pipefail
 HOME_DIR="${HOME:-/config}"
 LOG_DIR="$HOME_DIR/logs"
 
-# Source centralized gmweb environment setup
-# This ensures consistent environment across all shells and services
-if [ -f "$HOME_DIR/.gmweb-env.sh" ]; then
-  . "$HOME_DIR/.gmweb-env.sh"
+# Source beforestart hook to initialize environment
+# This ensures consistent environment across all services
+if [ -f "$HOME_DIR/beforestart" ]; then
+  . "$HOME_DIR/beforestart"
 else
-  echo "ERROR: gmweb environment setup not found at $HOME_DIR/.gmweb-env.sh"
+  echo "ERROR: beforestart hook not found at $HOME_DIR/beforestart"
   exit 1
 fi
 
