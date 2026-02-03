@@ -21,9 +21,9 @@ export default {
       PORT: String(PORT)
     };
 
-    // Start agentgui using bunx (bun's npx equivalent)
+     // Start agentgui@latest using bunx (bun's npx equivalent)
     // This spawns the process in background and returns immediately
-    const ps = spawn('bash', ['-c', 'bunx agentgui'], {
+    const ps = spawn('bash', ['-c', `PORT=${PORT} bunx agentgui@latest`], {
       env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
