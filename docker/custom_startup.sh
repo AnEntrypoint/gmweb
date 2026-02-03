@@ -662,7 +662,7 @@ sudo apt-get update -qq 2>/dev/null || true
 sudo apt-get install -y gh 2>&1 | tail -2 || log "WARNING: gh install had issues"
 log "✓ GitHub CLI installed"
 
-log "Phase 1.5: Install Bun (BLOCKING - required by file-manager and gmgui services)"
+log "Phase 1.5: Install Bun (BLOCKING - required by file-manager and agentgui services)"
 export BUN_INSTALL="/config/.gmweb/cache/.bun"
 log "  BUN_INSTALL=$BUN_INSTALL"
 

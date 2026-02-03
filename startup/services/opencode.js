@@ -49,14 +49,7 @@ export default {
     console.log(`[${NAME}] Starting opencode acp...`);
     const ps = spawn(binPath, ['acp'], {
       cwd: homeDir,
-      env: { 
-        ...env, 
-        HOME: homeDir,
-        // Ensure XDG directories are set for consistency
-        XDG_CONFIG_HOME: env.XDG_CONFIG_HOME || `${homeDir}/.gmweb/cache/.config`,
-        XDG_DATA_HOME: env.XDG_DATA_HOME || `${homeDir}/.gmweb/cache/.local/share`,
-        XDG_CACHE_HOME: env.XDG_CACHE_HOME || `${homeDir}/.gmweb/cache`,
-      },
+      env: { ...env, HOME: homeDir },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });

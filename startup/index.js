@@ -41,7 +41,7 @@ async function main() {
         'opencode-config',
         'opencode',
         'proxypilot',
-        'gmgui',
+        'agentgui',
         'aion-ui',
         'moltbot',
         'claude-config',

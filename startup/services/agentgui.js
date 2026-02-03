@@ -4,9 +4,9 @@ import { existsSync, mkdirSync } from 'fs';
 
 const sleep = promisify(setTimeout);
 
-const NAME = 'gmgui';
+const NAME = 'agentgui';
 const PORT = 9897;
-const INSTALL_DIR = '/tmp/gmgui-install';
+const INSTALL_DIR = '/tmp/agentgui-install';
 
 export default {
   name: NAME,
@@ -15,7 +15,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log(`[${NAME}] Starting service via GitHub gmgui...`);
+    console.log(`[${NAME}] Starting service via GitHub agentgui...`);
     return new Promise((resolve, reject) => {
       try {
         if (!existsSync(INSTALL_DIR)) {
@@ -27,7 +27,7 @@ export default {
 
       const childEnv = { ...env, HOME: '/config', PORT: String(PORT) };
 
-      const ps = spawn('bash', ['-c', 'curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmgui/main/install.sh | bash'], {
+      const ps = spawn('bash', ['-c', 'curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/agentgui/main/install.sh | bash'], {
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,

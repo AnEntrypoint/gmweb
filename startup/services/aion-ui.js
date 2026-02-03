@@ -2,7 +2,7 @@ import { spawnAsAbcUser, waitForPort } from '../lib/service-utils.js';
 import { execSync } from 'child_process';
 import { createRequire } from 'module';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import os from 'os';
 
 const PORT = 25808;
@@ -196,24 +196,15 @@ export default {
 
     try { execSync('rm -rf /config/.config/AionUi/Singleton* 2>/dev/null || true'); } catch (e) {}
     try { execSync('pkill -f AionUi || true'); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
-    
-    // Ensure NVM bin directory is in PATH so AionUI can find claude-code-acp
-    const nvmBinPath = dirname(process.execPath);
-    const envPath = env.PATH || process.env.PATH || '';
-    const pathWithNvm = envPath.includes(nvmBinPath) ? envPath : `${nvmBinPath}:${envPath}`;
-    
-    const serviceEnv = { 
-      ...env, 
-      DISPLAY: ':1', 
-      DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus', 
-      AIONUI_PORT: String(PORT), 
-      AIONUI_ALLOWED_ORIGINS: '*',
-      PATH: pathWithNvm
+
+    const serviceEnv = {
+      ...env,
+      DISPLAY: ':1',
+      DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus',
+      AIONUI_PORT: String(PORT),
+      AIONUI_ALLOWED_ORIGINS: '*'
     };
-    // Source bash profile to ensure AionUI has full CLI context (opencode, npm packages, etc.)
-    // Explicitly export PATH after sourcing to ensure it includes NVM bin
-    // Start in /config directory so AionUI treats it as home for file access
-    const command = `cd /config && source /config/.profile && source /config/.bashrc 2>/dev/null || true && export PATH="${pathWithNvm}" && ${AIONUI_BINARY} --no-sandbox --webui --remote --port ${PORT}`;
+    const command = `cd /config && source /config/.profile && source /config/.bashrc 2>/dev/null || true && ${AIONUI_BINARY} --no-sandbox --webui --remote --port ${PORT}`;
     const ps = spawnAsAbcUser(command, serviceEnv);
     ps.stdout?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation')) console.log(`[aion-ui] ${m}`); });
     ps.stderr?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation') && !m.includes('GPU process')) console.log(`[aion-ui:err] ${m}`); });

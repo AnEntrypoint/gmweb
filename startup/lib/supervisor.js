@@ -266,14 +266,11 @@ export class Supervisor {
     env.PATH = `${BUN_BIN}:${GMWEB_BIN}:${OPENCODE_BIN}:${NVM_BIN}:${LOCAL_BIN}:${env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'}`;
     env.NODE_PATH = `${NVM_LIB}:${env.NODE_PATH || ''}`;
 
-    // CRITICAL: Force all services to use centralized npm cache (prevents /config pollution)
-    // BUT: Services that use NVM (webssh2, aion-ui) need NPM_CONFIG_PREFIX unset
-    // Those services will delete it in their own code after inheriting this env
+    // CRITICAL: Only services that directly invoke npm should have npm config
+    // Services that spawn bash shells (webssh2, aion-ui) will get these from .bashrc/.profile
+    // Services that use npm directly (opencode) will set these themselves if needed
     env.npm_config_cache = env.npm_config_cache || '/config/.gmweb/npm-cache';
-    env.npm_config_prefix = env.npm_config_prefix || '/config/.gmweb/npm-global';
     env.NPM_CONFIG_CACHE = env.NPM_CONFIG_CACHE || '/config/.gmweb/npm-cache';
-    // DO NOT set NPM_CONFIG_PREFIX here - services that need NVM must delete it
-    // env.NPM_CONFIG_PREFIX is set by custom_startup.sh but services will unset it
 
     const uid = process.getuid?.() || 1000;
 

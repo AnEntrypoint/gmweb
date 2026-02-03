@@ -38,7 +38,7 @@
       "enabled": true,
       "type": "install"
     },
-    "gmgui": {
+    "agentgui": {
       "enabled": true,
       "type": "system"
     },
