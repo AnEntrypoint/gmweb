@@ -161,20 +161,21 @@ export class Supervisor {
   }
 
   async ensureNginxAuth() {
-    // CRITICAL: Never override PASSWORD here - it's already set correctly in custom_startup.sh
-    // Only regenerate htpasswd if PASSWORD has changed, otherwise nginx reload is unnecessary
-    // This prevents the race condition where supervisor overwrites a correct htpasswd
-    const pw = this.env.PASSWORD;
+    // CRITICAL: PASSWORD must be set in supervisor environment for all auth to work
+    // If PASSWORD is not provided, use fallback but log warning
+    let pw = this.env.PASSWORD;
     if (!pw) {
-      this.logger.log('WARN', 'PASSWORD not set in supervisor env, skipping nginx auth regeneration');
-      return;
+      this.logger.log('WARN', 'PASSWORD not set in supervisor env, using fallback "password"');
+      pw = 'password';
+    } else {
+      this.logger.log('INFO', `PASSWORD configured (${pw.length} chars)`);
     }
     try {
       const hash = execSync('openssl passwd -apr1 -stdin', { input: pw, encoding: 'utf8' }).trim();
       const escaped = hash.replace(/\$/g, '\\$');
       execSync(`sudo sh -c 'printf "abc:%s\\n" "${escaped}" > /etc/nginx/.htpasswd'`, { timeout: 10000, stdio: 'pipe' });
       execSync('sudo nginx -s reload', { timeout: 10000, stdio: 'pipe' });
-      this.logger.log('INFO', 'nginx auth configured');
+      this.logger.log('INFO', 'nginx auth configured with PASSWORD');
     } catch (err) { this.logger.log('WARN', `nginx auth: ${err.message}`); }
   }
 
