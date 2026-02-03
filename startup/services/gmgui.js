@@ -13,7 +13,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log(`[${NAME}] Starting service via agentgui server.js...`);
+    console.log(`[${NAME}] Starting service via bunx agentgui@latest...`);
     return new Promise((resolve, reject) => {
       const childEnv = {
         ...env,
@@ -22,15 +22,11 @@ export default {
         BASE_URL: '/gm'
       };
 
-      // Directly spawn server.js instead of going through bunx wrapper
-      // The bunx -> gmgui.cjs -> server.js chain has stdio issues
-      const serverPath = '/config/.tmp/bunx-1000-agentgui@latest/node_modules/agentgui/server.js';
-
-      const ps = spawn('node', [serverPath], {
+      // Use bunx to run agentgui directly - bunx handles resolution and stdio passthrough
+      const ps = spawn('bunx', ['agentgui@latest'], {
         env: childEnv,
         stdio: 'inherit',
-        detached: false,
-        shell: false
+        detached: false
       });
 
       let startCheckCount = 0;

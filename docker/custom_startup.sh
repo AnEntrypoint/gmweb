@@ -60,6 +60,52 @@ sudo nginx -s reload 2>/dev/null || log "WARNING: nginx reload failed (nginx may
 export PASSWORD
 log "✓ HTTP Basic Auth configured with valid apr1 hash"
 
+# CRITICAL: Start background installs IMMEDIATELY after nginx is ready
+# This is the earliest point where non-blocking work can begin
+# These run in parallel while we proceed with core setup
+{
+  export NVM_DIR=/config/nvm
+  export HOME=/config
+  export GMWEB_DIR=/config/.gmweb
+
+  log() {
+    echo "[gmweb-bg-installs] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "/config/logs/startup.log"
+  }
+
+  log "Starting background installations (parallel with core setup)..."
+
+  # Install ttyd early (needed for webssh2 service)
+  if [ ! -f /usr/bin/ttyd ]; then
+    log "Installing ttyd for webssh2..."
+    sudo apt-get update -qq 2>/dev/null || true
+    sudo apt-get install -y ttyd 2>/dev/null && \
+      log "✓ ttyd installed from apt-get" || \
+      log "WARNING: ttyd installation failed"
+  fi
+
+  # Install GitHub CLI
+  log "Installing GitHub CLI (gh)..."
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
+  echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
+  sudo apt-get update -qq 2>/dev/null || true
+  sudo apt-get install -y --no-install-recommends gh 2>/dev/null && \
+    log "✓ GitHub CLI installed" || \
+    log "WARNING: gh install failed"
+
+  # Install Google Cloud CLI
+  log "Installing Google Cloud CLI..."
+  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
+  curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
+  sudo apt-get update -qq 2>/dev/null || true
+  sudo apt-get install -y --no-install-recommends google-cloud-cli 2>/dev/null && \
+    log "✓ Google Cloud CLI installed" || \
+    log "WARNING: gcloud install failed"
+
+  log "Background installations complete"
+} >> /config/logs/startup.log 2>&1 &
+BG_INSTALL_PID=$!
+log "Background installs started in parallel (PID: $BG_INSTALL_PID)"
+
 # Note: .bashrc and .profile are no longer used - environment is set via beforestart hook
 
 # MIGRATION: Move legacy installations to centralized directory and clean pollution
@@ -498,14 +544,7 @@ cd /opt/gmweb-startup && \
 nginx -s reload 2>/dev/null || true
 log "Supervisor ready (fresh from git)"
 
-if [ ! -f /usr/bin/ttyd ]; then
-  log "Installing ttyd for webssh2..."
-  # Use apt-get for reliable, compatible binaries across all architectures
-  sudo apt-get update -qq 2>/dev/null && \
-  sudo apt-get install -y ttyd 2>/dev/null && \
-  log "✓ ttyd installed from apt-get" || \
-  log "WARNING: ttyd installation failed - webssh2 will be unavailable"
-fi
+# ttyd installation moved to background phase (runs right after nginx is ready)
 
 cat > /tmp/launch_xfce_components.sh << 'XFCE_LAUNCHER_EOF'
 #!/bin/bash
@@ -713,14 +752,7 @@ log "XFCE component launcher started (PID: $!)"
   apt-get update
   apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
 
-  # Install Google Cloud CLI (gcloud) from official repository
-  log "Installing Google Cloud CLI..."
-  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null
-  curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
-
-  # Update package lists and install gcloud
-  sudo apt-get update -qq 2>/dev/null || true
-  sudo apt-get install -y --no-install-recommends google-cloud-cli 2>&1 | tail -3 || log "WARNING: gcloud install had issues"
+  # Note: gcloud and gh already installed in background phase after nginx
 
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
