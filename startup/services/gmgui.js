@@ -13,19 +13,24 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log(`[${NAME}] Starting service via bunx agentgui@latest...`);
+    console.log(`[${NAME}] Starting service via agentgui server.js...`);
     return new Promise((resolve, reject) => {
       const childEnv = {
         ...env,
         HOME: '/tmp',
-        PORT: String(PORT)
+        PORT: String(PORT),
+        BASE_URL: '/gm'
       };
 
-      const ps = spawn('bunx', ['agentgui@latest'], {
+      // Directly spawn server.js instead of going through bunx wrapper
+      // The bunx -> gmgui.cjs -> server.js chain has stdio issues
+      const serverPath = '/config/.tmp/bunx-1000-agentgui@latest/node_modules/agentgui/server.js';
+
+      const ps = spawn('node', [serverPath], {
         env: childEnv,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: 'inherit',
         detached: false,
-        shell: true
+        shell: false
       });
 
       let startCheckCount = 0;
@@ -72,14 +77,6 @@ export default {
           }
         }
       };
-
-      ps.stdout?.on('data', (data) => {
-        console.log(`[${NAME}] ${data.toString().trim()}`);
-      });
-
-      ps.stderr?.on('data', (data) => {
-        console.log(`[${NAME}:err] ${data.toString().trim()}`);
-      });
 
       ps.on('error', (err) => {
         clearInterval(startCheckInterval);
