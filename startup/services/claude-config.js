@@ -79,24 +79,35 @@ function cloneMarketplace(name, repo, installLocation) {
 }
 
 function installClaudeCode() {
-  // Install Claude Code via native installer (not npm - npm method is deprecated)
-  // Native binary goes to ~/.local/bin/claude with auto-updates
-  const claudeBin = join(process.env.HOME || '/config', '.local', 'bin', 'claude');
-  try {
-    if (!existsSync(claudeBin)) {
-      console.log('[claude-config] Installing Claude Code via native installer...');
-      execSync('curl -fsSL https://claude.ai/install.sh | bash', {
-        stdio: 'pipe',
-        timeout: 120000
-      });
-    }
-    if (existsSync(claudeBin)) {
-      console.log('[claude-config] ✓ Claude Code installed natively');
-    }
-  } catch (e) {
-    console.log(`[claude-config] Warning: Claude Code native install failed: ${e.message}`);
-  }
-}
+   // Install Claude Code via native installer (not npm - npm method is deprecated)
+   // Native binary goes to ~/.local/bin/claude with auto-updates
+   const claudeBin = join(process.env.HOME || '/config', '.local', 'bin', 'claude');
+   const localBinDir = join(process.env.HOME || '/config', '.local', 'bin');
+   try {
+     // Ensure .local/bin directory exists with proper permissions
+     if (!existsSync(localBinDir)) {
+       execSync(`sudo mkdir -p "${localBinDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+     }
+     execSync(`sudo chown abc:abc "${localBinDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+     execSync(`sudo chmod 755 "${localBinDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+
+     if (!existsSync(claudeBin)) {
+       console.log('[claude-config] Installing Claude Code via native installer...');
+       execSync('curl -fsSL https://claude.ai/install.sh | bash', {
+         stdio: 'pipe',
+         timeout: 120000
+       });
+     }
+     if (existsSync(claudeBin)) {
+       // Fix permissions on the installed binary
+       execSync(`sudo chown abc:abc "${claudeBin}" 2>/dev/null || true`, { stdio: 'pipe' });
+       execSync(`sudo chmod 755 "${claudeBin}" 2>/dev/null || true`, { stdio: 'pipe' });
+       console.log('[claude-config] ✓ Claude Code installed natively');
+     }
+   } catch (e) {
+     console.log(`[claude-config] Warning: Claude Code native install failed: ${e.message}`);
+   }
+ }
 
 
 export default {
