@@ -5,64 +5,25 @@
 set -o pipefail
 HOME_DIR="${HOME:-/config}"
 LOG_DIR="$HOME_DIR/logs"
-NVM_DIR="${NVM_DIR:-$HOME_DIR/nvm}"
 
-# Ensure NVM_DIR exists
-if [ ! -d "$NVM_DIR" ]; then
-  echo "ERROR: NVM_DIR does not exist: $NVM_DIR"
+# Source centralized gmweb environment setup
+# This ensures consistent environment across all shells and services
+if [ -f "$HOME_DIR/.gmweb-env.sh" ]; then
+  . "$HOME_DIR/.gmweb-env.sh"
+else
+  echo "ERROR: gmweb environment setup not found at $HOME_DIR/.gmweb-env.sh"
   exit 1
 fi
 
-# CRITICAL: Use NVM compatibility shim to hide npm config before any shell sourcing
-# This prevents npm_config_prefix from conflicting with NVM
-if [ -f "$HOME_DIR/.nvm_compat.sh" ]; then
-  . "$HOME_DIR/.nvm_compat.sh"
-else
-  echo "WARNING: NVM compat shim not found, manually unsetting npm config vars"
-  unset npm_config_cache npm_config_prefix NPM_CONFIG_CACHE NPM_CONFIG_PREFIX
-  [ -f "$HOME_DIR/.npmrc" ] && mv "$HOME_DIR/.npmrc" "$HOME_DIR/.npmrc.nvmbackup" 2>/dev/null || true
-fi
-
-# Source NVM to load node/npm into PATH (safe now that npm config is hidden)
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  . "$NVM_DIR/nvm.sh"
-else
-  echo "WARNING: NVM script not found at $NVM_DIR/nvm.sh, using fallback"
-fi
-
-# CRITICAL: Restore npm config after NVM is loaded
-# This ensures npm uses centralized cache without conflicting with NVM
-if [ -f "$HOME_DIR/.nvm_restore.sh" ]; then
-  . "$HOME_DIR/.nvm_restore.sh"
-else
-  echo "WARNING: NVM restore shim not found, manually restoring npm config vars"
-  export npm_config_cache="/config/.gmweb/npm-cache"
-  export npm_config_prefix="/config/.gmweb/npm-global"
-  export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
-  export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
-  [ -f "$HOME_DIR/.npmrc.nvmbackup" ] && mv "$HOME_DIR/.npmrc.nvmbackup" "$HOME_DIR/.npmrc" 2>/dev/null || true
+# Verify critical tools are available
+if [ -z "$(command -v node)" ]; then
+  echo "ERROR: Node.js not found in PATH after sourcing gmweb environment"
+  exit 1
 fi
 
 # If nvm.sh didn't load node, add it to PATH manually
-NODE_BIN="$(which node 2>/dev/null)"
-if [ -z "$NODE_BIN" ] && [ -d "$NVM_DIR/versions/node" ]; then
-  LATEST_NODE=$(ls -1 "$NVM_DIR/versions/node" | sort -V | tail -1)
-  if [ -n "$LATEST_NODE" ]; then
-    NODE_BIN="$NVM_DIR/versions/node/$LATEST_NODE/bin/node"
-    PATH="$NVM_DIR/versions/node/$LATEST_NODE/bin:$PATH"
-    export PATH
-  fi
-fi
-
-# Final verification
-if [ -z "$NODE_BIN" ] || [ ! -f "$NODE_BIN" ]; then
-  echo "ERROR: Node.js not found in PATH or NVM. NVM_DIR=$NVM_DIR"
-  echo "DEBUG: NODE_BIN=$NODE_BIN"
-  echo "DEBUG: Checking NVM directory structure:"
-  ls -la "$NVM_DIR/versions/node/" 2>&1 | head -20 || echo "NVM versions directory not found or empty"
-  exit 1
-fi
 SUPERVISOR_LOG="$LOG_DIR/supervisor.log"
+NODE_BIN="$(which node)"
 
 # Ensure log directory exists with proper permissions
 mkdir -p "$LOG_DIR"

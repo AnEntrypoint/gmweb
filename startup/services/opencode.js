@@ -10,7 +10,7 @@ export default {
   name: NAME,
   type: 'install',
   requiresDesktop: false,
-  dependencies: ['opencode-config'],
+  dependencies: ['opencode-config', 'glootie-oc'],
 
   async start(env) {
     const binPath = `${dirname(process.execPath)}/${NAME}`;

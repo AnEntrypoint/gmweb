@@ -4,6 +4,7 @@
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { promisify } from 'util';
+import { join } from 'path';
 
 const sleep = promisify(setTimeout);
 
@@ -11,7 +12,7 @@ export default {
   name: 'glootie-oc',
   type: 'install',
   requiresDesktop: false,
-  dependencies: [],
+  dependencies: ['opencode-config'],
 
   async start(env) {
     const glootieDir = `${env.HOME || '/config'}/.opencode/glootie-oc`;
@@ -31,19 +32,43 @@ export default {
         }
         
         // Pull latest from main branch
-        const pullCmd = spawn('bash', ['-c', `cd "${glootieDir}" && timeout 30 sudo -u abc git pull origin main`], {
+        const pullCmd = spawn('bash', ['-c', `cd "${glootieDir}" && timeout 30 git pull origin main`], {
           env: { ...env },
           stdio: ['ignore', 'pipe', 'pipe'],
           detached: false
         });
 
+        let pullOutput = '';
+        let pullError = '';
+
+        pullCmd.stdout?.on('data', (data) => {
+          pullOutput += data.toString();
+        });
+        pullCmd.stderr?.on('data', (data) => {
+          pullError += data.toString();
+        });
+
         pullCmd.on('exit', (code) => {
           if (code === 0) {
             console.log('[glootie-oc] ✓ Repository updated successfully');
+            if (pullOutput) console.log(`[glootie-oc] ${pullOutput.trim()}`);
           } else {
-            console.log(`[glootie-oc] WARNING: Git pull exited with code ${code} (may already be up to date)`);
+            console.log(`[glootie-oc] WARNING: Git pull exited with code ${code}`);
+            if (pullError) console.log(`[glootie-oc] ${pullError.trim()}`);
           }
-          
+
+          // Check if setup.sh exists before running it
+          const setupPath = join(glootieDir, 'setup.sh');
+          if (!existsSync(setupPath)) {
+            console.log('[glootie-oc] setup.sh not found, skipping setup');
+            resolve({
+              pid: process.pid,
+              process: null,
+              cleanup: async () => {}
+            });
+            return;
+          }
+
           // Run setup.sh to apply any changes
           const setupCmd = spawn('bash', ['./setup.sh'], {
             env: { ...env },
@@ -52,10 +77,15 @@ export default {
             cwd: glootieDir
           });
 
+          let setupOutput = '';
+          let setupError = '';
+
           setupCmd.stdout?.on('data', (data) => {
+            setupOutput += data.toString();
             console.log(`[glootie-oc] ${data.toString().trim()}`);
           });
           setupCmd.stderr?.on('data', (data) => {
+            setupError += data.toString();
             console.log(`[glootie-oc:err] ${data.toString().trim()}`);
           });
 
@@ -64,6 +94,7 @@ export default {
               console.log('[glootie-oc] ✓ Setup completed successfully');
             } else {
               console.log(`[glootie-oc] WARNING: Setup exited with code ${setupCode}`);
+              if (setupError) console.log(`[glootie-oc] Setup stderr: ${setupError.trim()}`);
             }
             resolve({
               pid: process.pid,
@@ -89,45 +120,76 @@ export default {
       });
 
       return new Promise((resolve) => {
+        let cloneOutput = '';
+        let cloneError = '';
+
+        cloneCmd.stdout?.on('data', (data) => {
+          cloneOutput += data.toString();
+        });
+        cloneCmd.stderr?.on('data', (data) => {
+          cloneError += data.toString();
+        });
+
         cloneCmd.on('exit', (code) => {
           if (code === 0) {
             console.log('[glootie-oc] ✓ Repository cloned successfully');
-            
-            // Run setup.sh
-            const setupCmd = spawn('bash', ['./setup.sh'], {
-              env: { ...env },
-              stdio: ['ignore', 'pipe', 'pipe'],
-              detached: false,
-              cwd: glootieDir
-            });
-
-            setupCmd.stdout?.on('data', (data) => {
-              console.log(`[glootie-oc] ${data.toString().trim()}`);
-            });
-            setupCmd.stderr?.on('data', (data) => {
-              console.log(`[glootie-oc:err] ${data.toString().trim()}`);
-            });
-
-            setupCmd.on('exit', (setupCode) => {
-              if (setupCode === 0) {
-                console.log('[glootie-oc] ✓ Setup completed successfully');
-              } else {
-                console.log(`[glootie-oc] WARNING: Setup exited with code ${setupCode}`);
-              }
-              resolve({
-                pid: process.pid,
-                process: null,
-                cleanup: async () => {}
-              });
-            });
+            if (cloneOutput) console.log(`[glootie-oc] ${cloneOutput.trim()}`);
           } else {
             console.log(`[glootie-oc] ERROR: Git clone failed with code ${code}`);
+            if (cloneError) console.log(`[glootie-oc] ${cloneError.trim()}`);
             resolve({
               pid: process.pid,
               process: null,
               cleanup: async () => {}
             });
+            return;
           }
+
+          // Check if setup.sh exists before running it
+          const setupPath = join(glootieDir, 'setup.sh');
+          if (!existsSync(setupPath)) {
+            console.log('[glootie-oc] setup.sh not found, skipping setup');
+            resolve({
+              pid: process.pid,
+              process: null,
+              cleanup: async () => {}
+            });
+            return;
+          }
+
+          // Run setup.sh
+          const setupCmd = spawn('bash', ['./setup.sh'], {
+            env: { ...env },
+            stdio: ['ignore', 'pipe', 'pipe'],
+            detached: false,
+            cwd: glootieDir
+          });
+
+          let setupOutput = '';
+          let setupError = '';
+
+          setupCmd.stdout?.on('data', (data) => {
+            setupOutput += data.toString();
+            console.log(`[glootie-oc] ${data.toString().trim()}`);
+          });
+          setupCmd.stderr?.on('data', (data) => {
+            setupError += data.toString();
+            console.log(`[glootie-oc:err] ${data.toString().trim()}`);
+          });
+
+          setupCmd.on('exit', (setupCode) => {
+            if (setupCode === 0) {
+              console.log('[glootie-oc] ✓ Setup completed successfully');
+            } else {
+              console.log(`[glootie-oc] WARNING: Setup exited with code ${setupCode}`);
+              if (setupError) console.log(`[glootie-oc] Setup stderr: ${setupError.trim()}`);
+            }
+            resolve({
+              pid: process.pid,
+              process: null,
+              cleanup: async () => {}
+            });
+          });
         });
       });
     }
