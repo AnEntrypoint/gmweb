@@ -687,10 +687,10 @@ NPM_CONFIG_PREFIX= bash << 'BUNINSTALL_EOF'
 
   # Install official latest Bun (always fresh)
   if timeout 120 curl -fsSL https://bun.sh/install | bash 2>&1 | tail -3; then
-    if command -v bun &>/dev/null; then
-      echo "  ✓ Fresh Bun installed: $(bun --version)" | tee -a "$HOME/logs/startup.log"
+    if [ -f "/config/.gmweb/cache/.bun/bin/bun" ]; then
+      echo "  ✓ Fresh Bun installed at /config/.gmweb/cache/.bun/bin/bun" | tee -a "$HOME/logs/startup.log"
     else
-      echo "  ERROR: Bun installer completed but bun command not found" | tee -a "$HOME/logs/startup.log"
+      echo "  ERROR: Bun installer completed but bun binary not found at expected location" | tee -a "$HOME/logs/startup.log"
       exit 1
     fi
   else
@@ -698,6 +698,57 @@ NPM_CONFIG_PREFIX= bash << 'BUNINSTALL_EOF'
     exit 1
   fi
 BUNINSTALL_EOF
+
+# CRITICAL: After subshell completes, verify Bun exists and add to PATH in PARENT shell
+# Variables set in subshell do NOT persist to parent, so we must set PATH here
+if [ -f "$BUN_INSTALL/bin/bun" ]; then
+  log "✓ Bun binary verified at $BUN_INSTALL/bin/bun"
+  # Add to PATH for supervisor and all subsequent processes
+  export PATH="$BUN_INSTALL/bin:$PATH"
+  log "✓ Bun bin directory added to PATH: $BUN_INSTALL/bin"
+else
+  log "ERROR: Bun installation verification failed - binary not found at $BUN_INSTALL/bin/bun"
+  exit 1
+fi
+
+log "Phase 1.6: Install CLI coding tools (opencode/Claude Code) - BLOCKING (required for services)"
+# CRITICAL: opencode must be installed BEFORE supervisor starts
+# Services need Claude Code in PATH - cannot wait for background installs
+export OPENCODE_INSTALL_DIR="$GMWEB_DIR/tools"
+mkdir -p "$OPENCODE_INSTALL_DIR"
+
+log "  Installing opencode CLI..."
+NPM_CONFIG_PREFIX= bash << 'OPENCODE_INSTALL_EOF'
+  export NVM_DIR=/config/nvm
+  export GMWEB_DIR=/config/.gmweb
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+  if [ -f "$GMWEB_DIR/tools/opencode/bin/opencode" ] || command -v opencode &>/dev/null; then
+    echo "  ✓ opencode already installed" | tee -a "/config/logs/startup.log"
+  else
+    mkdir -p "$GMWEB_DIR/tools"
+    if timeout 60 curl -fsSL https://opencode.ai/install | bash 2>&1 | tail -3; then
+      if [ -f "$GMWEB_DIR/tools/opencode/bin/opencode" ] || command -v opencode &>/dev/null; then
+        echo "  ✓ Fresh opencode installed" | tee -a "/config/logs/startup.log"
+      else
+        echo "  WARNING: opencode installer completed but binary not verified" | tee -a "/config/logs/startup.log"
+      fi
+    else
+      echo "  WARNING: opencode installation failed (will retry in background)" | tee -a "/config/logs/startup.log"
+    fi
+  fi
+OPENCODE_INSTALL_EOF
+
+# CRITICAL: After subshell completes, verify opencode exists and add to PATH in PARENT shell
+if [ -f "$OPENCODE_INSTALL_DIR/opencode/bin/opencode" ]; then
+  log "✓ opencode binary verified at $OPENCODE_INSTALL_DIR/opencode/bin/opencode"
+  export PATH="$OPENCODE_INSTALL_DIR/opencode/bin:$PATH"
+  log "✓ opencode bin directory added to PATH"
+elif command -v opencode &>/dev/null; then
+  log "✓ opencode available in PATH"
+else
+  log "WARNING: opencode not found, will proceed without it"
+fi
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
@@ -757,16 +808,8 @@ log "XFCE component launcher started (PID: $!)"
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
 
-  log "Installing CLI coding tools (opencode)..."
-  # Install opencode to centralized directory
-  export OPENCODE_INSTALL_DIR="$GMWEB_DIR/tools"
-  if ! command -v opencode &>/dev/null; then
-    mkdir -p "$OPENCODE_INSTALL_DIR"
-    curl -fsSL https://opencode.ai/install | bash 2>&1 | tail -5 && log "opencode installed" || log "WARNING: opencode install failed"
-  else
-    log "opencode already installed"
-  fi
-  log "CLI coding tools installation complete"
+  # Note: opencode already installed during blocking phase 1.6
+  # (moved before supervisor start to ensure it's available for services)
 
   log "Installing cloud and deployment tools (wrangler)..."
   npm install -g wrangler 2>&1 | tail -3 && log "wrangler installed" || log "WARNING: wrangler install failed"
