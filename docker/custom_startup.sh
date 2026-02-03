@@ -257,6 +257,17 @@ export PATH="/config/.gmweb/npm-global/bin:$PATH"
 
 log "✓ Centralized gmweb directory configured at $GMWEB_DIR (system + user + env)"
 
+# CRITICAL: Fix npm cache permissions from previous boots (may have root-owned files)
+# This prevents "EACCES: permission denied" errors when npm operations run as abc user
+if [ -d "$GMWEB_DIR/npm-cache" ]; then
+  chown -R abc:abc "$GMWEB_DIR/npm-cache" 2>/dev/null || true
+fi
+if [ -d "$GMWEB_DIR/npm-global" ]; then
+  chown -R abc:abc "$GMWEB_DIR/npm-global" 2>/dev/null || true
+fi
+chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR/npm-cache" 2>/dev/null || true
+chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR/npm-global" 2>/dev/null || true
+
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
 
