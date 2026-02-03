@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { ensureServiceEnvironment } from '../lib/service-utils.js';
 
 const DEFAULT_SETTINGS = {
   model: 'haiku',
@@ -178,6 +179,15 @@ export default {
     const marketplacesFile = join(pluginsDir, 'known_marketplaces.json');
 
     console.log('[claude-config] Ensuring Claude Code configuration...');
+
+    // CRITICAL: Ensure service environment is properly set up first
+    const homeDir = env.HOME || '/config';
+    ensureServiceEnvironment(homeDir, 'claude-config', [
+      claudeDir,
+      pluginsDir,
+      marketplacesDir,
+      `${homeDir}/.local/bin`
+    ]);
 
     // Install Claude Code native binary (curl installer, auto-updates)
     installClaudeCode();

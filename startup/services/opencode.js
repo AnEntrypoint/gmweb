@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { createNpxWrapper, precacheNpmPackage } from '../lib/service-utils.js';
 
@@ -13,7 +13,31 @@ export default {
   dependencies: ['opencode-config', 'glootie-oc'],
 
   async start(env) {
+    const homeDir = env.HOME || '/config';
     const binPath = `${dirname(process.execPath)}/${NAME}`;
+
+    // CRITICAL: Ensure opencode config directory exists with proper permissions
+    const opencodeConfigDir = `${homeDir}/.config/opencode`;
+    const opencodeStorageDir = `${homeDir}/.local/share/opencode/storage`;
+    try {
+      if (!existsSync(opencodeConfigDir)) {
+        mkdirSync(opencodeConfigDir, { recursive: true });
+        console.log(`[${NAME}] Created opencode config directory: ${opencodeConfigDir}`);
+      }
+      if (!existsSync(opencodeStorageDir)) {
+        mkdirSync(opencodeStorageDir, { recursive: true });
+        console.log(`[${NAME}] Created opencode storage directory: ${opencodeStorageDir}`);
+      }
+      // Ensure proper ownership (abc:abc)
+      const { execSync } = await import('child_process');
+      execSync(`chown -R abc:abc "${opencodeConfigDir}" 2>/dev/null || true`);
+      execSync(`chown -R abc:abc "${opencodeStorageDir}" 2>/dev/null || true`);
+      execSync(`chmod -R 755 "${opencodeConfigDir}" 2>/dev/null || true`);
+      execSync(`chmod -R 755 "${opencodeStorageDir}" 2>/dev/null || true`);
+    } catch (e) {
+      console.log(`[${NAME}] Warning: Could not setup opencode directories: ${e.message}`);
+    }
+
     console.log(`[${NAME}] Creating wrapper...`);
     if (!createNpxWrapper(binPath, PKG)) {
       console.log(`[${NAME}] Failed to create wrapper`);
@@ -24,8 +48,15 @@ export default {
 
     console.log(`[${NAME}] Starting opencode acp...`);
     const ps = spawn(binPath, ['acp'], {
-      cwd: '/config',
-      env: { ...env, HOME: '/config' },
+      cwd: homeDir,
+      env: { 
+        ...env, 
+        HOME: homeDir,
+        // Ensure XDG directories are set for consistency
+        XDG_CONFIG_HOME: env.XDG_CONFIG_HOME || `${homeDir}/.gmweb/cache/.config`,
+        XDG_DATA_HOME: env.XDG_DATA_HOME || `${homeDir}/.gmweb/cache/.local/share`,
+        XDG_CACHE_HOME: env.XDG_CACHE_HOME || `${homeDir}/.gmweb/cache`,
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true
     });
@@ -35,6 +66,16 @@ export default {
     });
     ps.stderr?.on('data', d => {
       console.log(`[${NAME}:acp:err] ${d.toString().trim()}`);
+    });
+
+    ps.on('error', (err) => {
+      console.log(`[${NAME}:error] Process error: ${err.message}`);
+    });
+
+    ps.on('exit', (code, signal) => {
+      if (code !== 0) {
+        console.log(`[${NAME}:exit] Process exited with code ${code}, signal ${signal}`);
+      }
     });
 
     ps.unref();
@@ -52,7 +93,11 @@ export default {
   },
 
   async health() {
-    const binPath = `${dirname(process.execPath)}/${NAME}`;
-    return existsSync(binPath);
+    try {
+      const binPath = `${dirname(process.execPath)}/${NAME}`;
+      return existsSync(binPath);
+    } catch (e) {
+      return false;
+    }
   }
 };

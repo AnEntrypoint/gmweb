@@ -17,6 +17,80 @@ export function createNpxWrapper(binPath, packageName) {
   }
 }
 
+/**
+ * Ensures a directory exists with proper permissions for the abc user.
+ * This is a critical utility to prevent permission issues across all services.
+ * 
+ * @param {string} dir - The directory path to ensure exists
+ * @param {string} serviceName - Name of the service (for logging)
+ * @returns {boolean} - Whether the directory is ready for use
+ */
+export function ensureDirectory(dir, serviceName = 'service') {
+  try {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+      console.log(`[${serviceName}] Created directory: ${dir}`);
+    }
+    
+    // Fix ownership to abc:abc
+    try {
+      execSync(`chown abc:abc "${dir}" 2>/dev/null || true`);
+      execSync(`chmod 755 "${dir}" 2>/dev/null || true`);
+    } catch (e) {
+      // Non-fatal: directory exists but ownership fix failed
+      console.log(`[${serviceName}] Warning: Could not fix ownership for ${dir}: ${e.message}`);
+    }
+    
+    return true;
+  } catch (e) {
+    console.error(`[${serviceName}] Failed to ensure directory ${dir}: ${e.message}`);
+    return false;
+  }
+}
+
+/**
+ * Ensures critical service directories exist with proper permissions.
+ * This function sets up the standard directory structure that services expect.
+ * 
+ * @param {string} homeDir - The home directory (usually /config)
+ * @param {string} serviceName - Name of the service (for logging)
+ * @param {Array<string>} extraDirs - Additional directories specific to this service
+ */
+export function ensureServiceEnvironment(homeDir, serviceName = 'service', extraDirs = []) {
+  const dirs = [
+    homeDir,
+    `${homeDir}/.local`,
+    `${homeDir}/.local/bin`,
+    `${homeDir}/.local/share`,
+    `${homeDir}/.config`,
+    `${homeDir}/.gmweb`,
+    `${homeDir}/.gmweb/cache`,
+    `${homeDir}/.tmp`,
+    `${homeDir}/logs`,
+    `${homeDir}/workspace`,
+    ...extraDirs
+  ];
+  
+  console.log(`[${serviceName}] Ensuring service environment...`);
+  
+  for (const dir of dirs) {
+    ensureDirectory(dir, serviceName);
+  }
+  
+  // Fix ownership on critical parent directories
+  try {
+    execSync(`chown -R abc:abc "${homeDir}/.local" 2>/dev/null || true`);
+    execSync(`chown -R abc:abc "${homeDir}/.config" 2>/dev/null || true`);
+    execSync(`chown -R abc:abc "${homeDir}/.gmweb" 2>/dev/null || true`);
+    execSync(`chown abc:abc "${homeDir}" 2>/dev/null || true`);
+    console.log(`[${serviceName}] Fixed ownership on critical directories`);
+  } catch (e) {
+    console.log(`[${serviceName}] Warning: Could not fix ownership: ${e.message}`);
+  }
+  
+  console.log(`[${serviceName}] Service environment ready`);
+}
+
 export function precacheNpmPackage(packageName, env, timeout = 120000) {
   const NPX_PATH = `${dirname(process.execPath)}/npx`;
   const child = spawn(NPX_PATH, ['-y', packageName, '--help'], {

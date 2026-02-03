@@ -1,5 +1,5 @@
 import { spawn, execSync } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { promisify } from 'util';
 import path from 'path';
 import { SupervisorLogger } from './supervisor-logger.js';
@@ -39,6 +39,7 @@ export class Supervisor {
     this.logger.log('INFO', 'Supervisor starting');
     try {
       if (this.needsDesktop()) await this.waitForDesktop();
+      await this.prepareEnvironment(); // CRITICAL: Ensure directories exist with proper permissions
       this.env = await this.getEnvironment();
       await this.ensureNginxAuth();
       const sorted = topologicalSort(this.services);
@@ -167,6 +168,91 @@ export class Supervisor {
       execSync('sudo nginx -s reload', { timeout: 10000, stdio: 'pipe' });
       this.logger.log('INFO', 'nginx auth configured');
     } catch (err) { this.logger.log('WARN', `nginx auth: ${err.message}`); }
+  }
+
+  async prepareEnvironment() {
+    // CRITICAL: Ensure all critical directories exist with proper permissions
+    // This must run BEFORE any services start to prevent permission issues
+    const homeDir = process.env.HOME || '/config';
+    const criticalDirs = [
+      homeDir,
+      `${homeDir}/.local`,
+      `${homeDir}/.local/bin`,
+      `${homeDir}/.local/share`,
+      `${homeDir}/.config`,
+      `${homeDir}/.gmweb`,
+      `${homeDir}/.gmweb/cache`,
+      `${homeDir}/.gmweb/cache/.config`,
+      `${homeDir}/.gmweb/cache/.local`,
+      `${homeDir}/.gmweb/cache/.local/share`,
+      `${homeDir}/.gmweb/npm-cache`,
+      `${homeDir}/.gmweb/npm-global`,
+      `${homeDir}/.gmweb/npm-global/bin`,
+      `${homeDir}/.gmweb/npm-global/lib`,
+      `${homeDir}/.gmweb/tools`,
+      `${homeDir}/.gmweb/tools/opencode`,
+      `${homeDir}/.gmweb/tools/opencode/bin`,
+      `${homeDir}/.tmp`,
+      `${homeDir}/logs`,
+      `${homeDir}/workspace`,
+      '/config/nvm',
+    ];
+
+    this.logger.log('INFO', 'Preparing environment - ensuring critical directories exist...');
+
+    // Create directories with proper permissions
+    for (const dir of criticalDirs) {
+      try {
+        if (!existsSync(dir)) {
+          mkdirSync(dir, { recursive: true });
+          this.logger.log('INFO', `Created directory: ${dir}`);
+        }
+      } catch (e) {
+        this.logger.log('WARN', `Could not create directory ${dir}: ${e.message}`);
+      }
+    }
+
+    // Fix ownership on critical directories (must be abc:abc)
+    try {
+      execSync(`chown -R abc:abc "${homeDir}/.local" 2>/dev/null || true`);
+      execSync(`chown -R abc:abc "${homeDir}/.config" 2>/dev/null || true`);
+      execSync(`chown -R abc:abc "${homeDir}/.gmweb" 2>/dev/null || true`);
+      execSync(`chown -R abc:abc "${homeDir}/.tmp" 2>/dev/null || true`);
+      execSync(`chown -R abc:abc "${homeDir}/logs" 2>/dev/null || true`);
+      execSync(`chown -R abc:abc "${homeDir}/workspace" 2>/dev/null || true`);
+      execSync(`chown abc:abc "${homeDir}" 2>/dev/null || true`);
+      this.logger.log('INFO', 'Fixed ownership on critical directories');
+    } catch (e) {
+      this.logger.log('WARN', `Could not fix ownership: ${e.message}`);
+    }
+
+    // Set permissions on critical directories
+    try {
+      execSync(`chmod 755 "${homeDir}" 2>/dev/null || true`);
+      execSync(`chmod -R 755 "${homeDir}/.local" 2>/dev/null || true`);
+      execSync(`chmod -R 755 "${homeDir}/.config" 2>/dev/null || true`);
+      execSync(`chmod -R 777 "${homeDir}/.gmweb" 2>/dev/null || true`);
+      execSync(`chmod 777 "${homeDir}/.tmp" 2>/dev/null || true`);
+      execSync(`chmod 755 "${homeDir}/logs" 2>/dev/null || true`);
+      execSync(`chmod 755 "${homeDir}/workspace" 2>/dev/null || true`);
+      this.logger.log('INFO', 'Set permissions on critical directories');
+    } catch (e) {
+      this.logger.log('WARN', `Could not set permissions: ${e.message}`);
+    }
+
+    // Verify opencode installation directory
+    const opencodeDir = `${homeDir}/.gmweb/tools/opencode`;
+    if (existsSync(opencodeDir)) {
+      try {
+        execSync(`chown -R abc:abc "${opencodeDir}" 2>/dev/null || true`);
+        execSync(`chmod -R 755 "${opencodeDir}" 2>/dev/null || true`);
+        this.logger.log('INFO', 'Fixed opencode installation permissions');
+      } catch (e) {
+        this.logger.log('WARN', `Could not fix opencode permissions: ${e.message}`);
+      }
+    }
+
+    this.logger.log('INFO', 'Environment preparation complete');
   }
 
   async getEnvironment() {

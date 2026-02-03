@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { ensureServiceEnvironment } from '../lib/service-utils.js';
 
 const OPENCODE_CONFIG_DIR = '/config/.config/opencode';
 const OPENCODE_STORAGE_DIR = '/config/.local/share/opencode/storage';
@@ -179,6 +180,16 @@ export default {
 
   async start(env) {
     console.log('[opencode-config] Configuring OpenCode and installing glootie-oc...');
+
+    // CRITICAL: Ensure service environment is properly set up first
+    const homeDir = env.HOME || '/config';
+    ensureServiceEnvironment(homeDir, 'opencode-config', [
+      OPENCODE_CONFIG_DIR,
+      OPENCODE_STORAGE_DIR,
+      `${homeDir}/.config/opencode`,
+      `${homeDir}/.local/share/opencode`,
+      `${homeDir}/.local/share/opencode/storage`
+    ]);
 
     ensureDir(OPENCODE_CONFIG_DIR);
     ensureDir(OPENCODE_STORAGE_DIR);
