@@ -27,6 +27,67 @@ log() {
 # Log the initial ownership fix (now that log function exists)
 log "CRITICAL: Initial /config ownership and permissions fixed (Phase 0 startup)"
 
+# CRITICAL PHASE 0.5: Comprehensive Permission Management
+# Ensure ALL critical home directory paths are created and owned by abc:abc
+# This prevents permission cascades where services fail to write to their own directories
+log "Phase 0.5: Comprehensive home directory permission setup"
+
+# Define all critical paths that abc user needs access to
+CRITICAL_PATHS=(
+  "$HOME_DIR"
+  "$HOME_DIR/.config"
+  "$HOME_DIR/.local"
+  "$HOME_DIR/.local/bin"
+  "$HOME_DIR/.local/share"
+  "$HOME_DIR/.local/share/opencode"
+  "$HOME_DIR/.local/share/opencode/storage"
+  "$HOME_DIR/.cache"
+  "$HOME_DIR/.gmweb"
+  "$HOME_DIR/.gmweb/tools"
+  "$HOME_DIR/.gmweb/cache"
+  "$HOME_DIR/.gmweb/npm-cache"
+  "$HOME_DIR/.gmweb/npm-global"
+  "$HOME_DIR/.gmweb/npm-global/bin"
+  "$HOME_DIR/.gmweb/npm-global/lib"
+  "$HOME_DIR/.tmp"
+  "$HOME_DIR/logs"
+  "$HOME_DIR/workspace"
+  "$HOME_DIR/.nvm"
+  "/run/user/1000"
+)
+
+# Create all critical paths with correct permissions
+for path in "${CRITICAL_PATHS[@]}"; do
+  if [ ! -d "$path" ]; then
+    mkdir -p "$path" 2>/dev/null || true
+    log "Created directory: $path"
+  fi
+  # Fix ownership: ensure abc:abc owns everything
+  chown 1000:1000 "$path" 2>/dev/null || true
+  # Fix permissions: directories should be rwx for owner, rx for group/others (755)
+  # But .cache, .tmp, .config should be more restrictive (700-750)
+  if [[ "$path" =~ (.cache|.tmp|.config|workspace) ]]; then
+    chmod 750 "$path" 2>/dev/null || true
+  else
+    chmod 755 "$path" 2>/dev/null || true
+  fi
+done
+
+# Recursively fix permissions on critical directories (important for stale volumes)
+log "Fixing permissions on critical directory trees..."
+for dir in "$HOME_DIR/.config" "$HOME_DIR/.local" "$HOME_DIR/.gmweb" "$HOME_DIR/.cache"; do
+  if [ -d "$dir" ]; then
+    # Fix all nested directories: 755 for dirs, preserving files
+    find "$dir" -type d -exec chown 1000:1000 {} \; 2>/dev/null || true
+    find "$dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    # Fix files: ensure they're readable and writable by owner
+    find "$dir" -type f -exec chown 1000:1000 {} \; 2>/dev/null || true
+    find "$dir" -type f -exec chmod 644 {} \; 2>/dev/null || true
+  fi
+done
+
+log "✓ Comprehensive permission setup complete (all paths now abc:abc owned)"
+
 BOOT_ID="$(date '+%s')-$$"
 log "===== GMWEB STARTUP (boot: $BOOT_ID) ====="
 

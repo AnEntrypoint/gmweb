@@ -30,10 +30,10 @@ export default {
       }
       // Ensure proper ownership (abc:abc)
       const { execSync } = await import('child_process');
-      execSync(`chown -R abc:abc "${opencodeConfigDir}" 2>/dev/null || true`);
-      execSync(`chown -R abc:abc "${opencodeStorageDir}" 2>/dev/null || true`);
-      execSync(`chmod -R 755 "${opencodeConfigDir}" 2>/dev/null || true`);
-      execSync(`chmod -R 755 "${opencodeStorageDir}" 2>/dev/null || true`);
+      execSync(`sudo chown -R abc:abc "${opencodeConfigDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${opencodeStorageDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 750 "${opencodeConfigDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 750 "${opencodeStorageDir}" 2>/dev/null || true`, { stdio: 'pipe' });
     } catch (e) {
       console.log(`[${NAME}] Warning: Could not setup opencode directories: ${e.message}`);
     }

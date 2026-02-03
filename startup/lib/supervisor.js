@@ -187,7 +187,10 @@ export class Supervisor {
       `${homeDir}/.local`,
       `${homeDir}/.local/bin`,
       `${homeDir}/.local/share`,
+      `${homeDir}/.local/share/opencode`,
+      `${homeDir}/.local/share/opencode/storage`,
       `${homeDir}/.config`,
+      `${homeDir}/.config/opencode`,
       `${homeDir}/.gmweb`,
       `${homeDir}/.gmweb/cache`,
       `${homeDir}/.gmweb/cache/.config`,
@@ -221,28 +224,29 @@ export class Supervisor {
     }
 
     // Fix ownership on critical directories (must be abc:abc)
+    // Use sudo for robustness in case supervisor doesn't run as root
     try {
-      execSync(`chown -R abc:abc "${homeDir}/.local" 2>/dev/null || true`);
-      execSync(`chown -R abc:abc "${homeDir}/.config" 2>/dev/null || true`);
-      execSync(`chown -R abc:abc "${homeDir}/.gmweb" 2>/dev/null || true`);
-      execSync(`chown -R abc:abc "${homeDir}/.tmp" 2>/dev/null || true`);
-      execSync(`chown -R abc:abc "${homeDir}/logs" 2>/dev/null || true`);
-      execSync(`chown -R abc:abc "${homeDir}/workspace" 2>/dev/null || true`);
-      execSync(`chown abc:abc "${homeDir}" 2>/dev/null || true`);
+      execSync(`sudo chown -R abc:abc "${homeDir}/.local" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${homeDir}/.config" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${homeDir}/.gmweb" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${homeDir}/.tmp" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${homeDir}/logs" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${homeDir}/workspace" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown abc:abc "${homeDir}" 2>/dev/null || true`, { stdio: 'pipe' });
       this.logger.log('INFO', 'Fixed ownership on critical directories');
     } catch (e) {
       this.logger.log('WARN', `Could not fix ownership: ${e.message}`);
     }
 
-    // Set permissions on critical directories
+    // Set permissions on critical directories with precise control
     try {
-      execSync(`chmod 755 "${homeDir}" 2>/dev/null || true`);
-      execSync(`chmod -R 755 "${homeDir}/.local" 2>/dev/null || true`);
-      execSync(`chmod -R 755 "${homeDir}/.config" 2>/dev/null || true`);
-      execSync(`chmod -R 777 "${homeDir}/.gmweb" 2>/dev/null || true`);
-      execSync(`chmod 777 "${homeDir}/.tmp" 2>/dev/null || true`);
-      execSync(`chmod 755 "${homeDir}/logs" 2>/dev/null || true`);
-      execSync(`chmod 755 "${homeDir}/workspace" 2>/dev/null || true`);
+      execSync(`sudo chmod 755 "${homeDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 755 "${homeDir}/.local" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 750 "${homeDir}/.config" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 755 "${homeDir}/.gmweb" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod 750 "${homeDir}/.tmp" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod 755 "${homeDir}/logs" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod 755 "${homeDir}/workspace" 2>/dev/null || true`, { stdio: 'pipe' });
       this.logger.log('INFO', 'Set permissions on critical directories');
     } catch (e) {
       this.logger.log('WARN', `Could not set permissions: ${e.message}`);

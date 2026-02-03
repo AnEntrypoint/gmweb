@@ -214,10 +214,12 @@ OPENCODE_WORKSPACE=/config/workspace
     // Setup opencode.json with permission:allow + glootie-oc config
     setupGlootieConfig();
 
-    // Set ownership
+    // Set ownership with sudo for robustness
     try {
-      execSync(`chown -R abc:abc "${OPENCODE_CONFIG_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
-      execSync(`chown -R abc:abc "${OPENCODE_STORAGE_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${OPENCODE_CONFIG_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${OPENCODE_STORAGE_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 750 "${OPENCODE_CONFIG_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 750 "${OPENCODE_STORAGE_DIR}" 2>/dev/null || true`, { stdio: 'pipe' });
     } catch (e) {}
 
     console.log('[opencode-config] ✓ OpenCode configuration complete');

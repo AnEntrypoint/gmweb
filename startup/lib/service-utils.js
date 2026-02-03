@@ -31,16 +31,21 @@ export function ensureDirectory(dir, serviceName = 'service') {
       mkdirSync(dir, { recursive: true });
       console.log(`[${serviceName}] Created directory: ${dir}`);
     }
-    
-    // Fix ownership to abc:abc
+
+    // Fix ownership to abc:abc with sudo for robustness
     try {
-      execSync(`chown abc:abc "${dir}" 2>/dev/null || true`);
-      execSync(`chmod 755 "${dir}" 2>/dev/null || true`);
+      execSync(`sudo chown abc:abc "${dir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      // Use more restrictive permissions for sensitive dirs, 755 for others
+      if (dir.includes('.config') || dir.includes('.tmp')) {
+        execSync(`sudo chmod 750 "${dir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      } else {
+        execSync(`sudo chmod 755 "${dir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      }
     } catch (e) {
       // Non-fatal: directory exists but ownership fix failed
       console.log(`[${serviceName}] Warning: Could not fix ownership for ${dir}: ${e.message}`);
     }
-    
+
     return true;
   } catch (e) {
     console.error(`[${serviceName}] Failed to ensure directory ${dir}: ${e.message}`);
@@ -77,17 +82,21 @@ export function ensureServiceEnvironment(homeDir, serviceName = 'service', extra
     ensureDirectory(dir, serviceName);
   }
   
-  // Fix ownership on critical parent directories
+  // Fix ownership on critical parent directories with recursive chown and chmod
   try {
-    execSync(`chown -R abc:abc "${homeDir}/.local" 2>/dev/null || true`);
-    execSync(`chown -R abc:abc "${homeDir}/.config" 2>/dev/null || true`);
-    execSync(`chown -R abc:abc "${homeDir}/.gmweb" 2>/dev/null || true`);
-    execSync(`chown abc:abc "${homeDir}" 2>/dev/null || true`);
-    console.log(`[${serviceName}] Fixed ownership on critical directories`);
+    execSync(`sudo chown -R abc:abc "${homeDir}/.local" 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`sudo chmod -R 755 "${homeDir}/.local" 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`sudo chown -R abc:abc "${homeDir}/.config" 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`sudo chmod -R 750 "${homeDir}/.config" 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`sudo chown -R abc:abc "${homeDir}/.gmweb" 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`sudo chmod -R 755 "${homeDir}/.gmweb" 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`sudo chown abc:abc "${homeDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+    execSync(`sudo chmod 755 "${homeDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+    console.log(`[${serviceName}] Fixed ownership and permissions on critical directories`);
   } catch (e) {
     console.log(`[${serviceName}] Warning: Could not fix ownership: ${e.message}`);
   }
-  
+
   console.log(`[${serviceName}] Service environment ready`);
 }
 
