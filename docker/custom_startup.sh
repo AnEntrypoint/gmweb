@@ -24,6 +24,9 @@ log() {
   echo "[gmweb-startup] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "$LOG_DIR/startup.log"
 }
 
+# Log the initial ownership fix (now that log function exists)
+log "CRITICAL: Initial /config ownership and permissions fixed (Phase 0 startup)"
+
 BOOT_ID="$(date '+%s')-$$"
 log "===== GMWEB STARTUP (boot: $BOOT_ID) ====="
 
@@ -332,9 +335,11 @@ else
   log "✓ jq and unzip already installed"
 fi
 
-# Ensure /config ownership is set to abc at the start
-chown -R abc:abc /config 2>/dev/null || true
-log "✓ /config ownership set to abc"
+# Verify /config ownership is set to abc:abc (UID 1000:GID 1000)
+# (This should already be done above, but verify again as safety check)
+chown -R 1000:1000 /config 2>/dev/null || true
+chmod -R u+rwX,g+rX,o-rwx /config 2>/dev/null || true
+log "✓ /config ownership verified as abc:abc (UID:GID 1000:1000)"
 
 log "Phase 0: Kill all old gmweb processes from previous boots"
 # CRITICAL: On persistent volumes, old processes keep running after container restart
@@ -735,8 +740,22 @@ if [ "$BUN_INSTALLED" = false ]; then
   log "  URL: $BUN_URL"
   
   if curl -fsSL --connect-timeout 10 --max-time 60 "$BUN_URL" -o "$BUN_INSTALL/bun.zip" 2>/dev/null; then
-    if unzip -q "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>/dev/null; then
-      log "✓ Bun downloaded and extracted"
+    log "✓ Downloaded bun from GitHub ($(du -h $BUN_INSTALL/bun.zip | cut -f1))"
+    
+    # Verify unzip is available
+    if ! command -v unzip &>/dev/null; then
+      log "ERROR: unzip command not found in PATH"
+      log "  Attempting to reinstall unzip..."
+      apt-get update -qq 2>/dev/null && apt-get install -y unzip 2>&1 | tail -2
+      if ! command -v unzip &>/dev/null; then
+        log "ERROR: Could not install unzip, cannot extract bun.zip"
+      fi
+    fi
+    
+    if unzip -q "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>&1 | grep -q "error\|Error"; then
+      log "ERROR: unzip failed with: $(unzip "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>&1 | head -3)"
+    elif [ -d "$BUN_INSTALL/bun-linux-${BUN_ARCH}" ]; then
+      log "✓ Bun downloaded and extracted successfully"
       # The zip contains bun-linux-{ARCH}/ directory with the binary
       if [ -f "$BUN_INSTALL/bun-linux-${BUN_ARCH}/bun" ]; then
         mkdir -p "$BUN_INSTALL/bin"
@@ -755,7 +774,8 @@ if [ "$BUN_INSTALLED" = false ]; then
         log "ERROR: Expected bun binary not found in extracted archive at $BUN_INSTALL/bun-linux-${BUN_ARCH}/bun"
       fi
     else
-      log "ERROR: Failed to unzip bun archive"
+      log "ERROR: After unzip, expected directory $BUN_INSTALL/bun-linux-${BUN_ARCH} not found"
+      log "  Contents: $(ls -la $BUN_INSTALL/ | head -10)"
     fi
   else
     log "ERROR: Failed to download bun from $BUN_URL"
