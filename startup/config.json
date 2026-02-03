@@ -39,7 +39,7 @@
       "type": "install"
     },
     "agentgui": {
-      "enabled": true,
+      "enabled": false,
       "type": "system"
     },
     "aion-ui": {
