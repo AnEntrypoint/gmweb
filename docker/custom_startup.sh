@@ -8,17 +8,17 @@ unset NPM_CONFIG_PREFIX
 HOME_DIR="/config"
 
 # CRITICAL: Set ownership to abc:abc (UID 1000) at startup start
-# Use direct chown without sudo (runs as root from s6-init)
+# Use sudo to ensure proper privilege elevation for permission operations
 # This is the FIRST thing to ensure all subsequent operations create abc-owned files
-chown -R 1000:1000 "/config" 2>/dev/null || true
-chmod -R u+rwX,g+rX,o-rwx "/config" 2>/dev/null || true
+sudo chown -R 1000:1000 "/config" 2>/dev/null || true
+sudo chmod -R u+rwX,g+rX,o-rwx "/config" 2>/dev/null || true
 LOG_DIR="$HOME_DIR/logs"
 
 # Clear all logs on every boot - fresh start
-rm -rf "$LOG_DIR" 2>/dev/null || true
-mkdir -p "$LOG_DIR"
-chmod 755 "$LOG_DIR"
-chown 1000:1000 "$LOG_DIR"
+sudo rm -rf "$LOG_DIR" 2>/dev/null || true
+sudo mkdir -p "$LOG_DIR"
+sudo chmod 755 "$LOG_DIR"
+sudo chown 1000:1000 "$LOG_DIR"
 
 log() {
   echo "[gmweb-startup] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "$LOG_DIR/startup.log"
@@ -59,17 +59,17 @@ CRITICAL_PATHS=(
 # Create all critical paths with correct permissions
 for path in "${CRITICAL_PATHS[@]}"; do
   if [ ! -d "$path" ]; then
-    mkdir -p "$path" 2>/dev/null || true
+    sudo mkdir -p "$path" 2>/dev/null || true
     log "Created directory: $path"
   fi
   # Fix ownership: ensure abc:abc owns everything
-  chown 1000:1000 "$path" 2>/dev/null || true
+  sudo chown 1000:1000 "$path" 2>/dev/null || true
   # Fix permissions: directories should be rwx for owner, rx for group/others (755)
   # But .cache, .tmp, .config should be more restrictive (700-750)
   if [[ "$path" =~ (.cache|.tmp|.config|workspace) ]]; then
-    chmod 750 "$path" 2>/dev/null || true
+    sudo chmod 750 "$path" 2>/dev/null || true
   else
-    chmod 755 "$path" 2>/dev/null || true
+    sudo chmod 755 "$path" 2>/dev/null || true
   fi
 done
 
@@ -78,11 +78,11 @@ log "Fixing permissions on critical directory trees..."
 for dir in "$HOME_DIR/.config" "$HOME_DIR/.local" "$HOME_DIR/.gmweb" "$HOME_DIR/.cache"; do
   if [ -d "$dir" ]; then
     # Fix all nested directories: 755 for dirs, preserving files
-    find "$dir" -type d -exec chown 1000:1000 {} \; 2>/dev/null || true
-    find "$dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    sudo find "$dir" -type d -exec chown 1000:1000 {} \; 2>/dev/null || true
+    sudo find "$dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
     # Fix files: ensure they're readable and writable by owner
-    find "$dir" -type f -exec chown 1000:1000 {} \; 2>/dev/null || true
-    find "$dir" -type f -exec chmod 644 {} \; 2>/dev/null || true
+    sudo find "$dir" -type f -exec chown 1000:1000 {} \; 2>/dev/null || true
+    sudo find "$dir" -type f -exec chmod 644 {} \; 2>/dev/null || true
   fi
 done
 
@@ -240,7 +240,7 @@ fi
 log "✓ Cleanup complete - installations centralized to /config/.gmweb/"
 
 # Compile close_range shim immediately (before anything else uses LD_PRELOAD)
-mkdir -p /opt/lib
+sudo mkdir -p /opt/lib
 
 if [ ! -f /opt/lib/libshim_close_range.so ]; then
   log "Compiling close_range shim..."
@@ -253,12 +253,15 @@ int close_range(unsigned int first, unsigned int last, int flags) {
     return -1;
 }
 SHIMEOF
-  gcc -fPIC -shared /tmp/shim_close_range.c -o /opt/lib/libshim_close_range.so 2>&1 | grep -v "^$" || true
+  gcc -fPIC -shared /tmp/shim_close_range.c -o /tmp/libshim_close_range.so 2>&1 | grep -v "^$" || true
   rm -f /tmp/shim_close_range.c
-  if [ ! -f /opt/lib/libshim_close_range.so ]; then
-    log "ERROR: Failed to compile shim to /opt/lib/libshim_close_range.so"
+  if [ ! -f /tmp/libshim_close_range.so ]; then
+    log "ERROR: Failed to compile shim to /tmp/libshim_close_range.so"
     exit 1
   fi
+  # Use sudo to move to /opt/lib
+  sudo mv /tmp/libshim_close_range.so /opt/lib/libshim_close_range.so
+  sudo chmod 755 /opt/lib/libshim_close_range.so
   log "✓ Shim compiled to /opt/lib/libshim_close_range.so"
 else
   log "✓ Shim already exists at /opt/lib/libshim_close_range.so"
@@ -273,10 +276,10 @@ RUNTIME_DIR="/run/user/$ABC_UID"
 
 # Create or fix permissions on runtime directory
 if [ ! -d "$RUNTIME_DIR" ]; then
-  # Try to create as current user first, fall back to sudo
-  mkdir -p "$RUNTIME_DIR" 2>/dev/null || sudo mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
-  [ -d "$RUNTIME_DIR" ] && chmod 700 "$RUNTIME_DIR" 2>/dev/null || sudo chmod 700 "$RUNTIME_DIR" 2>/dev/null || true
-  [ -d "$RUNTIME_DIR" ] && chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR" 2>/dev/null || sudo chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR" 2>/dev/null || true
+  # Use sudo for all runtime directory creation operations
+  sudo mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
+  sudo chmod 700 "$RUNTIME_DIR" 2>/dev/null || true
+  sudo chown "$ABC_UID:$ABC_GID" "$RUNTIME_DIR" 2>/dev/null || true
 fi
 
 # Fix npm cache and stale installs from persistent volume
@@ -293,9 +296,9 @@ fi
 # Create centralized directory for all gmweb tools and installations
 # This keeps /config clean and user-friendly
 GMWEB_DIR="/config/.gmweb"
-mkdir -p "$GMWEB_DIR"/{npm-cache,npm-global,opencode,tools}
-chown -R 1000:1000 "$GMWEB_DIR" 2>/dev/null || true
-chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR" 2>/dev/null || true
+sudo mkdir -p "$GMWEB_DIR"/{npm-cache,npm-global,opencode,tools}
+sudo chown -R 1000:1000 "$GMWEB_DIR" 2>/dev/null || true
+sudo chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR" 2>/dev/null || true
 
 # Configure npm to use centralized directory at ALL levels (black magic for bulletproof setup)
 
@@ -329,13 +332,13 @@ log "✓ Centralized gmweb directory configured at $GMWEB_DIR (system + user + e
 # CRITICAL: Fix npm cache permissions from previous boots (may have root-owned files)
 # This prevents "EACCES: permission denied" errors when npm operations run as abc user
 if [ -d "$GMWEB_DIR/npm-cache" ]; then
-  chown -R abc:abc "$GMWEB_DIR/npm-cache" 2>/dev/null || true
+  sudo chown -R abc:abc "$GMWEB_DIR/npm-cache" 2>/dev/null || true
 fi
 if [ -d "$GMWEB_DIR/npm-global" ]; then
-  chown -R abc:abc "$GMWEB_DIR/npm-global" 2>/dev/null || true
+  sudo chown -R abc:abc "$GMWEB_DIR/npm-global" 2>/dev/null || true
 fi
-chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR/npm-cache" 2>/dev/null || true
-chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR/npm-global" 2>/dev/null || true
+sudo chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR/npm-cache" 2>/dev/null || true
+sudo chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR/npm-global" 2>/dev/null || true
 
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
@@ -343,9 +346,9 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
 # Configure temp directory on same filesystem as config to avoid EXDEV errors
 # (cross-device link errors when rename() is called across filesystems)
 SAFE_TMPDIR="$HOME_DIR/.tmp"
-mkdir -p "$SAFE_TMPDIR"
-chmod 700 "$SAFE_TMPDIR"
-chown abc:abc "$SAFE_TMPDIR"
+sudo mkdir -p "$SAFE_TMPDIR"
+sudo chmod 700 "$SAFE_TMPDIR"
+sudo chown abc:abc "$SAFE_TMPDIR"
 export TMPDIR="$SAFE_TMPDIR"
 export TMP="$SAFE_TMPDIR"
 export TEMP="$SAFE_TMPDIR"
@@ -357,17 +360,17 @@ export XDG_CONFIG_HOME="/config/.gmweb/cache/.config"
 export XDG_DATA_HOME="/config/.gmweb/cache/.local/share"
 export DOCKER_CONFIG="/config/.gmweb/cache/.docker"
 export BUN_INSTALL="/config/.gmweb/cache/.bun"
-mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$DOCKER_CONFIG" "$BUN_INSTALL"
+sudo mkdir -p "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$DOCKER_CONFIG" "$BUN_INSTALL"
 log "Configured XDG directories to prevent /config pollution"
 
 # beforestart hook will be copied after git clone and used as source of truth for environment setup
 
 # Clean up old temp files (older than 7 days) to prevent unbounded growth
-find "$SAFE_TMPDIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
-find "$SAFE_TMPDIR" -maxdepth 1 -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
+sudo find "$SAFE_TMPDIR" -maxdepth 1 -type f -mtime +7 -delete 2>/dev/null || true
+sudo find "$SAFE_TMPDIR" -maxdepth 1 -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
 
-rm -f "$RUNTIME_DIR/bus"
-pkill -u abc dbus-daemon 2>/dev/null || true
+sudo rm -f "$RUNTIME_DIR/bus"
+sudo pkill -u abc dbus-daemon 2>/dev/null || true
 
 sudo -u abc DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
   dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --print-address 2>/dev/null &
@@ -398,8 +401,8 @@ fi
 
 # Verify /config ownership is set to abc:abc (UID 1000:GID 1000)
 # (This should already be done above, but verify again as safety check)
-chown -R 1000:1000 /config 2>/dev/null || true
-chmod -R u+rwX,g+rX,o-rwx /config 2>/dev/null || true
+sudo chown -R 1000:1000 /config 2>/dev/null || true
+sudo chmod -R u+rwX,g+rX,o-rwx /config 2>/dev/null || true
 log "✓ /config ownership verified as abc:abc (UID:GID 1000:1000)"
 
 log "Phase 0: Kill all old gmweb processes from previous boots"
@@ -534,14 +537,14 @@ sudo nginx -s reload 2>/dev/null || true
 log "✓ Nginx config updated from git"
 
 # Ensure gmweb directory exists and has correct permissions
-mkdir -p "$GMWEB_DIR" && chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || true
+sudo mkdir -p "$GMWEB_DIR" && sudo chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || true
 
 log "Phase 1 complete - environment ready (using beforestart hook)"
 
 log "Verifying persistent path structure..."
-mkdir -p /config/nvm /config/.tmp /config/logs
-chown 1000:1000 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
-chmod 755 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
+sudo mkdir -p /config/nvm /config/.tmp /config/logs
+sudo chown 1000:1000 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
+sudo chmod 755 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
 
 # Copy NVM compatibility shims to /config (shared across all shells and scripts)
 cp /tmp/gmweb/startup/.nvm_compat.sh /config/.nvm_compat.sh
@@ -602,7 +605,7 @@ nvm alias default 24 2>&1 | tail -2
 
 # Fix ownership (nvm install as root creates root-owned files)
 ACTIVE_NODE=$(nvm which current 2>/dev/null | sed 's|/bin/node||')
-[ -d "$ACTIVE_NODE" ] && chown -R abc:abc "$ACTIVE_NODE" 2>/dev/null || true
+[ -d "$ACTIVE_NODE" ] && sudo chown -R abc:abc "$ACTIVE_NODE" 2>/dev/null || true
 
 # Final verification
 if ! command -v npm &>/dev/null; then
@@ -696,9 +699,9 @@ chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
 log "Installing critical Node modules for AionUI..."
-mkdir -p "$GMWEB_DIR/deps"
-chown 1000:1000 "$GMWEB_DIR/deps" 2>/dev/null || true
-chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
+sudo mkdir -p "$GMWEB_DIR/deps"
+sudo chown 1000:1000 "$GMWEB_DIR/deps" 2>/dev/null || true
+sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
 
 # Ensure npm cache is clean before critical installs
 npm cache clean --force 2>&1 | tail -1 || log "WARNING: npm cache clean had issues"
@@ -742,7 +745,7 @@ if [ $RETRY -ge 3 ]; then
   exit 1
 fi
 
-chown -R abc:abc "$GMWEB_DIR/deps" 2>/dev/null || true
+sudo chown -R abc:abc "$GMWEB_DIR/deps" 2>/dev/null || true
 log "✓ Critical modules installed"
 
 log "Installing GitHub CLI (gh) in foreground..."
@@ -972,20 +975,20 @@ log "Background installs started (PID: $!)"
 # Ensures no root-owned files exist in /config after entire boot process
 # This catches any files created by background processes during startup
 log "Running final ownership and permission fix (catching any root-owned files)..."
-find /config -not -user 1000 2>/dev/null | while read file; do
-  chown 1000:1000 "$file" 2>/dev/null || true
+sudo find /config -not -user 1000 2>/dev/null | while read file; do
+  sudo chown 1000:1000 "$file" 2>/dev/null || true
   log "  Fixed ownership: $file"
 done
 
 # Set proper permissions on /config hierarchy
-chown -R 1000:1000 "/config" 2>/dev/null || true
-chmod -R u+rwX,g+rX,o-rwx "/config" 2>/dev/null || true
+sudo chown -R 1000:1000 "/config" 2>/dev/null || true
+sudo chmod -R u+rwX,g+rX,o-rwx "/config" 2>/dev/null || true
 log "✓ Final /config ownership and permissions verified (all abc:abc)"
 
 # Verify no root files remain
-if find /config -maxdepth 3 -not -user 1000 2>/dev/null | head -5 | grep -q .; then
+if sudo find /config -maxdepth 3 -not -user 1000 2>/dev/null | head -5 | grep -q .; then
   log "WARNING: Some root-owned files still exist in /config (may be system symlinks)"
-  find /config -maxdepth 3 -not -user 1000 2>/dev/null | head -5 | while read f; do
+  sudo find /config -maxdepth 3 -not -user 1000 2>/dev/null | head -5 | while read f; do
     log "  - $f"
   done
 else
