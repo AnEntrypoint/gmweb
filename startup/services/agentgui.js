@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
@@ -13,7 +13,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log(`[${NAME}] Starting agentgui with bunx...`);
+    console.log(`[${NAME}] Starting agentgui@latest with bunx...`);
     
     const childEnv = {
       ...env,
@@ -21,9 +21,18 @@ export default {
       PORT: String(PORT)
     };
 
-     // Start agentgui@latest using bunx (bun's npx equivalent)
+    // CRITICAL: Clear bunx cache to ensure latest version is downloaded
+    try {
+      const tmpDir = '/config/.tmp/bunx-*-agentgui@latest';
+      execSync(`rm -rf ${tmpDir} 2>/dev/null || true`, { stdio: 'pipe' });
+      console.log(`[${NAME}] Cleared old bunx cache to ensure latest version`);
+    } catch (e) {
+      console.log(`[${NAME}] Warning: Could not clear bunx cache: ${e.message}`);
+    }
+
+    // Start agentgui@latest using bunx with --latest flag to ensure fresh download
     // This spawns the process in background and returns immediately
-    const ps = spawn('bash', ['-c', `PORT=${PORT} bunx agentgui@latest`], {
+    const ps = spawn('bash', ['-c', `PORT=${PORT} bunx --latest agentgui@latest`], {
       env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
@@ -32,9 +41,9 @@ export default {
 
     ps.unref();
     
-    // Give bunx time to download and start agentgui (up to 60 seconds)
+    // Give bunx time to download and start agentgui (allow up to 30 seconds)
     // Then return with the process handle
-    await sleep(5000);
+    await sleep(10000);
     
     console.log(`[${NAME}] ✓ Service started in background (PID: ${ps.pid})`);
     
@@ -53,7 +62,7 @@ export default {
 
   async health() {
     try {
-      // Simple check: try to connect to the port
+      // Check if agentgui is listening on the correct port
       return await new Promise((resolve) => {
         const net = require('net');
         const socket = new net.Socket();
@@ -68,6 +77,7 @@ export default {
         socket.connect(PORT, 'localhost');
       });
     } catch (e) {
+      console.log(`[${NAME}] Health check error: ${e.message}`);
       return false;
     }
   }
