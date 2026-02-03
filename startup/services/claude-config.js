@@ -172,7 +172,8 @@ export default {
     console.log('[claude-config] ✓ Marketplaces configured:', Object.keys(mergedMarketplaces).join(', '));
 
     try {
-      execSync(`chown -R abc:abc "${claudeDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${claudeDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 755 "${claudeDir}" 2>/dev/null || true`, { stdio: 'pipe' });
     } catch (e) {}
 
     console.log('[claude-config] ✓ Claude Code configuration complete');

@@ -542,9 +542,9 @@ sudo mkdir -p "$GMWEB_DIR" && sudo chown -R abc:abc "$GMWEB_DIR" 2>/dev/null || 
 log "Phase 1 complete - environment ready (using beforestart hook)"
 
 log "Verifying persistent path structure..."
-sudo mkdir -p /config/nvm /config/.tmp /config/logs
-sudo chown 1000:1000 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
-sudo chmod 755 /config/nvm /config/.tmp /config/logs 2>/dev/null || true
+sudo mkdir -p /config/nvm /config/.tmp /config/logs /config/.local /config/.local/bin
+sudo chown 1000:1000 /config/nvm /config/.tmp /config/logs /config/.local /config/.local/bin 2>/dev/null || true
+sudo chmod 755 /config/nvm /config/.tmp /config/logs /config/.local /config/.local/bin 2>/dev/null || true
 
 # Copy NVM compatibility shims to /config (shared across all shells and scripts)
 cp /tmp/gmweb/startup/.nvm_compat.sh /config/.nvm_compat.sh
