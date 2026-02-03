@@ -75,16 +75,20 @@ done
 
 # Recursively fix permissions on critical directories (important for stale volumes)
 log "Fixing permissions on critical directory trees..."
-for dir in "$HOME_DIR/.config" "$HOME_DIR/.local" "$HOME_DIR/.gmweb" "$HOME_DIR/.cache"; do
+# CRITICAL: Use -maxdepth and avoid cache which can be huge (2.5GB+)
+# -cache is cleared below, so no need to fix its permissions
+for dir in "$HOME_DIR/.config" "$HOME_DIR/.local" "$HOME_DIR/.gmweb"; do
   if [ -d "$dir" ]; then
-    # Fix all nested directories: 755 for dirs, preserving files
-    sudo find "$dir" -type d -exec chown 1000:1000 {} \; 2>/dev/null || true
-    sudo find "$dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    # Use -maxdepth 3 to avoid going too deep into large directory trees
+    # This prevents the find command from getting stuck on massive caches
+    timeout 30 sudo find "$dir" -maxdepth 3 -type d -exec chown 1000:1000 {} \; 2>/dev/null || true
+    timeout 30 sudo find "$dir" -maxdepth 3 -type d -exec chmod 755 {} \; 2>/dev/null || true
     # Fix files: ensure they're readable and writable by owner
-    sudo find "$dir" -type f -exec chown 1000:1000 {} \; 2>/dev/null || true
-    sudo find "$dir" -type f -exec chmod 644 {} \; 2>/dev/null || true
+    timeout 30 sudo find "$dir" -maxdepth 3 -type f -exec chown 1000:1000 {} \; 2>/dev/null || true
+    timeout 30 sudo find "$dir" -maxdepth 3 -type f -exec chmod 644 {} \; 2>/dev/null || true
   fi
 done
+# Cache is cleared separately below, no need to fix its permissions
 
 log "✓ Comprehensive permission setup complete (all paths now abc:abc owned)"
 
