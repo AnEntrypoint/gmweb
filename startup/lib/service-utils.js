@@ -1,5 +1,5 @@
 import { spawn, execSync } from 'child_process';
-import { existsSync, writeFileSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
 import { dirname } from 'path';
 import { promisify } from 'util';
 

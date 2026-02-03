@@ -79,6 +79,14 @@ export class Supervisor {
   }
 
   async startService(service) {
+    // CRITICAL: Ensure /config is owned by abc:abc (UID 1000) before starting each service
+    // This prevents permission issues from root-owned files created during installation
+    try {
+      execSync('sudo chown -R 1000:1000 "/config" 2>/dev/null || true', { stdio: 'pipe' });
+    } catch (e) {
+      // Non-critical: continue even if chown fails
+    }
+    
     this.logger.log('INFO', `Starting service`, null, service.name);
     const result = await service.start(this.env);
     if (result.process) {

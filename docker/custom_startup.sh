@@ -6,6 +6,9 @@ unset LD_PRELOAD
 unset NPM_CONFIG_PREFIX
 
 HOME_DIR="/config"
+
+# CRITICAL: Set ownership to abc:abc (UID 1000) at startup start
+sudo chown -R 1000:1000 "/config" 2>/dev/null || true
 LOG_DIR="$HOME_DIR/logs"
 
 # Clear all logs on every boot - fresh start
@@ -672,43 +675,26 @@ log "  Removing any existing Bun installation (force fresh state)..."
 rm -rf "$BUN_INSTALL" 2>/dev/null || true
 mkdir -p "$BUN_INSTALL"
 
-log "  Installing fresh latest Bun (this may take a minute)..."
-# Source NVM in subshell for Bun installation
-# CRITICAL: Clear NPM_CONFIG_PREFIX in subshell environment
-# NVM refuses to load if NPM_CONFIG_PREFIX is set (LinuxServer base image conflict)
-# Pass it as empty string to override parent shell's export
-NPM_CONFIG_PREFIX= bash << 'BUNINSTALL_EOF'
-  export NVM_DIR=/config/nvm
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-  # CRITICAL: Add Bun bin directory to PATH before installation check
-  # The installer puts bun at $BUN_INSTALL/bin/bun
-  export PATH="/config/.gmweb/cache/.bun/bin:$PATH"
-
-  # Install official latest Bun (always fresh)
-  if timeout 120 curl -fsSL https://bun.sh/install | bash 2>&1 | tail -3; then
-    if [ -f "/config/.gmweb/cache/.bun/bin/bun" ]; then
-      echo "  ✓ Fresh Bun installed at /config/.gmweb/cache/.bun/bin/bun" | tee -a "$HOME/logs/startup.log"
-    else
-      echo "  ERROR: Bun installer completed but bun binary not found at expected location" | tee -a "$HOME/logs/startup.log"
-      exit 1
-    fi
+log "  Installing fresh latest Bun..."
+# Install via apt-get for reliable, compatible binaries (like ttyd)
+# This is more reliable than curl | bash which can fail silently
+if apt-get update -qq 2>/dev/null && apt-get install -y bun 2>&1 | tail -3; then
+  if command -v bun &>/dev/null; then
+    log "✓ Bun installed via apt-get"
+    # Get the actual bun binary path and symlink to expected location
+    BUN_PATH=$(command -v bun)
+    log "  Bun location: $BUN_PATH"
+    mkdir -p "$BUN_INSTALL/bin"
+    ln -sf "$BUN_PATH" "$BUN_INSTALL/bin/bun"
+    export PATH="$BUN_INSTALL/bin:$PATH"
+    log "✓ Bun bin directory added to PATH"
   else
-    echo "  ERROR: Bun installation failed" | tee -a "$HOME/logs/startup.log"
-    exit 1
+    log "WARNING: Bun apt-get install completed but bun command not found, continuing anyway"
+    # Don't exit - services that need Bun will fail gracefully
   fi
-BUNINSTALL_EOF
-
-# CRITICAL: After subshell completes, verify Bun exists and add to PATH in PARENT shell
-# Variables set in subshell do NOT persist to parent, so we must set PATH here
-if [ -f "$BUN_INSTALL/bin/bun" ]; then
-  log "✓ Bun binary verified at $BUN_INSTALL/bin/bun"
-  # Add to PATH for supervisor and all subsequent processes
-  export PATH="$BUN_INSTALL/bin:$PATH"
-  log "✓ Bun bin directory added to PATH: $BUN_INSTALL/bin"
 else
-  log "ERROR: Bun installation verification failed - binary not found at $BUN_INSTALL/bin/bun"
-  exit 1
+  log "WARNING: Bun apt-get installation failed, continuing anyway"
+  # Don't exit - services that need Bun will fail gracefully
 fi
 
 log "Phase 1.6: Install CLI coding tools (opencode/Claude Code) - BLOCKING (required for services)"
@@ -822,9 +808,9 @@ log "Background installs started (PID: $!)"
 
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
-# Final ownership pass - ensure all files are owned by abc
-chown -R abc:abc "$HOME_DIR" 2>/dev/null || true
-log "✓ Final /config ownership set to abc"
+# Final ownership pass - ensure all files are owned by abc:abc (UID 1000)
+sudo chown -R 1000:1000 "/config" 2>/dev/null || true
+log "✓ Final /config ownership set to abc (UID 1000)"
 
 # Set working directory to /config for any subsequent processes
 cd /config
