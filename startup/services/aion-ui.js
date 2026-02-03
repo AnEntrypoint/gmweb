@@ -115,7 +115,7 @@ async function setCredentialsFromEnv(attempt = 0) {
     let Database, bcrypt;
     try { Database = require('/config/usr/local/lib/node_modules/better-sqlite3'); } catch (e) { Database = require('better-sqlite3'); }
     try { bcrypt = require('/config/.gmweb-deps/node_modules/bcrypt'); } catch (e) { bcrypt = require('bcrypt'); }
-    
+
     const dbPath = '/config/.config/AionUi/aionui/aionui.db';
 
     if (!existsSync(dbPath)) {
@@ -137,6 +137,25 @@ async function setCredentialsFromEnv(attempt = 0) {
       setTimeout(() => setCredentialsFromEnv(attempt + 1), RETRY_DELAY);
     }
   }
+}
+
+async function waitForAionUIPort(timeoutMs = 30000) {
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      const output = execSync(`ss -tln 2>/dev/null | grep :${PORT}`, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true,
+        encoding: 'utf8',
+        timeout: 2000
+      });
+      if (output && output.includes('LISTEN')) {
+        return true;
+      }
+    } catch (e) {}
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return false;
 }
 
 export default {
@@ -198,6 +217,18 @@ export default {
     const ps = spawnAsAbcUser(command, serviceEnv);
     ps.stdout?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation')) console.log(`[aion-ui] ${m}`); });
     ps.stderr?.on('data', d => { const m = d.toString().trim(); if (m && !m.includes('Deprecation') && !m.includes('GPU process')) console.log(`[aion-ui:err] ${m}`); });
+
+    // CRITICAL: Wait for port to actually be listening BEFORE resolving
+    // Don't use unref() until we know the service is actually responsive
+    console.log('[aion-ui] Waiting for port to be listening...');
+    const portReady = await waitForAionUIPort(30000);
+    if (!portReady) {
+      console.log('[aion-ui] WARNING: Port not listening after 30s, continuing anyway');
+    } else {
+      console.log('[aion-ui] ✓ Port is listening');
+    }
+
+    // NOW it's safe to unref since we know it's started
     ps.unref();
     setTimeout(() => setCredentialsFromEnv(), 8000);
     return {

@@ -1,10 +1,12 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
+import { existsSync, mkdirSync } from 'fs';
 
 const sleep = promisify(setTimeout);
 
 const NAME = 'gmgui';
 const PORT = 9897;
+const INSTALL_DIR = '/tmp/gmgui-install';
 
 export default {
   name: NAME,
@@ -13,20 +15,23 @@ export default {
   dependencies: [],
 
   async start(env) {
-    console.log(`[${NAME}] Starting service via bunx agentgui@latest...`);
+    console.log(`[${NAME}] Starting service via GitHub gmgui...`);
     return new Promise((resolve, reject) => {
-      const childEnv = {
-        ...env,
-        HOME: '/tmp',
-        PORT: String(PORT),
-        BASE_URL: '/gm'
-      };
+      try {
+        if (!existsSync(INSTALL_DIR)) {
+          mkdirSync(INSTALL_DIR, { recursive: true });
+        }
+      } catch (e) {
+        console.error(`[${NAME}] Failed to create install directory: ${e.message}`);
+      }
 
-      // Use bunx to run agentgui directly - bunx handles resolution and stdio passthrough
-      const ps = spawn('bunx', ['agentgui@latest'], {
+      const childEnv = { ...env, HOME: '/config', PORT: String(PORT) };
+
+      const ps = spawn('bash', ['-c', 'curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gmgui/main/install.sh | bash'], {
         env: childEnv,
-        stdio: 'inherit',
-        detached: false
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: false,
+        cwd: INSTALL_DIR
       });
 
       let startCheckCount = 0;
@@ -36,9 +41,7 @@ export default {
       const checkIfStarted = async () => {
         startCheckCount++;
         try {
-          const { execSync: exec } = await import('child_process');
-
-          const output = exec(`ss -tln 2>/dev/null | grep :${PORT}`, {
+          const output = execSync(`ss -tln 2>/dev/null | grep :${PORT}`, {
             stdio: ['pipe', 'pipe', 'pipe'],
             shell: true,
             encoding: 'utf8',
@@ -94,8 +97,7 @@ export default {
 
   async health() {
     try {
-      const { execSync: exec } = await import('child_process');
-      const output = exec(`ss -tln 2>/dev/null | grep :${PORT}`, {
+      const output = execSync(`ss -tln 2>/dev/null | grep :${PORT}`, {
         stdio: ['pipe', 'pipe', 'pipe'],
         shell: true,
         encoding: 'utf8',
