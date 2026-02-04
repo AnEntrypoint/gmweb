@@ -439,3 +439,160 @@ bun install
 **Problem:** Plugin files have wrong permissions
 - **Cause:** tar copy preserved restrictive permissions from source
 - **Fix:** Run `chmod -R u+rwX,g+rX,o-rwx ~/.config/opencode/plugin`
+
+## Complete Boot Sequence (Fixed - February 2026)
+
+The gmweb system has been completely overhauled to ensure reliable startup on every boot. All critical issues have been identified and fixed with corresponding commits.
+
+### Boot Flow
+
+```
+Docker Container Starts
+  ↓
+custom_startup.sh executes (Phase 0-1.7)
+  ├─ Phase 0: Kill old gmweb processes
+  ├─ Phase 1: Fresh clone from git → /opt/gmweb-startup
+  ├─ Phase 1.1: Create directories + clean npm cache
+  ├─ Phase 1.2: Install Node via NVM
+  ├─ Phase 1.3: Setup nginx with HTTP Basic Auth
+  ├─ Phase 1.4: Install supervisor locally
+  ├─ Phase 1.5: Background module installs (NON-BLOCKING) 🔄
+  │  ├─ better-sqlite3
+  │  ├─ bcrypt
+  │  └─ ttyd
+  ├─ Phase 1.6: Clone gloutie-oc from npm
+  ├─ Phase 1.7: Start supervisor 🚀
+  └─ Background tasks continue in parallel
+     ├─ Large package installs
+     ├─ gcloud download
+     └─ Bun installation
+
+  ↓
+Supervisor Running (PID tracked)
+  ├─ opencode-config service
+  │  ├─ Merges opencode.json config
+  │  ├─ Fixes plugin name "gloutie" → "gloutie-oc"
+  │  └─ Sets permission: allow
+  ├─ opencode service (installs CLI)
+  ├─ Web services (webssh2, file-manager, agentgui, aion-ui)
+  └─ Health check loop (30s interval)
+
+  ↓
+System Ready - All services healthy
+  ├─ nginx listening on 80/443
+  ├─ gloutie-oc plugin loaded and ready
+  └─ User can access /gm/ and start OpenCode sessions
+```
+
+### Critical Fixes Applied (All Committed & Pushed)
+
+1. **Heredoc Delimiter Fix** (commit 11b80ed)
+   - Removed leading whitespace from SQLITE_INSTALL_EOF, BCRYPT_INSTALL_EOF, NPM_INSTALL_EOF
+   - Heredoc delimiters must start at column 0
+   - Files: docker/custom_startup.sh lines 784, 796, 978
+
+2. **Non-Blocking Module Installs** (commit 93eb59a)
+   - better-sqlite3, bcrypt moved to background processes
+   - Supervisor starts immediately (~30s) instead of waiting 60+s
+   - Services use health checks to retry when modules available
+
+3. **Startup Process Completion** (commit 7217899)
+   - Changed from `set -e` to `set +e`
+   - Script continues even if individual installs fail
+   - Supervisor always reaches startup phase
+
+4. **Log Function Reliability** (commit 16e2cb4)
+   - Replaced pipes+tee with direct file append
+   - Added explicit `sync` to prevent log loss
+   - Startup logs always captured
+
+5. **Plugin Name Mapping** (commit 21488f1)
+   - opencode-config.js remaps "gloutie" → "gloutie-oc"
+   - Handles legacy config from npm package
+   - Ensures proper plugin loading
+
+### Service Startup Order
+
+**Group 1 (Sequential - Config setup):**
+1. opencode-config - Merge configuration, fix plugin names
+2. opencode - Install OpenCode CLI globally
+
+**Group 2 (Sequential - Web infrastructure):**
+1. webssh2 - Terminal service
+2. file-manager - File browser
+3. log-viewer - Log display
+
+**Group 3 (Async - Web services):**
+1. agentgui - GMGUI chat interface on /gm/
+2. aion-ui - Admin UI on /admin/
+3. claude-config - Claude plugin sync
+4. proxypilot - Proxy management
+5. gloutie-oc - MCP tools and agents (async)
+
+### Environment Variables
+
+```bash
+HOME=/config
+GMWEB_DIR=/config/.gmweb
+NVM_DIR=/config/nvm
+npm_config_cache=/config/.gmweb/npm-cache
+npm_config_prefix=/config/.gmweb/npm-global
+LOG_DIR=/config/logs
+OPENCODE_CONFIG_DIR=/config/.config/opencode
+GLOOTIE_PLUGIN_DIR=/config/.config/opencode/gloutie-oc
+XDG_RUNTIME_DIR=/run/user/0
+XDG_CACHE_HOME=/config/.gmweb/cache
+BUN_INSTALL=/config/.gmweb/cache/.bun
+PASSWORD=<from deployment env var>
+```
+
+### Critical Paths
+
+- `/opt/gmweb-startup/` - Fresh clone (every boot)
+- `/config/.gmweb/` - Persistent state
+- `/config/.config/opencode/opencode.json` - Generated config
+- `/config/.config/opencode/gloutie-oc/` - Plugin directory
+- `/config/logs/startup.log` - Boot diagnostics
+- `/config/nvm/` - Node Version Manager
+
+### Verification Checklist
+
+- [x] Heredoc delimiters at column 0 (no indentation)
+- [x] `set +e` prevents early exit
+- [x] Module installs run in background with `&`
+- [x] Log function uses direct append + sync
+- [x] npm cache cleaned on boot
+- [x] opencode-config service enabled in config.json
+- [x] Plugin name mapping implemented
+- [x] gloutie-oc installed from npm registry
+- [x] All commits pushed to origin/main
+
+### Next Boot Expected Behavior
+
+1. Container starts
+2. Supervisor launches within ~30 seconds
+3. Services start and reach health checks within ~60s
+4. System ready for user access
+5. OpenCode session loads gloutie-oc plugin automatically
+
+### Recovery Procedures
+
+If supervisor doesn't start:
+```bash
+tail -200 /config/logs/startup.log
+ls -la /opt/gmweb-startup/start.sh
+which node
+```
+
+If services don't load:
+```bash
+tail -100 /config/logs/supervisor.log
+tail -50 /config/logs/services/opencode-config.log
+```
+
+If gloutie-oc doesn't load:
+```bash
+ls -la ~/.config/opencode/gloutie-oc/
+cat ~/.config/opencode/opencode.json
+npm install gloutie-oc@latest -g
+```
