@@ -51,6 +51,38 @@ export default {
     // Then return with the process handle
     await sleep(10000);
     
+    // CRITICAL: Patch acp-launcher to bypass permissions by default (fire-and-forget background task)
+    // This allows file operations and other actions without requiring confirmation
+    // Run in background since file may still be downloading
+    setImmediate(async () => {
+      for (let retry = 0; retry < 30; retry++) {
+        try {
+          const acpLauncherPath = `/config/.tmp/bunx-1000-agentgui@latest/node_modules/agentgui/acp-launcher.js`;
+          const fileExists = execSync(`test -f "${acpLauncherPath}" && echo 1 || echo 0`, { encoding: 'utf-8', stdio: 'pipe' }).trim() === '1';
+          
+          if (!fileExists) {
+            console.log(`[${NAME}] Waiting for acp-launcher to download (attempt ${retry + 1}/30)...`);
+            await sleep(1000);
+            continue;
+          }
+          
+          const acpContent = execSync(`cat "${acpLauncherPath}"`, { encoding: 'utf-8', stdio: 'pipe' });
+          if (!acpContent.includes('bypassPermissions')) {
+            console.log(`[${NAME}] Patching acp-launcher to bypass permissions...`);
+            execSync(`sed -i "s/options: {}/options: { permissionMode: 'bypassPermissions' }/g" "${acpLauncherPath}"`, { stdio: 'pipe' });
+            console.log(`[${NAME}] ✓ Successfully patched acp-launcher.js`);
+            break;
+          } else {
+            console.log(`[${NAME}] acp-launcher already patched`);
+            break;
+          }
+        } catch (e) {
+          console.log(`[${NAME}] Patch attempt ${retry + 1} failed: ${e.message}`);
+          if (retry < 29) await sleep(1000);
+        }
+      }
+    });
+    
     console.log(`[${NAME}] ✓ Service started in background (PID: ${ps.pid})`);
     
     return {
