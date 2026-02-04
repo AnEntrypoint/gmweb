@@ -42,7 +42,6 @@ async function main() {
         'opencode',
         'proxypilot',
         'agentgui',
-        'aion-ui',
         'moltbot',
         'claude-config',
         'playwriter',
