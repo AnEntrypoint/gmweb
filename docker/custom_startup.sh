@@ -24,6 +24,22 @@ log() {
   echo "[gmweb-startup] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "$LOG_DIR/startup.log"
 }
 
+# CRITICAL: Create npm wrapper script for abc user
+# This ensures ALL npm operations run as abc, preventing root-owned files
+mkdir -p /tmp/gmweb-wrappers
+cat > /tmp/gmweb-wrappers/npm-as-abc.sh << 'NPM_WRAPPER_EOF'
+#!/bin/bash
+export NVM_DIR=/config/nvm
+export HOME=/config
+export GMWEB_DIR=/config/.gmweb
+export npm_config_cache=/config/.gmweb/npm-cache
+export npm_config_prefix=/config/.gmweb/npm-global
+export PATH="/config/.gmweb/npm-global/bin:$PATH"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+exec "$@"
+NPM_WRAPPER_EOF
+chmod +x /tmp/gmweb-wrappers/npm-as-abc.sh
+
 # Log the initial ownership fix (now that log function exists)
 log "CRITICAL: Initial /config ownership and permissions fixed (Phase 0 startup)"
 
@@ -293,8 +309,9 @@ sudo rm -rf /config/.npm 2>/dev/null || true
 sudo rm -rf /config/node_modules/.bin/* 2>/dev/null || true
 
 # Clean existing npm cache if it exists (will be recreated in centralized location)
+# CRITICAL: Run as abc user to prevent root cache contamination
 if command -v npm &>/dev/null; then
-  npm cache clean --force 2>/dev/null || true
+  sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>/dev/null || true
 fi
 
 # Create centralized directory for all gmweb tools and installations
@@ -649,7 +666,8 @@ if [ -d "/config/.gmweb/npm-global" ]; then
 fi
 
 # Clear npm cache to prevent cascading permission errors
-npm cache clean --force 2>&1 | tail -1 || true
+# CRITICAL: Run as abc user to prevent root contamination
+sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>&1 | tail -1 || true
 log "✓ npm cache cleaned and fixed"
 
 log "Setting up supervisor..."
@@ -659,10 +677,12 @@ rm -rf /tmp/gmweb /tmp/_keep_docker_scripts 2>/dev/null || true
 # DEFENSIVE: One more npm cache clean right before critical supervisor install
 # This catches any permission issues that may have crept in
 log "Final npm cache verification before supervisor install..."
-npm cache clean --force 2>&1 | tail -1 || true
+sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>&1 | tail -1 || true
 
+# CRITICAL: Run supervisor npm install as abc user to prevent root cache contamination
+log "Installing supervisor dependencies as abc user..."
 cd /opt/gmweb-startup && \
-  npm install --production --omit=dev 2>&1 | tail -3 && \
+  sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm install --production --omit=dev 2>&1 | tail -3 && \
   chmod +x install.sh start.sh index.js && \
   chmod -R go+rx . && \
   chown -R root:root . && \
@@ -742,14 +762,27 @@ sudo chown 1000:1000 "$GMWEB_DIR/deps" 2>/dev/null || true
 sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
 
 # Ensure npm cache is clean before critical installs
-npm cache clean --force 2>&1 | tail -1 || log "WARNING: npm cache clean had issues"
+# CRITICAL: Run as abc user to prevent root contamination
+sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>&1 | tail -1 || log "WARNING: npm cache clean had issues"
+
+# CRITICAL: Run all npm installs as abc user to prevent root-owned cache files
+# This is the ROOT CAUSE of "npm error errno EACCES" on persistent volumes
+# If root runs npm, it creates root-owned files in the cache that abc user can't access later
 
 # Install with timeout and retry logic
-log "  Installing better-sqlite3 (3 retries)..."
+log "  Installing better-sqlite3 (3 retries) as abc user..."
 RETRY=0
 while [ $RETRY -lt 3 ]; do
-  if timeout 30 npm install -g better-sqlite3 2>&1 | tail -2; then
-    log "  ✓ better-sqlite3 installed"
+  if timeout 30 sudo -u abc bash << 'SQLITE_INSTALL_EOF'
+    export NVM_DIR=/config/nvm
+    export HOME=/config
+    export npm_config_cache=/config/.gmweb/npm-cache
+    export npm_config_prefix=/config/.gmweb/npm-global
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    npm install -g better-sqlite3 2>&1 | tail -2
+  SQLITE_INSTALL_EOF
+  then
+    log "  ✓ better-sqlite3 installed (as abc user)"
     break
   fi
   RETRY=$((RETRY + 1))
@@ -764,11 +797,29 @@ if [ $RETRY -ge 3 ]; then
   exit 1
 fi
 
-log "  Installing bcrypt (3 retries)..."
+# CRITICAL: Clean npm cache immediately after install to remove any stale files
+log "  Cleaning npm cache after better-sqlite3 install..."
+sudo -u abc bash << 'CACHE_CLEAN_EOF'
+  export NVM_DIR=/config/nvm
+  export npm_config_cache=/config/.gmweb/npm-cache
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+  npm cache clean --force 2>&1 | tail -1
+CACHE_CLEAN_EOF
+
+log "  Installing bcrypt (3 retries) as abc user..."
 RETRY=0
 while [ $RETRY -lt 3 ]; do
-  if cd "$GMWEB_DIR/deps" && timeout 30 npm install bcrypt 2>&1 | tail -2; then
-    log "  ✓ bcrypt installed"
+  if timeout 30 sudo -u abc bash << 'BCRYPT_INSTALL_EOF'
+    export NVM_DIR=/config/nvm
+    export HOME=/config
+    export GMWEB_DIR=/config/.gmweb
+    export npm_config_cache=/config/.gmweb/npm-cache
+    export npm_config_prefix=/config/.gmweb/npm-global
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -2
+  BCRYPT_INSTALL_EOF
+  then
+    log "  ✓ bcrypt installed (as abc user)"
     break
   fi
   RETRY=$((RETRY + 1))
@@ -783,8 +834,16 @@ if [ $RETRY -ge 3 ]; then
   exit 1
 fi
 
-sudo chown -R abc:abc "$GMWEB_DIR/deps" 2>/dev/null || true
-log "✓ Critical modules installed"
+# CRITICAL: Clean npm cache immediately after install
+log "  Cleaning npm cache after bcrypt install..."
+sudo -u abc bash << 'CACHE_CLEAN_EOF'
+  export NVM_DIR=/config/nvm
+  export npm_config_cache=/config/.gmweb/npm-cache
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+  npm cache clean --force 2>&1 | tail -1
+CACHE_CLEAN_EOF
+
+log "✓ Critical modules installed (all as abc user)"
 
 log "Installing GitHub CLI (gh) in foreground..."
 sudo apt-get update -qq 2>/dev/null || true
@@ -1079,28 +1138,66 @@ log "Background installs started (PID: $!)"
 
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
-# CRITICAL: Final comprehensive ownership pass
-# Ensures no root-owned files exist in /config after entire boot process
-# This catches any files created by background processes during startup
-log "Running final ownership and permission fix (catching any root-owned files)..."
-sudo find /config -not -user 1000 2>/dev/null | while read file; do
-  sudo chown 1000:1000 "$file" 2>/dev/null || true
-  log "  Fixed ownership: $file"
+# CRITICAL: Final comprehensive ownership and permissions pass
+# Ensures ZERO root-owned files exist in /config after entire boot process
+# This is THE MOST IMPORTANT STEP - catches any files created by background/parallel processes
+log "FINAL PHASE: Aggressive ownership enforcement (no root files allowed)..."
+
+# Stage 1: Recursively fix ALL files/dirs in critical directories
+for dir in /config/.gmweb /config/.nvm /config/.local /config/.cache /config/.config /config/workspace; do
+  if [ -d "$dir" ]; then
+    log "  Stage 1: Fixing all permissions in $dir..."
+    sudo find "$dir" -type d -exec chown abc:abc {} \; 2>/dev/null || true
+    sudo find "$dir" -type f -exec chown abc:abc {} \; 2>/dev/null || true
+    sudo find "$dir" -type d -exec chmod u+rwX,g+rX,o-rwx {} \; 2>/dev/null || true
+    sudo find "$dir" -type f -exec chmod u+rw,g+r,o-rwx {} \; 2>/dev/null || true
+  fi
 done
 
-# Set proper permissions on /config hierarchy
-sudo chown -R 1000:1000 "/config" 2>/dev/null || true
-sudo chmod -R u+rwX,g+rX,o-rwx "/config" 2>/dev/null || true
-log "✓ Final /config ownership and permissions verified (all abc:abc)"
+# Stage 2: Delete npm cache if it has ANY root-owned files (corrupted state)
+if [ -d /config/.gmweb/npm-cache ]; then
+  if sudo find /config/.gmweb/npm-cache -not -user 1000 2>/dev/null | grep -q .; then
+    log "  Stage 2: Root-owned files found in npm cache - DELETING entire cache..."
+    sudo rm -rf /config/.gmweb/npm-cache
+    mkdir -p /config/.gmweb/npm-cache
+    chmod 777 /config/.gmweb/npm-cache
+    log "  ✓ npm cache deleted and recreated"
+  fi
+fi
 
-# Verify no root files remain
-if sudo find /config -maxdepth 3 -not -user 1000 2>/dev/null | head -5 | grep -q .; then
-  log "WARNING: Some root-owned files still exist in /config (may be system symlinks)"
-  sudo find /config -maxdepth 3 -not -user 1000 2>/dev/null | head -5 | while read f; do
-    log "  - $f"
+# Stage 3: Delete npm-global if it has ANY root-owned files (corrupted state)
+if [ -d /config/.gmweb/npm-global ]; then
+  if sudo find /config/.gmweb/npm-global -not -user 1000 2>/dev/null | grep -q .; then
+    log "  Stage 3: Root-owned files found in npm-global - DELETING entire directory..."
+    sudo rm -rf /config/.gmweb/npm-global
+    mkdir -p /config/.gmweb/npm-global
+    chmod 777 /config/.gmweb/npm-global
+    log "  ✓ npm-global deleted and recreated"
+  fi
+fi
+
+# Stage 4: Aggressive final pass - nuke any remaining root files
+ROOT_FILES=$(sudo find /config -not -user 1000 -not -path "/config/.git/*" 2>/dev/null | wc -l)
+if [ "$ROOT_FILES" -gt 0 ]; then
+  log "  Stage 4: Found $ROOT_FILES root-owned files - forcing ownership change..."
+  sudo find /config -not -user 1000 -not -path "/config/.git/*" -exec chown abc:abc {} \; 2>/dev/null || true
+  log "  ✓ All root-owned files reassigned to abc"
+fi
+
+# Stage 5: Final verification
+log "✓ Final ownership enforcement complete"
+
+# Verify absolutely ZERO root files remain (except .git which is ok)
+REMAINING_ROOT=$(sudo find /config -not -user 1000 -not -path "/config/.git/*" 2>/dev/null | wc -l)
+if [ "$REMAINING_ROOT" -gt 0 ]; then
+  log "ERROR: Still found $REMAINING_ROOT root-owned files after final pass!"
+  log "  List (first 10):"
+  sudo find /config -not -user 1000 -not -path "/config/.git/*" 2>/dev/null | head -10 | while read f; do
+    log "    - $f"
   done
+  log "CRITICAL: This will cause npm EACCES errors"
 else
-  log "✓ Verified: No root-owned files in /config"
+  log "✓ VERIFIED: ZERO root-owned files in /config (excluding .git)"
 fi
 
 # Set working directory to /config for any subsequent processes
