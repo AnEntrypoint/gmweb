@@ -256,3 +256,61 @@ curl -u abc:MySecurePassword https://your-domain.com/files/  # Should succeed (2
 ```
 
 Without proper PASSWORD deployment, users will fail to authenticate even if services are running correctly.
+
+## AgentGUI Multi-Agent Interface
+
+AgentGUI is a multi-agent UI that allows interacting with Claude Code and OpenCode agents. It's served on the `/gm/` endpoint (port 9897 internally, proxied via nginx on `/gm/`).
+
+### Configuration
+
+AgentGUI reads the `BASE_URL` environment variable to determine its routing prefix. The service is configured in `startup/services/agentgui.js`:
+
+```javascript
+// Pass BASE_URL environment variable to agentgui server
+const childEnv = {
+  ...env,
+  HOME: '/config',
+  PORT: String(PORT),
+  BASE_URL: '/gm',           // Router prefix for frontend
+  HOT_RELOAD: 'false',       // Disable in production
+  NODE_ENV: 'production'
+};
+```
+
+**Important:** AgentGUI connects to itself (the server it's running on) via WebSocket and API calls. It is NOT an external service – it's self-contained. The `BASE_URL` variable tells the frontend JavaScript what prefix to use when making API calls.
+
+### How It Works
+
+1. **Frontend served from `/gm/`** – nginx proxies HTTP requests to agentgui server on port 9897
+2. **Frontend makes API calls** – JavaScript uses `BASE_URL` variable injected at runtime: `window.__BASE_URL = '/gm'`
+3. **WebSocket sync** – Frontend connects to `wss://localhost/gm/sync` for real-time updates
+4. **ACP integration** – AgentGUI backend discovers and manages Claude Code / OpenCode ACP sessions
+
+### Endpoint Summary
+
+- **HTTP GET `/gm/`** – Serves the HTML interface (port 9897)
+- **API `/gm/api/conversations`** – Get/create/list conversations
+- **API `/gm/api/agents`** – Discover available agents (Claude Code, OpenCode)
+- **WebSocket `/gm/sync`** – Real-time session sync and state recovery
+- **API `/gm/api/sessions/*/stream-updates`** – Stream update events
+
+### Disabled During Development
+
+Previous versions had agentgui disabled because:
+- Initial investigation thought it was hardcoded to external domain `buildesk.acc.l-inc.co.za`
+- Actually, it was a misunderstanding – agentgui connects to itself via `BASE_URL` environment variable
+
+**As of commit 71bf160:** AgentGUI is fully enabled and functional. It provides a multi-agent chat interface for interacting with Claude Code and OpenCode agents.
+
+### Testing AgentGUI
+
+```bash
+# Verify agentgui process is running
+ps aux | grep agentgui
+
+# Test the /gm/ endpoint
+curl -u abc:password http://localhost/gm/ | head -20
+
+# WebSocket connectivity can be tested from browser console:
+# The frontend will establish sync connection automatically on page load
+```
