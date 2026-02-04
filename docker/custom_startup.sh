@@ -1000,71 +1000,40 @@ else
   log "WARNING: opencode not found, will proceed without it"
 fi
 
-log "Phase 1.7: Install gmweb as opencode plugin (BLOCKING - required for Claude Code integration)"
-# CRITICAL: Install gmweb repository as opencode plugin
-# This allows Claude Code to load gmweb as a plugin for agent capabilities
-OPENCODE_PLUGIN_DIR="$HOME_DIR/.config/opencode/plugin"
-log "  Creating opencode plugin directory: $OPENCODE_PLUGIN_DIR"
-mkdir -p "$OPENCODE_PLUGIN_DIR"
-chown abc:abc "$OPENCODE_PLUGIN_DIR"
-chmod 755 "$OPENCODE_PLUGIN_DIR"
+log "Phase 1.7: Install glootie-oc opencode plugin (BLOCKING - required for MCP tool integration)"
+# CRITICAL: Install glootie-oc plugin from npm package
+# This provides MCP tool integration and Claude Code agent capabilities
+GLOOTIE_PLUGIN_DIR="$HOME_DIR/.config/opencode/glootie-oc"
+log "  Creating glootie-oc plugin directory: $GLOOTIE_PLUGIN_DIR"
+mkdir -p "$GLOOTIE_PLUGIN_DIR"
+chown abc:abc "$GLOOTIE_PLUGIN_DIR"
+chmod 755 "$GLOOTIE_PLUGIN_DIR"
 
-# Copy gmweb repo to plugin directory (it's already cloned in /opt/gmweb-startup)
-# We'll use tar to copy everything except node_modules and .git (safer than cp -r with excludes)
-if [ -d /opt/gmweb-startup ]; then
-  log "  Copying gmweb from /opt/gmweb-startup to plugin directory..."
-  
-  # Use tar with exclude patterns (more reliable than rsync/cp with --exclude)
-  # This preserves file attributes while skipping large/stale directories
-  (cd /opt/gmweb-startup && tar --exclude='node_modules' --exclude='.git' \
-    --exclude='*.log' --exclude='.bun' -cf - .) | \
-    (cd "$OPENCODE_PLUGIN_DIR" && tar -xf -) 2>&1 | tail -1
-  
-  if [ $? -eq 0 ]; then
-    log "✓ gmweb copied to plugin directory"
-  else
-    log "WARNING: gmweb copy failed, attempting with cp -r as fallback..."
-    cp -r /opt/gmweb-startup/* "$OPENCODE_PLUGIN_DIR/" 2>/dev/null && \
-      log "✓ gmweb copied with cp (fallback)" || \
-      log "ERROR: Failed to copy gmweb to plugin directory"
-  fi
+# Install glootie-oc package from npm using npm/bun (CRITICAL: npm must be available)
+log "  Installing glootie-oc package from npm..."
+
+# Use npm to install glootie-oc package as abc user
+if [ -d "$GLOOTIE_PLUGIN_DIR" ]; then
+  (
+    cd "$GLOOTIE_PLUGIN_DIR" && \
+    timeout 120 sudo -u abc bash << 'NPM_INSTALL_EOF'
+      export HOME=/config
+      export PATH="/config/.gmweb/npm-global/bin:/config/nvm/versions/node/$(ls /config/nvm/versions/node | tail -1)/bin:$PATH"
+      npm install glootie-oc@latest 2>&1 | tail -5
+    NPM_INSTALL_EOF
+  ) && log "✓ glootie-oc plugin installed from npm" || \
+    log "WARNING: npm install glootie-oc failed, plugin may not be fully functional"
 else
-  log "WARNING: /opt/gmweb-startup not found, skipping gmweb plugin copy"
+  log "ERROR: Failed to create glootie plugin directory"
 fi
 
-# Install plugin dependencies with Bun (CRITICAL: Bun must be available)
-if [ -d "$OPENCODE_PLUGIN_DIR" ] && [ -f "$OPENCODE_PLUGIN_DIR/package.json" ]; then
-  log "  Installing opencode plugin dependencies with Bun..."
-  
-  # Ensure proper permissions before bun install
-  chown -R abc:abc "$OPENCODE_PLUGIN_DIR" 2>/dev/null || true
-  chmod -R u+rwX,g+rX,o-rwx "$OPENCODE_PLUGIN_DIR" 2>/dev/null || true
-  
-  # CRITICAL: bun must be available (installed in Phase 1.5)
-  if ! command -v bun &>/dev/null && [ -f "$BUN_INSTALL/bin/bun" ]; then
-    export PATH="$BUN_INSTALL/bin:$PATH"
-  fi
-  
-  if command -v bun &>/dev/null; then
-    # Run bun install in plugin directory as abc user
-    (
-      cd "$OPENCODE_PLUGIN_DIR" && \
-      timeout 120 sudo -u abc HOME=/config bash << 'BUN_INSTALL_EOF'
-        export BUN_INSTALL=/config/.gmweb/cache/.bun
-        export PATH="$BUN_INSTALL/bin:$PATH"
-        bun install 2>&1 | tail -5
-      BUN_INSTALL_EOF
-    ) && log "✓ opencode plugin dependencies installed with Bun" || \
-      log "WARNING: bun install failed, plugin may not be fully functional"
-  else
-    log "WARNING: Bun not available, skipping plugin dependency installation"
-    log "  (plugin can be manually installed with: cd $OPENCODE_PLUGIN_DIR && bun install)"
-  fi
-else
-  log "WARNING: Plugin directory or package.json not found, skipping plugin setup"
+# Fix permissions after install
+if [ -d "$GLOOTIE_PLUGIN_DIR" ]; then
+  chown -R abc:abc "$GLOOTIE_PLUGIN_DIR" 2>/dev/null || true
+  chmod -R u+rwX,g+rX,o-rwx "$GLOOTIE_PLUGIN_DIR" 2>/dev/null || true
 fi
 
-log "Phase 1.7 complete - opencode plugin ready (or will retry in background)"
+log "Phase 1.7 complete - glootie-oc plugin ready for MCP tools"
 
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
