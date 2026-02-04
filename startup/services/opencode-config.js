@@ -126,7 +126,7 @@ function setupGlootieConfig() {
     }
 
     // Build final config: schema + permission + glootie settings
-    const mergedConfig = {
+    let mergedConfig = {
       "$schema": "https://opencode.ai/config.json",
       "permission": "allow",
       ...existingConfig,
@@ -141,8 +141,14 @@ function setupGlootieConfig() {
       }
     };
 
+    // CRITICAL: Fix plugin name if it's the generic "gloutie" instead of "gloutie-oc"
+    // This handles the case where gloutie-oc package still has old config
+    if (mergedConfig.plugin && Array.isArray(mergedConfig.plugin)) {
+      mergedConfig.plugin = mergedConfig.plugin.map(p => p === 'gloutie' ? 'gloutie-oc' : p);
+    }
+
     writeFileSync(opencodeConfigDest, JSON.stringify(mergedConfig, null, 2));
-    console.log('[opencode-config] ✓ opencode.json configured with permission:allow + glootie-oc');
+    console.log('[opencode-config] ✓ opencode.json configured with permission:allow + gloutie-oc');
 
     // Copy agents from glootie-oc
     const agentsSrcDir = join(GLOOTIE_DIR, 'agents');
