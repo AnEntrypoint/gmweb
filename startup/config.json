@@ -43,7 +43,7 @@
       "type": "system"
     },
     "aion-ui": {
-      "enabled": true,
+      "enabled": false,
       "type": "web"
     },
     "moltbot": {
