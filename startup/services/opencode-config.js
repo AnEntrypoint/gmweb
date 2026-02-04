@@ -147,6 +147,14 @@ function setupGlootieConfig() {
       mergedConfig.plugin = mergedConfig.plugin.map(p => p === 'gloutie' ? 'gloutie-oc' : p);
     }
 
+    // CRITICAL: Ensure gloutie-oc is ALWAYS in the plugin array
+    // If plugin array doesn't exist or doesn't include gloutie-oc, add it
+    if (!mergedConfig.plugin) {
+      mergedConfig.plugin = ['gloutie-oc'];
+    } else if (!mergedConfig.plugin.includes('gloutie-oc')) {
+      mergedConfig.plugin.push('gloutie-oc');
+    }
+
     writeFileSync(opencodeConfigDest, JSON.stringify(mergedConfig, null, 2));
     console.log('[opencode-config] ✓ opencode.json configured with permission:allow + gloutie-oc');
 
