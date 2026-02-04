@@ -46,10 +46,12 @@ export default class ACPConnection {
         }
       });
 
-      // Collect all messages and render them beautifully
+      // Collect all messages and render with RippleUI components
       const htmlParts = [];
       let hasStarted = false;
-      let allText = '';
+      const allText = '';
+      const toolCalls = [];
+      let totalDuration = 0;
 
       for await (const message of response) {
         const msgType = message.type;
@@ -58,11 +60,16 @@ export default class ACPConnection {
         if (msgType === 'assistant' && message.message?.content) {
           if (!hasStarted) {
             hasStarted = true;
-            // Add thinking indicator
+            // RippleUI Alert component for thinking state - full width
             htmlParts.push(`
-<div style="display: flex; align-items: center; gap: 0.75rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; border-radius: 0.5rem; margin-bottom: 1rem;">
-  <span style="font-size: 1.5rem;">💭</span>
-  <p style="color: #1f2937; margin: 0; font-weight: 500;">Executing request...</p>
+<div class="ripple-alert ripple-alert-info" role="alert" style="width: 100%; box-sizing: border-box;">
+  <div class="ripple-alert-content">
+    <span class="ripple-icon">💭</span>
+    <div>
+      <h4 class="ripple-alert-title" style="margin-bottom: 0.25rem;">Processing Request</h4>
+      <p class="ripple-alert-message" style="margin: 0;">Claude Code is analyzing and executing your request...</p>
+    </div>
+  </div>
 </div>`);
           }
 
@@ -70,8 +77,6 @@ export default class ACPConnection {
           if (Array.isArray(content)) {
             for (const block of content) {
               if (block.type === 'text' && block.text) {
-                allText += block.text;
-                
                 // Emit update for real-time streaming
                 if (this.onUpdate) {
                   this.onUpdate({
@@ -82,23 +87,33 @@ export default class ACPConnection {
                   });
                 }
                 
-                // Render text block
+                // RippleUI Card for text response - full width
                 htmlParts.push(`
-<div style="padding: 1rem; background: #f3f4f6; border-radius: 0.5rem; border-left: 4px solid #3b82f6; margin-bottom: 1rem;">
-  <p style="color: #1f2937; line-height: 1.6; margin: 0; white-space: pre-wrap;">${this._escapeHtml(block.text)}</p>
+<div class="ripple-card ripple-card-subtle" style="width: 100%; box-sizing: border-box;">
+  <div class="ripple-card-body">
+    <p class="ripple-text-base ripple-text-secondary" style="white-space: pre-wrap; line-height: 1.6; margin: 0;">${this._escapeHtml(block.text)}</p>
+  </div>
 </div>`);
               } else if (block.type === 'tool_use') {
-                // Render tool execution
+                // Track tool call
+                toolCalls.push({
+                  name: block.name,
+                  input: block.input
+                });
+
+                // RippleUI Card with Badge for tool execution - full width
                 const inputJson = JSON.stringify(block.input, null, 2);
                 const toolHtml = `
-<div style="margin-bottom: 1.5rem;">
-  <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(168, 85, 247, 0.1); border-left: 4px solid #a855f7; border-radius: 0.5rem; margin-bottom: 0.75rem;">
-    <span style="font-size: 1.2rem;">🔧</span>
-    <span style="color: #1f2937; font-weight: 600;">Tool Execution: <code style="background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-family: monospace; color: #7c3aed;">${this._escapeHtml(block.name)}</code></span>
+<div class="ripple-card ripple-card-warning" style="width: 100%; box-sizing: border-box;">
+  <div class="ripple-card-header">
+    <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+      <span class="ripple-badge ripple-badge-warning">🔧 Tool</span>
+      <code class="ripple-code-inline ripple-text-lg">${this._escapeHtml(block.name)}</code>
+    </div>
   </div>
-  <div style="padding: 1rem; background: #f9fafb; border-radius: 0.5rem; margin-left: 2rem; border: 1px solid #e5e7eb;">
-    <div style="color: #6b7280; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem;">Input Parameters:</div>
-    <pre style="color: #1f2937; overflow-x: auto; margin: 0; font-size: 0.875rem; font-family: 'Courier New', monospace; line-height: 1.4;"><code>${this._escapeHtml(inputJson)}</code></pre>
+  <div class="ripple-card-body">
+    <h5 class="ripple-text-sm ripple-text-secondary ripple-font-semibold" style="margin-bottom: 0.75rem; margin-top: 0;">Input Parameters</h5>
+    <pre class="ripple-code-block ripple-bg-secondary ripple-rounded ripple-p-md" style="overflow-x: auto; width: 100%; box-sizing: border-box; margin: 0;"><code>${this._escapeHtml(inputJson)}</code></pre>
   </div>
 </div>`;
                 
@@ -120,32 +135,63 @@ export default class ACPConnection {
         
         // Handle result messages (completion)
         if (msgType === 'result') {
-          const duration = message.duration_ms || 0;
-          const resultHtml = `
-<div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; border-radius: 0.5rem;">
-  <span style="font-size: 1.2rem;">✅</span>
-  <p style="color: #1f2937; margin: 0; font-weight: 500;">Completed in <code style="background: #e5e7eb; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-family: monospace;">${duration}ms</code></p>
+          totalDuration = message.duration_ms || 0;
+          
+          // RippleUI Success Alert with stats - full width
+          const statsHtml = `
+<div class="ripple-alert ripple-alert-success" role="alert" style="width: 100%; box-sizing: border-box;">
+  <div class="ripple-alert-content">
+    <span class="ripple-icon">✅</span>
+    <div>
+      <h4 class="ripple-alert-title" style="margin-bottom: 0.5rem;">Execution Complete</h4>
+      <div class="ripple-text-sm ripple-mt-xs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 0.5rem;">
+        <div>
+          <span class="ripple-text-secondary">Duration:</span><br/>
+          <code class="ripple-code-inline ripple-text-success">${totalDuration}ms</code>
+        </div>
+        <div>
+          <span class="ripple-text-secondary">Tools Executed:</span><br/>
+          <code class="ripple-code-inline ripple-text-success">${toolCalls.length}</code>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>`;
           
-          htmlParts.push(resultHtml);
+          htmlParts.push(statsHtml);
           
           // Emit final update
           if (this.onUpdate) {
             this.onUpdate({
               update: {
                 sessionUpdate: 'agent_message_chunk',
-                content: { text: resultHtml }
+                content: { text: statsHtml }
               }
             });
           }
         }
       }
 
-      // Combine all HTML parts
-      const fullHtml = `<div style="display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem;">\n${htmlParts.join('\n')}\n</div>`;
+      // Combine all HTML parts with RippleUI container - full width styling
+      const fullHtml = `
+<div style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+  ${htmlParts.join('\n  ')}
+</div>`;
       
-      console.log(`[ACP-Direct] ✓ Response rendered (${fullHtml.length} chars)`);
-      return { content: fullHtml || 'No response from agent' };
+      // Also wrap to ensure cards fill width
+      const styledHtml = `<style>
+.ripple-card, .ripple-alert {
+  width: 100% !important;
+  max-width: none !important;
+}
+.ripple-code-block {
+  width: 100% !important;
+}
+</style>
+${fullHtml}`;
+      
+      console.log(`[ACP-Direct] ✓ Response rendered with RippleUI (${styledHtml.length} chars, ${toolCalls.length} tools)`);
+      return { content: styledHtml || 'No response from agent' };
     } catch (err) {
       console.error(`[ACP-Direct] Query error: ${err.message}`);
       throw err;
