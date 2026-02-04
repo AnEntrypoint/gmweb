@@ -24,7 +24,12 @@ sudo chmod 755 "$LOG_DIR"
 sudo chown 1000:1000 "$LOG_DIR"
 
 log() {
-  echo "[gmweb-startup] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "$LOG_DIR/startup.log"
+  local msg="[gmweb-startup] $(date '+%Y-%m-%d %H:%M:%S') $@"
+  echo "$msg"
+  echo "$msg" >> "$LOG_DIR/startup.log"
+  # CRITICAL: Flush to disk immediately - prevents log loss if script exits unexpectedly
+  # Direct file append avoids pipe buffering issues with tee
+  sync "$LOG_DIR/startup.log" 2>/dev/null || true
 }
 
 # CRITICAL: Create npm wrapper script for abc user
