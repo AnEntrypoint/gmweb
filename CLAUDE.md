@@ -311,6 +311,33 @@ ps aux | grep agentgui
 # Test the /gm/ endpoint
 curl -u abc:password http://localhost/gm/ | head -20
 
+# Test agentgui API to discover agents
+curl -u abc:password http://localhost/gm/api/agents
+
+# Create a test conversation
+curl -u abc:password -X POST http://localhost/gm/api/conversations \
+  -H "Content-Type: application/json" \
+  -d '{"agentId":"claude-code","title":"Test"}' | head -5
+
 # WebSocket connectivity can be tested from browser console:
 # The frontend will establish sync connection automatically on page load
 ```
+
+### Hot-Reload Disable Issue (Fixed)
+
+**Problem:** AgentGUI frontend was injecting hot-reload WebSocket code even though `HOT_RELOAD=false` was set.
+
+**Root Cause:** Environment variables set in bash command strings weren't being inherited by child processes (bunx/bun). The bash `-c` execution context doesn't properly propagate environment variables to spawned children.
+
+**Fix:** Changed from bash string execution to direct process spawn with `env` object:
+```javascript
+// Before (broken):
+spawn('bash', ['-c', `PORT=${PORT} HOT_RELOAD=false bunx --latest agentgui@latest`], { env: childEnv })
+
+// After (fixed):
+spawn('bunx', ['--latest', 'agentgui@latest'], { env: childEnv })
+```
+
+This ensures all environment variables in `childEnv` (including `HOT_RELOAD`, `BASE_URL`, `NODE_ENV`) are properly passed to the bunx/agentgui process.
+
+**Verification:** After restart, `/gm/` page no longer includes hot-reload WebSocket injection and page functionality is fully enabled.
