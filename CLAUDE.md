@@ -37,6 +37,23 @@ Many services have external dependencies (GitHub downloads, large npm installs, 
 
 This is a **hierarchical resilience** pattern: block on fast operations (git clone, local npm install), non-block on slow operations. Services fail gracefully when dependencies are missing; don't let one slow install starve the entire boot sequence.
 
+### Graceful Startup Failure Handling
+
+The `custom_startup.sh` script uses `set +e` (NOT `set -e`) to ensure it completes even if individual module installs fail:
+
+**Why this matters:**
+- `set -e` causes bash to exit on first error, preventing supervisor from ever starting
+- If better-sqlite3, bcrypt, or Bun install fails, the container can't launch services
+- Container orchestration timeouts before startup completes, leaving system broken
+
+**Implementation:**
+- Failed module installs (better-sqlite3, bcrypt, Bun) logged as warnings, not errors
+- Startup script always reaches "Starting supervisor" 
+- Supervisor handles retry logic via health checks for failed services
+- Services gracefully degrade if dependencies missing (AionUI works without bcrypt, services restart automatically)
+
+This ensures supervisor always starts, even if critical module installation fails. Services retry failed installs via health check loops rather than hard exit on first failure.
+
 ### Authentication as Architectural Layers
 
 Single `PASSWORD` env var controls all system authentication, but implementation varies by layer:
