@@ -764,92 +764,43 @@ XFCE_LAUNCHER_EOF
 chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
-log "Installing critical Node modules for AionUI..."
+log "Installing critical Node modules for AionUI (background - supervisor will retry)..."
 sudo mkdir -p "$GMWEB_DIR/deps"
 sudo chown 1000:1000 "$GMWEB_DIR/deps" 2>/dev/null || true
 sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
 
-# Ensure npm cache is clean before critical installs
-# CRITICAL: Run as abc user to prevent root contamination
-sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>&1 | tail -1 || log "WARNING: npm cache clean had issues"
-
-# CRITICAL: Run all npm installs as abc user to prevent root-owned cache files
-# This is the ROOT CAUSE of "npm error errno EACCES" on persistent volumes
-# If root runs npm, it creates root-owned files in the cache that abc user can't access later
-
-# Install with timeout and retry logic
-log "  Installing better-sqlite3 (3 retries) as abc user..."
-RETRY=0
-while [ $RETRY -lt 3 ]; do
-  if timeout 30 sudo -u abc bash << 'SQLITE_INSTALL_EOF'
+# CRITICAL: These native module installs are SLOW on ARM64 (compile time)
+# Run in background so supervisor can start immediately
+# Services will gracefully handle missing modules via health checks
+{
+  log "Background: Installing better-sqlite3..."
+  sudo -u abc bash << 'SQLITE_INSTALL_EOF'
     export NVM_DIR=/config/nvm
     export HOME=/config
     export npm_config_cache=/config/.gmweb/npm-cache
     export npm_config_prefix=/config/.gmweb/npm-global
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-    npm install -g better-sqlite3 2>&1 | tail -2
+    npm install -g better-sqlite3 2>&1 | tail -3
   SQLITE_INSTALL_EOF
-  then
-    log "  ✓ better-sqlite3 installed (as abc user)"
-    break
-  fi
-  RETRY=$((RETRY + 1))
-  if [ $RETRY -lt 3 ]; then
-    log "  WARNING: better-sqlite3 install failed, retry $RETRY/3..."
-    sleep 2
-  fi
-done
+  [ $? -eq 0 ] && log "✓ better-sqlite3 installed" || log "WARNING: better-sqlite3 install incomplete"
 
-if [ $RETRY -ge 3 ]; then
-  log "WARNING: better-sqlite3 installation failed after 3 retries (supervisor will retry)"
-fi
-
-# CRITICAL: Clean npm cache immediately after install to remove any stale files
-log "  Cleaning npm cache after better-sqlite3 install..."
-sudo -u abc bash << 'CACHE_CLEAN_EOF'
-  export NVM_DIR=/config/nvm
-  export npm_config_cache=/config/.gmweb/npm-cache
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  npm cache clean --force 2>&1 | tail -1
-CACHE_CLEAN_EOF
-
-log "  Installing bcrypt (3 retries) as abc user..."
-RETRY=0
-while [ $RETRY -lt 3 ]; do
-  if timeout 30 sudo -u abc bash << 'BCRYPT_INSTALL_EOF'
+  log "Background: Installing bcrypt..."
+  sudo -u abc bash << 'BCRYPT_INSTALL_EOF'
     export NVM_DIR=/config/nvm
     export HOME=/config
     export GMWEB_DIR=/config/.gmweb
     export npm_config_cache=/config/.gmweb/npm-cache
     export npm_config_prefix=/config/.gmweb/npm-global
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-    cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -2
+    cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -3
   BCRYPT_INSTALL_EOF
-  then
-    log "  ✓ bcrypt installed (as abc user)"
-    break
-  fi
-  RETRY=$((RETRY + 1))
-  if [ $RETRY -lt 3 ]; then
-    log "  WARNING: bcrypt install failed, retry $RETRY/3..."
-    sleep 2
-  fi
-done
+  [ $? -eq 0 ] && log "✓ bcrypt installed" || log "WARNING: bcrypt install incomplete"
 
-if [ $RETRY -ge 3 ]; then
-  log "WARNING: bcrypt installation failed after 3 retries (supervisor will retry)"
-fi
+  sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>&1 | tail -1
+  log "Background: Critical module installs complete"
+} >> "$LOG_DIR/startup.log" 2>&1 &
 
-# CRITICAL: Clean npm cache immediately after install
-log "  Cleaning npm cache after bcrypt install..."
-sudo -u abc bash << 'CACHE_CLEAN_EOF'
-  export NVM_DIR=/config/nvm
-  export npm_config_cache=/config/.gmweb/npm-cache
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  npm cache clean --force 2>&1 | tail -1
-CACHE_CLEAN_EOF
-
-log "✓ Critical modules installed (all as abc user)"
+log "✓ Critical modules background install started (supervisor will handle retries)"
 
 log "Installing GitHub CLI (gh) in foreground..."
 sudo apt-get update -qq 2>/dev/null || true
