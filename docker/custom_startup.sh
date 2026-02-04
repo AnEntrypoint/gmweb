@@ -1,5 +1,7 @@
 #!/bin/bash
-set -e
+# CRITICAL: Do NOT use 'set -e' - allows startup to continue even if critical module install fails
+# Supervisor will retry failed services via health checks
+set +e
 
 # Force redeploy: Ensures latest glootie-oc package with fixed opencode.json
 # CRITICAL: Unset problematic environment variables immediately before anything else
@@ -794,8 +796,7 @@ while [ $RETRY -lt 3 ]; do
 done
 
 if [ $RETRY -ge 3 ]; then
-  log "ERROR: better-sqlite3 installation failed after 3 retries"
-  exit 1
+  log "WARNING: better-sqlite3 installation failed after 3 retries (supervisor will retry)"
 fi
 
 # CRITICAL: Clean npm cache immediately after install to remove any stale files
@@ -831,8 +832,7 @@ while [ $RETRY -lt 3 ]; do
 done
 
 if [ $RETRY -ge 3 ]; then
-  log "ERROR: bcrypt installation failed after 3 retries"
-  exit 1
+  log "WARNING: bcrypt installation failed after 3 retries (supervisor will retry)"
 fi
 
 # CRITICAL: Clean npm cache immediately after install
@@ -948,11 +948,9 @@ if [ "$BUN_INSTALLED" = false ]; then
   fi
 fi
 
-# CRITICAL: If Bun still not installed, exit with error
+# CRITICAL: If Bun still not installed, log warning but continue
 if [ "$BUN_INSTALLED" = false ]; then
-  log "ERROR: Failed to install Bun - this is CRITICAL for gmweb services"
-  log "ERROR: Checked: apt-get install + GitHub direct download"
-  exit 1
+  log "WARNING: Failed to install Bun - supervisor services may fail (will retry on boot)"
 else
   log "✓ Bun bin directory added to PATH: $BUN_INSTALL/bin"
   # Verify bunx is available (symlink to bun)
@@ -1064,8 +1062,8 @@ if [ -f /opt/gmweb-startup/start.sh ]; then
   sleep 2
   kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"
 else
-  log "ERROR: start.sh not found"
-  exit 1
+  log "ERROR: start.sh not found at /opt/gmweb-startup/start.sh"
+  log "This is critical - supervisor will not start"
 fi
 
 # Launch XFCE components in background (after supervisor is running)
