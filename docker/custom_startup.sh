@@ -447,15 +447,18 @@ log "Phase 0: Kill all old gmweb processes from previous boots"
 # CRITICAL: On persistent volumes, old processes keep running after container restart
 # Kill all node processes running supervisor, services, or gmweb-related scripts
 # Use stronger kill signals and verify cleanup
-sudo pkill -9 -f "node.*supervisor.js" 2>/dev/null || true
+sudo pkill -9 -f "node.*supervisor" 2>/dev/null || true
 sudo pkill -9 -f "node.*/opt/gmweb-startup" 2>/dev/null || true
+sudo pkill -9 -f "node.*index.js" 2>/dev/null || true
+sudo pkill -9 -f "bunx.*fsbrowse" 2>/dev/null || true
+sudo pkill -9 -f "bunx.*agentgui" 2>/dev/null || true
 sudo pkill -9 -f "ttyd.*9999" 2>/dev/null || true
 # Kill any lingering processes on critical ports (use sudo for fuser)
-sudo fuser -k -9 9997/tcp 9998/tcp 9999/tcp 25808/tcp 8317/tcp 2>/dev/null || true
+sudo fuser -k -9 9997/tcp 9998/tcp 9999/tcp 25808/tcp 8317/tcp 8082/tcp 2>/dev/null || true
 # Wait for processes to fully die
 sleep 3
 # Verify no old processes remain
-if sudo lsof -i :9997 :9998 :9999 :25808 :8317 2>/dev/null | grep -q LISTEN; then
+if sudo lsof -i :9997 :9998 :9999 :25808 :8317 :8082 2>/dev/null | grep -q LISTEN; then
   log "WARNING: Some ports still in use, waiting additional 2s..."
   sleep 2
 fi
