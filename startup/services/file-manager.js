@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 
 const sleep = promisify(setTimeout);
@@ -23,9 +23,8 @@ export default {
        let args = ['fsbrowse@latest'];
        let useFallback = false;
        
-       try {
-         const { execSync: checkCmd } = require('child_process');
-         checkCmd('which bunx', { stdio: 'pipe' });
+        try {
+          execSync('which bunx', { stdio: 'pipe' });
          console.log('[file-manager] ✓ bunx available, using Bun package runner');
        } catch (e) {
          console.log('[file-manager] ⚠ bunx not available, falling back to npx');
