@@ -1,5 +1,6 @@
 import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
+import net from 'net';
 
 const sleep = promisify(setTimeout);
 
@@ -60,12 +61,11 @@ export default {
     };
   },
 
-  async health() {
-    try {
-      // Check if agentgui is listening on the correct port
-      return await new Promise((resolve) => {
-        const net = require('net');
-        const socket = new net.Socket();
+   async health() {
+     try {
+       // Check if agentgui is listening on the correct port
+       return await new Promise((resolve) => {
+         const socket = new net.Socket();
         socket.setTimeout(1000);
         socket.once('connect', () => {
           socket.destroy();
