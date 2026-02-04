@@ -19,7 +19,10 @@ export default {
     const childEnv = {
       ...env,
       HOME: '/config',
-      PORT: String(PORT)
+      PORT: String(PORT),
+      BASE_URL: '/gm',  // agentgui connects to itself via this base path
+      HOT_RELOAD: 'false',  // Disable hot reload in production
+      NODE_ENV: 'production'
     };
 
     // CRITICAL: Clear bunx cache to ensure latest version is downloaded
@@ -33,7 +36,7 @@ export default {
 
     // Start agentgui@latest using bunx with --latest flag to ensure fresh download
     // This spawns the process in background and returns immediately
-    const ps = spawn('bash', ['-c', `PORT=${PORT} bunx --latest agentgui@latest`], {
+    const ps = spawn('bash', ['-c', `PORT=${PORT} BASE_URL=/gm bunx --latest agentgui@latest`], {
       env: childEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
