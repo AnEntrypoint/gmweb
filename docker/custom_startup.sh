@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+# Force redeploy: Ensures latest glootie-oc package with fixed opencode.json
 # CRITICAL: Unset problematic environment variables immediately before anything else
 unset LD_PRELOAD
 unset NPM_CONFIG_PREFIX
