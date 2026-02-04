@@ -167,7 +167,9 @@ log "✓ HTTP Basic Auth configured with valid apr1 hash"
   export GMWEB_DIR=/config/.gmweb
 
   log() {
-    echo "[gmweb-bg-installs] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "/config/logs/startup.log"
+    # Direct append to log file to avoid tee duplication
+    # The background process group (} >> ... 2>&1 &) will capture this to the log file
+    echo "[gmweb-bg-installs] $(date '+%Y-%m-%d %H:%M:%S') $@"
   }
 
   log "Starting background installations (parallel with core setup)..."
@@ -713,7 +715,8 @@ export XDG_RUNTIME_DIR="/run/user/1000"
 export HOME=/config
 
 log() {
-  echo "[xfce-launcher] $(date '+%Y-%m-%d %H:%M:%S') $@" | tee -a "$HOME/logs/startup.log"
+  # Direct echo (background process group handles file redirection)
+  echo "[xfce-launcher] $(date '+%Y-%m-%d %H:%M:%S') $@"
 }
 
 # Wait for XFCE session manager to start (max 30 seconds)
@@ -928,20 +931,20 @@ NPM_CONFIG_PREFIX= bash << 'OPENCODE_INSTALL_EOF'
   export GMWEB_DIR=/config/.gmweb
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-  if [ -f "$GMWEB_DIR/tools/opencode/bin/opencode" ] || command -v opencode &>/dev/null; then
-    echo "  ✓ opencode already installed" | tee -a "/config/logs/startup.log"
-  else
-    mkdir -p "$GMWEB_DIR/tools"
-    if timeout 60 curl -fsSL https://opencode.ai/install | bash 2>&1 | tail -3; then
-      if [ -f "$GMWEB_DIR/tools/opencode/bin/opencode" ] || command -v opencode &>/dev/null; then
-        echo "  ✓ Fresh opencode installed" | tee -a "/config/logs/startup.log"
-      else
-        echo "  WARNING: opencode installer completed but binary not verified" | tee -a "/config/logs/startup.log"
-      fi
-    else
-      echo "  WARNING: opencode installation failed (will retry in background)" | tee -a "/config/logs/startup.log"
-    fi
-  fi
+   if [ -f "$GMWEB_DIR/tools/opencode/bin/opencode" ] || command -v opencode &>/dev/null; then
+     echo "  ✓ opencode already installed"
+   else
+     mkdir -p "$GMWEB_DIR/tools"
+     if timeout 60 curl -fsSL https://opencode.ai/install | bash 2>&1 | tail -3; then
+       if [ -f "$GMWEB_DIR/tools/opencode/bin/opencode" ] || command -v opencode &>/dev/null; then
+         echo "  ✓ Fresh opencode installed"
+       else
+         echo "  WARNING: opencode installer completed but binary not verified"
+       fi
+     else
+       echo "  WARNING: opencode installation failed (will retry in background)"
+     fi
+   fi
 OPENCODE_INSTALL_EOF
 
 # CRITICAL: After subshell completes, verify opencode exists and add to PATH in PARENT shell
