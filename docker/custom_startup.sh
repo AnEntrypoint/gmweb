@@ -333,16 +333,23 @@ export PATH="/config/.gmweb/npm-global/bin:$PATH"
 
 log "✓ Centralized gmweb directory configured at $GMWEB_DIR (system + user + env)"
 
-# CRITICAL: Fix npm cache permissions from previous boots (may have root-owned files)
-# This prevents "EACCES: permission denied" errors when npm operations run as abc user
+# EARLY FIX: Clear npm cache early (before NVM is even set up)
+# Root-owned files from previous boots cause EACCES cascades later
+# We DELETE and recreate to ensure fresh clean state
+log "Phase 0.75: Pre-clearing npm cache directories (prevents root-owned file cascade)..."
 if [ -d "$GMWEB_DIR/npm-cache" ]; then
-  sudo chown -R abc:abc "$GMWEB_DIR/npm-cache" 2>/dev/null || true
+  sudo rm -rf "$GMWEB_DIR/npm-cache" 2>/dev/null || true
+  mkdir -p "$GMWEB_DIR/npm-cache"
+  chmod 777 "$GMWEB_DIR/npm-cache"
+  log "  ✓ npm-cache pre-cleared and recreated with 777 permissions"
 fi
+
 if [ -d "$GMWEB_DIR/npm-global" ]; then
-  sudo chown -R abc:abc "$GMWEB_DIR/npm-global" 2>/dev/null || true
+  sudo rm -rf "$GMWEB_DIR/npm-global" 2>/dev/null || true
+  mkdir -p "$GMWEB_DIR/npm-global"
+  chmod 777 "$GMWEB_DIR/npm-global"
+  log "  ✓ npm-global pre-cleared and recreated with 777 permissions"
 fi
-sudo chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR/npm-cache" 2>/dev/null || true
-sudo chmod -R u+rwX,g+rX,o-rwx "$GMWEB_DIR/npm-global" 2>/dev/null || true
 
 export XDG_RUNTIME_DIR="$RUNTIME_DIR"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus"
@@ -623,9 +630,36 @@ NODE_VERSION=$(node -v | tr -d 'v')
 NPM_VERSION=$(npm -v)
 log "Node.js $NODE_VERSION, npm $NPM_VERSION (NVM_DIR=$NVM_DIR)"
 
+# CRITICAL FIX: Clean and fix npm cache IMMEDIATELY after npm is available
+# This prevents EACCES errors when npm tries to write to cache owned by root
+log "CRITICAL: Fixing npm cache permissions (root-owned files from previous boots)..."
+if [ -d "/config/.gmweb/npm-cache" ]; then
+  # Force remove all cache to ensure clean state (corrupted cache causes cascading errors)
+  sudo rm -rf /config/.gmweb/npm-cache 2>/dev/null || true
+  mkdir -p /config/.gmweb/npm-cache
+  chmod 777 /config/.gmweb/npm-cache
+  log "  ✓ npm cache cleaned and recreated with proper permissions"
+fi
+
+# Also fix npm-global if it has permission issues
+if [ -d "/config/.gmweb/npm-global" ]; then
+  sudo chown -R abc:abc /config/.gmweb/npm-global 2>/dev/null || true
+  sudo chmod -R u+rwX,g+rX,o-rwx /config/.gmweb/npm-global 2>/dev/null || true
+  log "  ✓ npm-global permissions fixed"
+fi
+
+# Clear npm cache to prevent cascading permission errors
+npm cache clean --force 2>&1 | tail -1 || true
+log "✓ npm cache cleaned and fixed"
+
 log "Setting up supervisor..."
 # Clean up temp clone dir
 rm -rf /tmp/gmweb /tmp/_keep_docker_scripts 2>/dev/null || true
+
+# DEFENSIVE: One more npm cache clean right before critical supervisor install
+# This catches any permission issues that may have crept in
+log "Final npm cache verification before supervisor install..."
+npm cache clean --force 2>&1 | tail -1 || true
 
 cd /opt/gmweb-startup && \
   npm install --production --omit=dev 2>&1 | tail -3 && \

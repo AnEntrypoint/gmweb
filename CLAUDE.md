@@ -151,6 +151,27 @@ sleep 2
 1. custom_startup.sh generates early (for race condition safety, even though nginx reload fails silently)
 2. supervisor.js regenerates AFTER confirming nginx is listening
 
+### npm Cache Permissions on Persistent Volumes
+
+**Issue:** When `/config` persists across container restarts, npm cache from previous boots becomes root-owned. When the `abc` user runs npm, permission errors occur:
+```
+npm error syscall mkdir
+npm error path /config/.gmweb/npm-cache/_cacache/index-v5/...
+npm error errno EACCES
+```
+
+**Root Cause:** Previous startup scripts set up npm cache in `/config/.gmweb/npm-cache` but didn't clean it between boots. On persistent volumes, stale root-owned files accumulate. `chown` and `chmod` alone can't fix filesystem corruption across restarts.
+
+**Fix - Three-Layer Defense:**
+
+1. **Early Cleanup (Phase 0.75):** BEFORE NVM is installed, completely delete `/config/.gmweb/{npm-cache,npm-global}` and recreate with 777 permissions.
+2. **Post-NVM Cleanup:** IMMEDIATELY after npm becomes available, delete cache again and run `npm cache clean --force`.
+3. **Pre-Supervisor Cleanup:** Right before installing supervisor, clean npm cache one final time.
+
+All npm install commands happen AFTER cleanup layers.
+
+**Why 777 Permissions:** Temporary measure during boot. npm needs to create subdirectories and cache files as `abc` user. This is safer than trying to fix permissions after npm runs and creates files with restrictive defaults.
+
 ### NVM Bin Directory Permissions
 
 **Issue:** Supervisor runs as `abc` user. NVM bin directory owned by dockremap with 755 (not writable).
