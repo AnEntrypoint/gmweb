@@ -37,8 +37,9 @@ export default {
     // Start agentgui@latest using bunx with --latest flag to ensure fresh download
     // This spawns the process in background and returns immediately
     // CRITICAL: Pass all environment variables through env object, not via bash -c
-    const ps = spawn('bash', ['-c', `PORT=${PORT} BASE_URL=/gm HOT_RELOAD=false NODE_ENV=production bunx --latest agentgui@latest`], {
-      env: childEnv,
+    // The env object is used by spawn to set environment for the child process
+    const ps = spawn('bunx', ['--latest', 'agentgui@latest'], {
+      env: childEnv,  // childEnv already contains BASE_URL, HOT_RELOAD, NODE_ENV, HOME, PORT
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
       cwd: '/config'
