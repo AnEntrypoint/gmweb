@@ -362,3 +362,63 @@ spawn('bunx', ['--latest', 'agentgui@latest'], { env: childEnv })
 This ensures all environment variables in `childEnv` (including `HOT_RELOAD`, `BASE_URL`, `NODE_ENV`) are properly passed to the bunx/agentgui process.
 
 **Verification:** After restart, `/gm/` page no longer includes hot-reload WebSocket injection and page functionality is fully enabled.
+
+## Opencode Plugin Installation
+
+gmweb is installed as an opencode plugin during startup (Phase 1.7) to enable Claude Code agent capabilities. The plugin installation flow:
+
+### How It Works
+
+1. **Directory Setup:** Create `~/.config/opencode/plugin` with proper ownership (abc:abc)
+2. **Repository Copy:** Copy gmweb from `/opt/gmweb-startup` to plugin directory using tar (excludes `node_modules`, `.git`, logs)
+3. **Permission Fixing:** Ensure abc user can read/write all plugin files
+4. **Dependency Install:** Run `bun install` in the plugin directory to install dependencies
+
+### Technical Details
+
+**Copy Method:** Uses tar to exclude stale/large directories:
+```bash
+(cd /opt/gmweb-startup && tar --exclude='node_modules' --exclude='.git' \
+  --exclude='*.log' --exclude='.bun' -cf - .) | \
+  (cd "$OPENCODE_PLUGIN_DIR" && tar -xf -)
+```
+
+**Why tar over cp/rsync:**
+- More reliable with complex exclude patterns
+- Preserves file attributes during copy
+- Atomic operation (pipe creates output as destination receives input)
+- Works consistently across all systems (no rsync dependency)
+
+**Permission Flow:**
+- Plugin directory created with 755 (rwxr-xr-x)
+- Files set to 660 (rw-rw---- group-readable)
+- Directories set to 750 (rwxr-x---)
+- Ensures abc user can execute scripts and access files
+
+**Bun Install Execution:**
+- Runs as abc user (not root) to avoid permission issues
+- Sets BUN_INSTALL and PATH environment variables
+- 120-second timeout to prevent hanging
+- Non-blocking: if Bun install fails, startup continues (plugin can be manually installed later)
+
+### Manual Plugin Installation
+
+If plugin installation fails during startup, manually install with:
+```bash
+cd ~/.config/opencode/plugin
+bun install
+```
+
+### Troubleshooting
+
+**Problem:** Plugin directory doesn't exist or is empty
+- **Cause:** /opt/gmweb-startup not found or copy failed
+- **Fix:** Verify git clone completed successfully and /opt/gmweb-startup contains startup files
+
+**Problem:** "bun install failed" warning
+- **Cause:** Bun not available or permission issues
+- **Fix:** Manually run `cd ~/.config/opencode/plugin && bun install` after container boots
+
+**Problem:** Plugin files have wrong permissions
+- **Cause:** tar copy preserved restrictive permissions from source
+- **Fix:** Run `chmod -R u+rwX,g+rX,o-rwx ~/.config/opencode/plugin`

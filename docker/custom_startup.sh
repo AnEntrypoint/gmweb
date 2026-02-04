@@ -941,6 +941,72 @@ else
   log "WARNING: opencode not found, will proceed without it"
 fi
 
+log "Phase 1.7: Install gmweb as opencode plugin (BLOCKING - required for Claude Code integration)"
+# CRITICAL: Install gmweb repository as opencode plugin
+# This allows Claude Code to load gmweb as a plugin for agent capabilities
+OPENCODE_PLUGIN_DIR="$HOME_DIR/.config/opencode/plugin"
+log "  Creating opencode plugin directory: $OPENCODE_PLUGIN_DIR"
+mkdir -p "$OPENCODE_PLUGIN_DIR"
+chown abc:abc "$OPENCODE_PLUGIN_DIR"
+chmod 755 "$OPENCODE_PLUGIN_DIR"
+
+# Copy gmweb repo to plugin directory (it's already cloned in /opt/gmweb-startup)
+# We'll use tar to copy everything except node_modules and .git (safer than cp -r with excludes)
+if [ -d /opt/gmweb-startup ]; then
+  log "  Copying gmweb from /opt/gmweb-startup to plugin directory..."
+  
+  # Use tar with exclude patterns (more reliable than rsync/cp with --exclude)
+  # This preserves file attributes while skipping large/stale directories
+  (cd /opt/gmweb-startup && tar --exclude='node_modules' --exclude='.git' \
+    --exclude='*.log' --exclude='.bun' -cf - .) | \
+    (cd "$OPENCODE_PLUGIN_DIR" && tar -xf -) 2>&1 | tail -1
+  
+  if [ $? -eq 0 ]; then
+    log "✓ gmweb copied to plugin directory"
+  else
+    log "WARNING: gmweb copy failed, attempting with cp -r as fallback..."
+    cp -r /opt/gmweb-startup/* "$OPENCODE_PLUGIN_DIR/" 2>/dev/null && \
+      log "✓ gmweb copied with cp (fallback)" || \
+      log "ERROR: Failed to copy gmweb to plugin directory"
+  fi
+else
+  log "WARNING: /opt/gmweb-startup not found, skipping gmweb plugin copy"
+fi
+
+# Install plugin dependencies with Bun (CRITICAL: Bun must be available)
+if [ -d "$OPENCODE_PLUGIN_DIR" ] && [ -f "$OPENCODE_PLUGIN_DIR/package.json" ]; then
+  log "  Installing opencode plugin dependencies with Bun..."
+  
+  # Ensure proper permissions before bun install
+  chown -R abc:abc "$OPENCODE_PLUGIN_DIR" 2>/dev/null || true
+  chmod -R u+rwX,g+rX,o-rwx "$OPENCODE_PLUGIN_DIR" 2>/dev/null || true
+  
+  # CRITICAL: bun must be available (installed in Phase 1.5)
+  if ! command -v bun &>/dev/null && [ -f "$BUN_INSTALL/bin/bun" ]; then
+    export PATH="$BUN_INSTALL/bin:$PATH"
+  fi
+  
+  if command -v bun &>/dev/null; then
+    # Run bun install in plugin directory as abc user
+    (
+      cd "$OPENCODE_PLUGIN_DIR" && \
+      timeout 120 sudo -u abc HOME=/config bash << 'BUN_INSTALL_EOF'
+        export BUN_INSTALL=/config/.gmweb/cache/.bun
+        export PATH="$BUN_INSTALL/bin:$PATH"
+        bun install 2>&1 | tail -5
+      BUN_INSTALL_EOF
+    ) && log "✓ opencode plugin dependencies installed with Bun" || \
+      log "WARNING: bun install failed, plugin may not be fully functional"
+  else
+    log "WARNING: Bun not available, skipping plugin dependency installation"
+    log "  (plugin can be manually installed with: cd $OPENCODE_PLUGIN_DIR && bun install)"
+  fi
+else
+  log "WARNING: Plugin directory or package.json not found, skipping plugin setup"
+fi
+
+log "Phase 1.7 complete - opencode plugin ready (or will retry in background)"
+
 log "Starting supervisor..."
 if [ -f /opt/gmweb-startup/start.sh ]; then
   # CRITICAL: Do NOT pass npm_config_prefix/NPM_CONFIG_PREFIX to supervisor
