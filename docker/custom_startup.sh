@@ -775,25 +775,25 @@ sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
 {
   log "Background: Installing better-sqlite3..."
   sudo -u abc bash << 'SQLITE_INSTALL_EOF'
-    export NVM_DIR=/config/nvm
-    export HOME=/config
-    export npm_config_cache=/config/.gmweb/npm-cache
-    export npm_config_prefix=/config/.gmweb/npm-global
-    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-    npm install -g better-sqlite3 2>&1 | tail -3
-  SQLITE_INSTALL_EOF
+export NVM_DIR=/config/nvm
+export HOME=/config
+export npm_config_cache=/config/.gmweb/npm-cache
+export npm_config_prefix=/config/.gmweb/npm-global
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+npm install -g better-sqlite3 2>&1 | tail -3
+SQLITE_INSTALL_EOF
   [ $? -eq 0 ] && log "✓ better-sqlite3 installed" || log "WARNING: better-sqlite3 install incomplete"
 
   log "Background: Installing bcrypt..."
   sudo -u abc bash << 'BCRYPT_INSTALL_EOF'
-    export NVM_DIR=/config/nvm
-    export HOME=/config
-    export GMWEB_DIR=/config/.gmweb
-    export npm_config_cache=/config/.gmweb/npm-cache
-    export npm_config_prefix=/config/.gmweb/npm-global
-    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-    cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -3
-  BCRYPT_INSTALL_EOF
+export NVM_DIR=/config/nvm
+export HOME=/config
+export GMWEB_DIR=/config/.gmweb
+export npm_config_cache=/config/.gmweb/npm-cache
+export npm_config_prefix=/config/.gmweb/npm-global
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -3
+BCRYPT_INSTALL_EOF
   [ $? -eq 0 ] && log "✓ bcrypt installed" || log "WARNING: bcrypt install incomplete"
 
   sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>&1 | tail -1
@@ -972,10 +972,10 @@ if [ -d "$GLOOTIE_PLUGIN_DIR" ]; then
   (
     cd "$GLOOTIE_PLUGIN_DIR" && \
     timeout 120 sudo -u abc bash << 'NPM_INSTALL_EOF'
-      export HOME=/config
-      export PATH="/config/.gmweb/npm-global/bin:/config/nvm/versions/node/$(ls /config/nvm/versions/node | tail -1)/bin:$PATH"
-      npm install glootie-oc@latest 2>&1 | tail -5
-    NPM_INSTALL_EOF
+export HOME=/config
+export PATH="/config/.gmweb/npm-global/bin:/config/nvm/versions/node/$(ls /config/nvm/versions/node | tail -1)/bin:$PATH"
+npm install glootie-oc@latest 2>&1 | tail -5
+NPM_INSTALL_EOF
   ) && log "✓ glootie-oc plugin installed from npm" || \
     log "WARNING: npm install glootie-oc failed, plugin may not be fully functional"
 else
