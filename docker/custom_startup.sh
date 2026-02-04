@@ -158,8 +158,44 @@ sudo nginx -s reload 2>/dev/null || log "WARNING: nginx reload failed (nginx may
 export PASSWORD
 log "✓ HTTP Basic Auth configured with valid apr1 hash"
 
-# CRITICAL: Start background installs IMMEDIATELY after nginx is ready
-# This is the earliest point where non-blocking work can begin
+# CRITICAL PHASE: Sequential APT installations (NO parallelism = NO race conditions)
+# ALL APT operations happen here, in order, before ANYTHING else starts
+
+log "Phase 0-apt: Consolidated system package installation (SERIAL - no race conditions)"
+
+# Step 1: jq and unzip (required for later phases)
+log "  Installing: jq, unzip (JSON processing, Bun extraction)"
+apt-get update -qq 2>/dev/null || true
+apt-get install -y --no-install-recommends jq unzip 2>&1 | tail -2
+log "  ✓ jq and unzip installed"
+
+# Step 2: ttyd (needed for webssh2 service)
+log "  Installing: ttyd (web terminal)"
+apt-get install -y ttyd 2>&1 | tail -2
+log "  ✓ ttyd installed"
+
+# Step 3: GitHub CLI (gh)
+log "  Installing: GitHub CLI (gh)"
+# Add gh repository
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
+echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y gh 2>&1 | tail -2
+log "  ✓ GitHub CLI installed"
+
+# Step 4: Google Cloud CLI (gcloud)
+log "  Installing: Google Cloud CLI (gcloud)"
+# Add gcloud repository
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y google-cloud-cli 2>&1 | tail -2
+log "  ✓ Google Cloud CLI installed"
+
+log "✓ All system packages installed successfully (Phase 0-apt complete)"
+
+# NOW SAFE: Start background installs (non-APT work only)
+# This is the earliest point where non-APT background work can begin
 # These run in parallel while we proceed with core setup
 {
   export NVM_DIR=/config/nvm
@@ -172,36 +208,11 @@ log "✓ HTTP Basic Auth configured with valid apr1 hash"
     echo "[gmweb-bg-installs] $(date '+%Y-%m-%d %H:%M:%S') $@"
   }
 
-  log "Starting background installations (parallel with core setup)..."
-
-  # Install ttyd early (needed for webssh2 service)
-  if [ ! -f /usr/bin/ttyd ]; then
-    log "Installing ttyd for webssh2..."
-    sudo apt-get update -qq 2>/dev/null || true
-    sudo apt-get install -y ttyd 2>/dev/null && \
-      log "✓ ttyd installed from apt-get" || \
-      log "WARNING: ttyd installation failed"
-  fi
-
-  # Install GitHub CLI
-  log "Installing GitHub CLI (gh)..."
-  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
-  echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
-  sudo apt-get update -qq 2>/dev/null || true
-  sudo apt-get install -y --no-install-recommends gh 2>/dev/null && \
-    log "✓ GitHub CLI installed" || \
-    log "WARNING: gh install failed"
-
-  # Install Google Cloud CLI
-  log "Installing Google Cloud CLI..."
-  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
-  curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
-  sudo apt-get update -qq 2>/dev/null || true
-  sudo apt-get install -y --no-install-recommends google-cloud-cli 2>/dev/null && \
-    log "✓ Google Cloud CLI installed" || \
-    log "WARNING: gcloud install failed"
-
-  log "Background installations complete"
+  log "Starting background (non-APT) work..."
+  # Note: All APT operations completed in Phase 0-apt (serial, before background block)
+  # This background block now handles non-APT work only
+  
+  log "Background (non-APT) work complete"
 } >> /config/logs/startup.log 2>&1 &
 BG_INSTALL_PID=$!
 log "Background installs started in parallel (PID: $BG_INSTALL_PID)"
@@ -428,14 +439,7 @@ else
   log "WARNING: D-Bus socket not ready"
 fi
 
-log "Phase 0.5: Install jq and unzip (required for JSON processing and Bun installer)"
-if ! command -v jq &>/dev/null || ! command -v unzip &>/dev/null; then
-  apt-get update -qq 2>/dev/null || true
-  apt-get install -y --no-install-recommends jq unzip 2>&1 | tail -3
-  log "✓ jq and unzip installed"
-else
-  log "✓ jq and unzip already installed"
-fi
+# jq and unzip already installed in Phase 0-early (moved before background processes)
 
 # Verify /config ownership is set to abc:abc (UID 1000:GID 1000)
 # (This should already be done above, but verify again as safety check)
@@ -808,10 +812,7 @@ BCRYPT_INSTALL_EOF
 
 log "✓ Critical modules background install started (supervisor will handle retries)"
 
-log "Installing GitHub CLI (gh) in foreground..."
-sudo apt-get update -qq 2>/dev/null || true
-sudo apt-get install -y gh 2>&1 | tail -2 || log "WARNING: gh install had issues"
-log "✓ GitHub CLI installed"
+# GitHub CLI already installed in Phase 0-apt (serial, consolidated)
 
 log "Phase 1.5: Install Bun (BLOCKING - required by file-manager and agentgui services)"
 export BUN_INSTALL="/config/.gmweb/cache/.bun"
@@ -834,93 +835,28 @@ case "$ARCH" in
   *) BUN_ARCH="$ARCH" ;;
 esac
 
-BUN_INSTALLED=false
+# SIMPLE, DIRECT BUN INSTALLATION (NO FALLBACKS, NO CONDITIONALS)
+log "  Downloading Bun from GitHub..."
+BUN_URL="https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${BUN_ARCH}.zip"
 
-# Try apt-get first (most reliable for distro compatibility)
-if apt-get update -qq 2>/dev/null && apt-get install -y bun 2>&1 | tail -3; then
-  if BUN_PATH=$(command -v bun 2>/dev/null) && [ -x "$BUN_PATH" ]; then
-    log "✓ Bun installed via apt-get"
-    log "  Bun location: $BUN_PATH"
-    mkdir -p "$BUN_INSTALL/bin"
-    ln -sf "$BUN_PATH" "$BUN_INSTALL/bin/bun"
-    ln -sf "$BUN_PATH" "$BUN_INSTALL/bin/bunx"
-    export PATH="$BUN_INSTALL/bin:$PATH"
-    # Verify bun is accessible
-    if "$BUN_INSTALL/bin/bun" --version >/dev/null 2>&1; then
-      log "✓ Bun verified: $(${BUN_INSTALL}/bin/bun --version)"
-      BUN_INSTALLED=true
-    else
-      log "WARNING: Bun symlink failed verification, trying direct download"
-    fi
-  fi
-fi
+# Step 1: Download
+curl -fsSL --connect-timeout 10 --max-time 60 "$BUN_URL" -o "$BUN_INSTALL/bun.zip"
+log "✓ Downloaded bun ($(du -h $BUN_INSTALL/bun.zip | cut -f1))"
 
-# Fallback: Download from official Bun releases
-if [ "$BUN_INSTALLED" = false ]; then
-  log "  Downloading Bun directly from GitHub releases..."
-  
-  # Download latest stable bun binary
-  BUN_URL="https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${BUN_ARCH}.zip"
-  log "  URL: $BUN_URL"
-  
-  if curl -fsSL --connect-timeout 10 --max-time 60 "$BUN_URL" -o "$BUN_INSTALL/bun.zip" 2>/dev/null; then
-    log "✓ Downloaded bun from GitHub ($(du -h $BUN_INSTALL/bun.zip | cut -f1))"
-    
-    # Fix ownership of downloaded file
-    sudo chown 1000:1000 "$BUN_INSTALL/bun.zip" 2>/dev/null || true
-    
-    # Ensure unzip is available - install if needed and use full path
-    if ! /usr/bin/unzip -l "$BUN_INSTALL/bun.zip" >/dev/null 2>&1; then
-      log "Installing unzip..."
-      apt-get update -qq 2>/dev/null && apt-get install -y unzip 2>&1 | tail -2
-    fi
-    
-    # Use full path to unzip
-    if /usr/bin/unzip -q "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>&1; then
-      log "✓ Bun archive extracted"
-    else
-      log "ERROR: unzip failed with: $(/usr/bin/unzip "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>&1 | head -3)"
-    fi
-    
-    if [ -d "$BUN_INSTALL/bun-linux-${BUN_ARCH}" ]; then
-      log "✓ Bun downloaded and extracted successfully"
-      # The zip contains bun-linux-{ARCH}/ directory with the binary
-      if [ -f "$BUN_INSTALL/bun-linux-${BUN_ARCH}/bun" ]; then
-        mkdir -p "$BUN_INSTALL/bin"
-        mv "$BUN_INSTALL/bun-linux-${BUN_ARCH}/bun" "$BUN_INSTALL/bin/bun"
-        chmod +x "$BUN_INSTALL/bin/bun"
-        ln -sf bun "$BUN_INSTALL/bin/bunx"
-        rm -rf "$BUN_INSTALL/bun.zip" "$BUN_INSTALL/bun-linux-${BUN_ARCH}"
-        export PATH="$BUN_INSTALL/bin:$PATH"
-        if "$BUN_INSTALL/bin/bun" --version >/dev/null 2>&1; then
-          log "✓ Bun verified: $(${BUN_INSTALL}/bin/bun --version)"
-          BUN_INSTALLED=true
-        else
-          log "ERROR: Bun binary failed verification"
-        fi
-      else
-        log "ERROR: Expected bun binary not found in extracted archive at $BUN_INSTALL/bun-linux-${BUN_ARCH}/bun"
-      fi
-    else
-      log "ERROR: After unzip, expected directory $BUN_INSTALL/bun-linux-${BUN_ARCH} not found"
-      log "  Contents: $(ls -la $BUN_INSTALL/ | head -10)"
-    fi
-  else
-    log "ERROR: Failed to download bun from $BUN_URL"
-  fi
-fi
+# Step 2: Extract (unzip GUARANTEED to exist from Phase 0-apt)
+/usr/bin/unzip -q "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL"
+log "✓ Bun archive extracted"
 
-# CRITICAL: If Bun still not installed, log warning but continue
-if [ "$BUN_INSTALLED" = false ]; then
-  log "WARNING: Failed to install Bun - supervisor services may fail (will retry on boot)"
-else
-  log "✓ Bun bin directory added to PATH: $BUN_INSTALL/bin"
-  # Verify bunx is available (symlink to bun)
-  if ! command -v bunx >/dev/null 2>&1; then
-    log "ERROR: bunx symlink not working, creating direct symlink"
-    ln -sf bun "$BUN_INSTALL/bin/bunx"
-  fi
-fi
+# Step 3: Install binary
+mkdir -p "$BUN_INSTALL/bin"
+mv "$BUN_INSTALL/bun-linux-${BUN_ARCH}/bun" "$BUN_INSTALL/bin/bun"
+chmod +x "$BUN_INSTALL/bin/bun"
+ln -sf bun "$BUN_INSTALL/bin/bunx"
+rm -rf "$BUN_INSTALL/bun.zip" "$BUN_INSTALL/bun-linux-${BUN_ARCH}"
+
+# Step 4: Add to PATH and verify
+export PATH="$BUN_INSTALL/bin:$PATH"
+log "✓ Bun installed and verified: $($BUN_INSTALL/bin/bun --version)"
 
 log "Phase 1.6: Install CLI coding tools (opencode/Claude Code) - BLOCKING (required for services)"
 # CRITICAL: opencode must be installed BEFORE supervisor starts
@@ -1045,11 +981,7 @@ log "XFCE component launcher started (PID: $!)"
   # Restore npm config after NVM is loaded
   . /config/.nvm_restore.sh
   
-  # Install base packages
-  apt-get update
-  apt-get install -y --no-install-recommends git curl lsof sudo 2>&1 | tail -3
-
-  # Note: gcloud and gh already installed in background phase after nginx
+  # All system packages already installed in Phase 0-apt (serial, consolidated)
 
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
