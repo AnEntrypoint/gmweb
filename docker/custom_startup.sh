@@ -810,19 +810,23 @@ if [ "$BUN_INSTALLED" = false ]; then
   if curl -fsSL --connect-timeout 10 --max-time 60 "$BUN_URL" -o "$BUN_INSTALL/bun.zip" 2>/dev/null; then
     log "✓ Downloaded bun from GitHub ($(du -h $BUN_INSTALL/bun.zip | cut -f1))"
     
-    # Verify unzip is available
-    if ! command -v unzip &>/dev/null; then
-      log "ERROR: unzip command not found in PATH"
-      log "  Attempting to reinstall unzip..."
+    # Fix ownership of downloaded file
+    sudo chown 1000:1000 "$BUN_INSTALL/bun.zip" 2>/dev/null || true
+    
+    # Ensure unzip is available - install if needed and use full path
+    if ! /usr/bin/unzip -l "$BUN_INSTALL/bun.zip" >/dev/null 2>&1; then
+      log "Installing unzip..."
       apt-get update -qq 2>/dev/null && apt-get install -y unzip 2>&1 | tail -2
-      if ! command -v unzip &>/dev/null; then
-        log "ERROR: Could not install unzip, cannot extract bun.zip"
-      fi
     fi
     
-    if unzip -q "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>&1 | grep -q "error\|Error"; then
-      log "ERROR: unzip failed with: $(unzip "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>&1 | head -3)"
-    elif [ -d "$BUN_INSTALL/bun-linux-${BUN_ARCH}" ]; then
+    # Use full path to unzip
+    if /usr/bin/unzip -q "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>&1; then
+      log "✓ Bun archive extracted"
+    else
+      log "ERROR: unzip failed with: $(/usr/bin/unzip "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL" 2>&1 | head -3)"
+    fi
+    
+    if [ -d "$BUN_INSTALL/bun-linux-${BUN_ARCH}" ]; then
       log "✓ Bun downloaded and extracted successfully"
       # The zip contains bun-linux-{ARCH}/ directory with the binary
       if [ -f "$BUN_INSTALL/bun-linux-${BUN_ARCH}/bun" ]; then
