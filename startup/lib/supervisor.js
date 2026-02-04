@@ -234,6 +234,9 @@ export class Supervisor {
       execSync(`sudo chown -R abc:abc "${homeDir}/logs" 2>/dev/null || true`, { stdio: 'pipe' });
       execSync(`sudo chown -R abc:abc "${homeDir}/workspace" 2>/dev/null || true`, { stdio: 'pipe' });
       execSync(`sudo chown abc:abc "${homeDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+      // CRITICAL: Fix npm cache permission issues - npm leaves root-owned files sometimes
+      execSync(`sudo chown -R abc:abc "${homeDir}/.gmweb/npm-cache" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chown -R abc:abc "${homeDir}/.gmweb/npm-global" 2>/dev/null || true`, { stdio: 'pipe' });
       this.logger.log('INFO', 'Fixed ownership on critical directories');
     } catch (e) {
       this.logger.log('WARN', `Could not fix ownership: ${e.message}`);
@@ -248,6 +251,9 @@ export class Supervisor {
       execSync(`sudo chmod 750 "${homeDir}/.tmp" 2>/dev/null || true`, { stdio: 'pipe' });
       execSync(`sudo chmod 755 "${homeDir}/logs" 2>/dev/null || true`, { stdio: 'pipe' });
       execSync(`sudo chmod 755 "${homeDir}/workspace" 2>/dev/null || true`, { stdio: 'pipe' });
+      // CRITICAL: Fix npm cache permissions - must be 755 for abc user to write
+      execSync(`sudo chmod -R 755 "${homeDir}/.gmweb/npm-cache" 2>/dev/null || true`, { stdio: 'pipe' });
+      execSync(`sudo chmod -R 755 "${homeDir}/.gmweb/npm-global" 2>/dev/null || true`, { stdio: 'pipe' });
       this.logger.log('INFO', 'Set permissions on critical directories');
     } catch (e) {
       this.logger.log('WARN', `Could not set permissions: ${e.message}`);
