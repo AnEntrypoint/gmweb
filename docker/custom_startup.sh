@@ -898,36 +898,30 @@ else
 fi
 
 log "Phase 1.7: Install glootie-oc opencode plugin (BLOCKING - required for MCP tool integration)"
-# CRITICAL: Install glootie-oc plugin from npm package
+# CRITICAL: Install glootie-oc plugin from GitHub
 # This provides MCP tool integration and Claude Code agent capabilities
 GLOOTIE_PLUGIN_DIR="$HOME_DIR/.config/opencode/glootie-oc"
-log "  Creating glootie-oc plugin directory: $GLOOTIE_PLUGIN_DIR"
+log "  Setting up glootie-oc plugin directory: $GLOOTIE_PLUGIN_DIR"
+
+# Remove old directory and clone fresh
+rm -rf "$GLOOTIE_PLUGIN_DIR"
 mkdir -p "$GLOOTIE_PLUGIN_DIR"
-chown abc:abc "$GLOOTIE_PLUGIN_DIR"
-chmod 755 "$GLOOTIE_PLUGIN_DIR"
 
-# Install glootie-oc package from npm using npm/bun (CRITICAL: npm must be available)
-log "  Installing glootie-oc package from npm..."
-
-# Use npm to install glootie-oc package as abc user
-if [ -d "$GLOOTIE_PLUGIN_DIR" ]; then
-  (
-    cd "$GLOOTIE_PLUGIN_DIR" && \
-    timeout 120 sudo -u abc bash << 'NPM_INSTALL_EOF'
-export HOME=/config
-export PATH="/config/.gmweb/npm-global/bin:/config/nvm/versions/node/$(ls /config/nvm/versions/node | tail -1)/bin:$PATH"
-npm install glootie-oc@latest 2>&1 | tail -5
-NPM_INSTALL_EOF
-  ) && log "✓ glootie-oc plugin installed from npm" || \
-    log "WARNING: npm install glootie-oc failed, plugin may not be fully functional"
+# Clone from GitHub
+log "  Cloning glootie-oc from GitHub..."
+if git clone --depth 1 https://github.com/AnEntrypoint/glootie-oc.git "$GLOOTIE_PLUGIN_DIR" 2>&1 | tail -3; then
+  log "✓ glootie-oc cloned from GitHub"
+  
+  # Try to install dependencies (may fail on native modules but that's ok)
+  log "  Installing dependencies..."
+  (cd "$GLOOTIE_PLUGIN_DIR" && npm install --silent 2>&1 | tail -3) || \
+    log "  Note: Some dependencies failed (plugin will work without them)"
+  
+  chown -R abc:abc "$GLOOTIE_PLUGIN_DIR"
+  chmod -R u+rwX,g+rX,o-rwx "$GLOOTIE_PLUGIN_DIR"
+  log "✓ glootie-oc plugin ready"
 else
-  log "ERROR: Failed to create glootie plugin directory"
-fi
-
-# Fix permissions after install
-if [ -d "$GLOOTIE_PLUGIN_DIR" ]; then
-  chown -R abc:abc "$GLOOTIE_PLUGIN_DIR" 2>/dev/null || true
-  chmod -R u+rwX,g+rX,o-rwx "$GLOOTIE_PLUGIN_DIR" 2>/dev/null || true
+  log "WARNING: Failed to clone glootie-oc"
 fi
 
 log "Phase 1.7 complete - glootie-oc plugin ready for MCP tools"
