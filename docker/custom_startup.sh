@@ -430,18 +430,13 @@ sudo -u abc DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
   dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --print-address 2>/dev/null &
 DBUS_DAEMON_PID=$!
 
-for i in {1..10}; do
-  if [ -S "$RUNTIME_DIR/bus" ]; then
-    log "D-Bus session socket ready (attempt $i/10)"
-    break
-  fi
-  sleep 0.5
-done
+# Wait for D-Bus to be ready (one strategic sleep - socket creation is fast)
+sleep 1
 
 if [ -S "$RUNTIME_DIR/bus" ]; then
-  log "D-Bus session initialized"
+  log "✓ D-Bus session initialized"
 else
-  log "WARNING: D-Bus socket not ready"
+  log "WARNING: D-Bus socket not ready (will continue - system may still work)"
 fi
 
 # jq and unzip already installed in Phase 0-early (BLOCKING phase before Bun installation)
@@ -468,32 +463,31 @@ sudo rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
 
 sudo mkdir -p /opt/gmweb-startup
 
+# Ensure network is ready - one attempt with timeout
+log "  Verifying network connectivity..."
+if timeout 10 curl -fsSL --connect-timeout 5 https://api.github.com/users/AnEntrypoint >/dev/null 2>&1; then
+  log "  ✓ Network verified"
+else
+  log "  WARNING: Network check failed, attempting clone anyway (may timeout)"
+fi
+
 # Clone with minimal history and data - much faster
 # --depth 1: no history
 # --filter=blob:none: only get tree/commit objects, fetch blobs on demand (even smaller)
 # --single-branch: only main branch
-CLONE_RETRY=0
-CLONE_MAX_RETRY=3
-while [ $CLONE_RETRY -lt $CLONE_MAX_RETRY ]; do
-  rm -rf /tmp/gmweb 2>/dev/null || true
-  if timeout 120 git clone --depth 1 --filter=blob:none --single-branch --branch main \
-    https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3; then
-    if [ -d /tmp/gmweb/startup ]; then
-      log "✓ Git clone succeeded (attempt $((CLONE_RETRY + 1))/$CLONE_MAX_RETRY)"
-      break
-    fi
-  fi
-  CLONE_RETRY=$((CLONE_RETRY + 1))
-  if [ $CLONE_RETRY -lt $CLONE_MAX_RETRY ]; then
-    log "WARNING: Git clone failed, retrying (attempt $((CLONE_RETRY + 1))/$CLONE_MAX_RETRY)..."
-    sleep $((CLONE_RETRY * 5))
-  fi
-done
-
-if [ ! -d /tmp/gmweb/startup ]; then
-  log "ERROR: Git clone failed after $CLONE_MAX_RETRY attempts, startup files missing"
+rm -rf /tmp/gmweb 2>/dev/null || true
+if ! timeout 120 git clone --depth 1 --filter=blob:none --single-branch --branch main \
+  https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3; then
+  log "ERROR: Git clone failed (network or GitHub unavailable)"
   exit 1
 fi
+
+if [ ! -d /tmp/gmweb/startup ]; then
+  log "ERROR: Git clone completed but startup directory missing"
+  exit 1
+fi
+
+log "✓ Git clone succeeded"
 
 cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
 cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
@@ -717,20 +711,17 @@ log() {
   echo "[xfce-launcher] $(date '+%Y-%m-%d %H:%M:%S') $@"
 }
 
-# Wait for XFCE session manager to start (max 30 seconds)
-for i in {1..30}; do
-  if pgrep -u abc xfce4-session >/dev/null 2>&1; then
-    log "XFCE session detected (attempt $i/30)"
-    sleep 2  # Give session a moment to stabilize
-    break
-  fi
-  sleep 1
-done
+# Give XFCE session a moment to start (s6 manages it independently)
+# XFCE is started by s6-rc service manager, not by this script
+sleep 15
 
 if ! pgrep -u abc xfce4-session >/dev/null 2>&1; then
-  log "WARNING: XFCE session manager not detected after 30s, skipping component launch"
+  log "NOTE: XFCE session manager not running (desktop components skipped)"
   exit 0
 fi
+
+log "XFCE session detected, launching components..."
+sleep 2  # Give session a moment to stabilize
 
 # Launch XFCE components (they may already be running, that's OK)
 log "Launching XFCE desktop components..."
