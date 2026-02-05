@@ -175,42 +175,37 @@ fi
 export PASSWORD
 log "✓ HTTP Basic Auth configured and nginx started"
 
-# CRITICAL PHASE: Early APT installations (BLOCKING - required before Bun installation)
-# These MUST complete before we proceed to Bun installation
-log "Phase 0-early: Install critical tools (unzip, jq) needed before Bun"
+# CRITICAL PHASE 0-apt: Consolidated APT installations
+# ALL system packages installed at once before anything else
+# This is BLOCKING and required before Bun installation
+log "Phase 0-apt: Consolidated system package installation (BLOCKING - required for Bun and services)"
 apt-get update -qq 2>/dev/null || true
-apt-get install -y --no-install-recommends unzip jq 2>&1 | tail -2
-log "✓ Phase 0-early complete - unzip and jq installed"
 
-# CRITICAL PHASE: Sequential APT installations (NO parallelism = NO race conditions)
-# Remaining APT operations deferred to background
+# Install all packages together: core tools + ttyd + gh + gcloud dependencies
+log "  Installing: unzip jq ttyd"
+apt-get install -y --no-install-recommends unzip jq ttyd 2>&1 | tail -2
+log "  ✓ Core packages installed (unzip, jq, ttyd)"
 
-log "Phase 0-apt: Remaining system packages deferred to background (after supervisor starts)"
-log "  Note: ttyd, gh, gcloud will be installed in parallel background process"
-log "  Services use health checks to retry if packages not available yet"
+# Add and install GitHub CLI (gh)
+log "  Adding GitHub CLI repository and installing gh"
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
+echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y gh 2>&1 | tail -2
+log "  ✓ GitHub CLI (gh) installed"
 
-# NOW SAFE: Start background installs (non-APT work only)
-# This is the earliest point where non-APT background work can begin
-# These run in parallel while we proceed with core setup
-{
-  export NVM_DIR=/config/nvm
-  export HOME=/config
-  export GMWEB_DIR=/config/.gmweb
+# Add and install Google Cloud CLI (gcloud)
+log "  Adding Google Cloud repository and installing gcloud"
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y google-cloud-cli 2>&1 | tail -2
+log "  ✓ Google Cloud CLI (gcloud) installed"
 
-  log() {
-    # Direct append to log file to avoid tee duplication
-    # The background process group (} >> ... 2>&1 &) will capture this to the log file
-    echo "[gmweb-bg-installs] $(date '+%Y-%m-%d %H:%M:%S') $@"
-  }
+log "✓ Phase 0-apt complete - all system packages installed (unzip, jq, ttyd, gh, gcloud)"
 
-  log "Starting background (non-APT) work..."
-  # Note: All APT operations completed in Phase 0-apt (serial, before background block)
-  # This background block now handles non-APT work only
-  
-  log "Background (non-APT) work complete"
-} >> /config/logs/startup.log 2>&1 &
-BG_INSTALL_PID=$!
-log "Background installs started in parallel (PID: $BG_INSTALL_PID)"
+# APT installation is now complete and blocking is done
+# Proceed with remaining setup
 
 # Note: .bashrc and .profile are no longer used - environment is set via beforestart hook
 
@@ -979,39 +974,7 @@ fi
 bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1 &
 log "XFCE component launcher started (PID: $!)"
 
-# Phase 0-apt: System package installation in background (non-blocking)
-# CRITICAL: These packages (jq, unzip, ttyd, gh, gcloud) run in background so supervisor starts faster
-# Services use health checks to retry if packages not available yet
-# This optimization reduces supervisor startup time from 60+s to 30s
-{
-  log "Background Phase 0-apt: Starting system package installation (unzip/jq already in Phase 0-early)"
-
-  # Step 1: ttyd (needed for webssh2 service)
-  log "  Background: Installing ttyd (web terminal)"
-  apt-get install -y ttyd 2>&1 | tail -2
-  log "  ✓ Background: ttyd installed"
-
-  # Step 3: GitHub CLI (gh)
-  log "  Background: Installing GitHub CLI (gh)"
-  # Add gh repository
-  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
-  echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
-  apt-get update -qq 2>/dev/null || true
-  apt-get install -y gh 2>&1 | tail -2
-  log "  ✓ Background: GitHub CLI installed"
-
-  # Step 4: Google Cloud CLI (gcloud)
-  log "  Background: Installing Google Cloud CLI (gcloud)"
-  # Add gcloud repository
-  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
-  curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
-  apt-get update -qq 2>/dev/null || true
-  apt-get install -y google-cloud-cli 2>&1 | tail -2
-  log "  ✓ Background: Google Cloud CLI installed"
-
-  log "✓ Background Phase 0-apt complete - all system packages installed"
-} >> "$LOG_DIR/startup.log" 2>&1 &
-log "Phase 0-apt background installation started (non-blocking - supervisor already running)"
+# All system packages are already installed in Phase 0-apt (consolidated, blocking phase)
 
 {
   # CRITICAL: Source NVM in subshell so npm/node commands work
@@ -1025,8 +988,9 @@ log "Phase 0-apt background installation started (non-blocking - supervisor alre
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
   # Restore npm config after NVM is loaded
   . /config/.nvm_restore.sh
-  
-  # All system packages already installed in Phase 0-apt (serial, consolidated)
+
+  # All system packages already installed in Phase 0-apt (BLOCKING phase before supervisor)
+  # This background block now handles npm-based installs only
 
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
@@ -1041,7 +1005,7 @@ log "Phase 0-apt background installation started (non-blocking - supervisor alre
   touch /tmp/gmweb-installs-complete
   log "Installation marker file created"
 } >> "$LOG_DIR/startup.log" 2>&1 &
-log "Background installs started (PID: $!)"
+log "Background npm-based installs started (PID: $!)"
 
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
