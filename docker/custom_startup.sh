@@ -42,8 +42,17 @@ export HOME=/config
 export GMWEB_DIR=/config/.gmweb
 export npm_config_cache=/config/.gmweb/npm-cache
 export npm_config_prefix=/config/.gmweb/npm-global
-export PATH="/config/.gmweb/npm-global/bin:$PATH"
+# Source NVM FIRST to get node/npm in PATH
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# THEN add npm-global to PATH (after NVM's PATH updates)
+export PATH="/config/.gmweb/npm-global/bin:$PATH"
+# CRITICAL: Verify npm exists before running command
+if ! command -v npm &>/dev/null; then
+  echo "ERROR: npm not available after NVM source" >&2
+  echo "DEBUG: NVM_DIR=$NVM_DIR" >&2
+  echo "DEBUG: PATH=$PATH" >&2
+  exit 1
+fi
 exec "$@"
 NPM_WRAPPER_EOF
 chmod +x /tmp/gmweb-wrappers/npm-as-abc.sh
@@ -154,39 +163,65 @@ if ! sudo grep -q '^abc:\$apr1\$' /etc/nginx/.htpasswd; then
   exit 1
 fi
 
-sudo nginx -s reload 2>/dev/null || log "WARNING: nginx reload failed (nginx may not be running yet)"
+# CRITICAL: Install nginx binary BEFORE attempting to start it
+# nginx-common is in base image but nginx binary itself is not installed
+log "Installing nginx binary package"
+apt-get update -qq 2>/dev/null || true
+apt-get install -y --no-install-recommends nginx 2>&1 | tail -2 || {
+  log "ERROR: Failed to install nginx"
+  exit 1
+}
+
+# Verify nginx binary is now available
+if ! which nginx > /dev/null 2>&1; then
+  log "ERROR: nginx binary not found after installation"
+  exit 1
+fi
+log "✓ nginx binary installed"
+
+# Start nginx immediately (it may not be running from s6 yet)
+sudo nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || log "WARNING: nginx start/reload failed"
+sleep 1
+# Verify nginx is listening
+if netstat -tuln 2>/dev/null | grep -q ":80 " || lsof -i :80 2>/dev/null | grep -q nginx; then
+  log "✓ nginx listening on port 80"
+else
+  log "WARNING: nginx may not be listening yet (will retry)"
+fi
 export PASSWORD
-log "✓ HTTP Basic Auth configured with valid apr1 hash"
+log "✓ HTTP Basic Auth configured and nginx started"
 
-# CRITICAL PHASE: Sequential APT installations (NO parallelism = NO race conditions)
-# ALL APT operations happen here, in order, before ANYTHING else starts
+# CRITICAL PHASE 0-apt: Consolidated APT installations
+# ALL system packages installed at once before anything else
+# This is BLOCKING and required before Bun installation
+log "Phase 0-apt: Consolidated system package installation (BLOCKING - required for Bun and services)"
+apt-get update -qq 2>/dev/null || true
 
-log "Phase 0-apt: System package installation deferred to background (after supervisor starts)"
-log "  Note: jq, unzip, ttyd, gh, gcloud will be installed in parallel background process"
-log "  Services use health checks to retry if packages not available yet"
+# Install all packages together: core tools + ttyd + gh + gcloud dependencies
+log "  Installing: unzip jq ttyd"
+apt-get install -y --no-install-recommends unzip jq ttyd 2>&1 | tail -2
+log "  ✓ Core packages installed (unzip, jq, ttyd)"
 
-# NOW SAFE: Start background installs (non-APT work only)
-# This is the earliest point where non-APT background work can begin
-# These run in parallel while we proceed with core setup
-{
-  export NVM_DIR=/config/nvm
-  export HOME=/config
-  export GMWEB_DIR=/config/.gmweb
+# Add and install GitHub CLI (gh)
+log "  Adding GitHub CLI repository and installing gh"
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
+echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y gh 2>&1 | tail -2
+log "  ✓ GitHub CLI (gh) installed"
 
-  log() {
-    # Direct append to log file to avoid tee duplication
-    # The background process group (} >> ... 2>&1 &) will capture this to the log file
-    echo "[gmweb-bg-installs] $(date '+%Y-%m-%d %H:%M:%S') $@"
-  }
+# Add and install Google Cloud CLI (gcloud)
+log "  Adding Google Cloud repository and installing gcloud"
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y google-cloud-cli 2>&1 | tail -2
+log "  ✓ Google Cloud CLI (gcloud) installed"
 
-  log "Starting background (non-APT) work..."
-  # Note: All APT operations completed in Phase 0-apt (serial, before background block)
-  # This background block now handles non-APT work only
-  
-  log "Background (non-APT) work complete"
-} >> /config/logs/startup.log 2>&1 &
-BG_INSTALL_PID=$!
-log "Background installs started in parallel (PID: $BG_INSTALL_PID)"
+log "✓ Phase 0-apt complete - all system packages installed (unzip, jq, ttyd, gh, gcloud)"
+
+# APT installation is now complete and blocking is done
+# Proceed with remaining setup
 
 # Note: .bashrc and .profile are no longer used - environment is set via beforestart hook
 
@@ -331,13 +366,12 @@ sudo cp /tmp/npmrc /config/.npmrc 2>/dev/null || true
 sudo chown abc:abc /config/.npmrc 2>/dev/null || true
 rm -f /tmp/npmrc
 
-# 3. Environment variables - override everything, highest priority
-export npm_config_cache="/config/.gmweb/npm-cache"
-export npm_config_prefix="/config/.gmweb/npm-global"
-export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
-export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
+# 3. CRITICAL: Do NOT set npm_config_prefix/NPM_CONFIG_PREFIX as env vars
+# This interferes with NVM which refuses to load when these are set
+# npm will read config from .npmrc files instead (already configured above)
+# Only the npm wrapper will set these when needed, after NVM is sourced
 
-# 4. Add npm global binaries to PATH
+# 4. Add npm global binaries to PATH (NVM will add node bins later)
 export PATH="/config/.gmweb/npm-global/bin:$PATH"
 
 log "✓ Centralized gmweb directory configured at $GMWEB_DIR (system + user + env)"
@@ -396,21 +430,16 @@ sudo -u abc DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
   dbus-daemon --session --address=unix:path=$RUNTIME_DIR/bus --print-address 2>/dev/null &
 DBUS_DAEMON_PID=$!
 
-for i in {1..10}; do
-  if [ -S "$RUNTIME_DIR/bus" ]; then
-    log "D-Bus session socket ready (attempt $i/10)"
-    break
-  fi
-  sleep 0.5
-done
+# Wait for D-Bus to be ready (one strategic sleep - socket creation is fast)
+sleep 1
 
 if [ -S "$RUNTIME_DIR/bus" ]; then
-  log "D-Bus session initialized"
+  log "✓ D-Bus session initialized"
 else
-  log "WARNING: D-Bus socket not ready"
+  log "WARNING: D-Bus socket not ready (will continue - system may still work)"
 fi
 
-# jq and unzip already installed in Phase 0-early (moved before background processes)
+# jq and unzip already installed in Phase 0-early (BLOCKING phase before Bun installation)
 
 # Verify /config ownership is set to abc:abc (UID 1000:GID 1000)
 # (This should already be done above, but verify again as safety check)
@@ -418,21 +447,7 @@ sudo chown -R 1000:1000 /config 2>/dev/null || true
 sudo chmod -R u+rwX,g+rX,o-rwx /config 2>/dev/null || true
 log "✓ /config ownership verified as abc:abc (UID:GID 1000:1000)"
 
-log "Phase 0: Kill all old gmweb processes from previous boots"
-# CRITICAL: On persistent volumes, old processes keep running after container restart
-# Kill all node processes running supervisor, services, or gmweb-related scripts
-# Use stronger kill signals and verify cleanup
-sudo pkill -9 -f "node.*supervisor" 2>/dev/null || true
-sudo pkill -9 -f "node.*/opt/gmweb-startup" 2>/dev/null || true
-sudo pkill -9 -f "node.*index.js" 2>/dev/null || true
-sudo pkill -9 -f "bunx.*fsbrowse" 2>/dev/null || true
-sudo pkill -9 -f "bunx.*agentgui" 2>/dev/null || true
-sudo pkill -9 -f "ttyd.*9999" 2>/dev/null || true
-# Kill any lingering processes on critical ports (use sudo for fuser)
-sudo fuser -k -9 9997/tcp 9998/tcp 9999/tcp 25808/tcp 8317/tcp 8082/tcp 2>/dev/null || true
-# Wait for processes to fully die
-sleep 3
-# Verify no old processes remain
+# Every boot is fresh - redeploy means new container, no old processes to kill
 if sudo lsof -i :9997 :9998 :9999 :25808 :8317 :8082 2>/dev/null | grep -q LISTEN; then
   log "WARNING: Some ports still in use, waiting additional 2s..."
   sleep 2
@@ -448,32 +463,31 @@ sudo rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
 
 sudo mkdir -p /opt/gmweb-startup
 
+# Ensure network is ready - one attempt with timeout
+log "  Verifying network connectivity..."
+if timeout 10 curl -fsSL --connect-timeout 5 https://api.github.com/users/AnEntrypoint >/dev/null 2>&1; then
+  log "  ✓ Network verified"
+else
+  log "  WARNING: Network check failed, attempting clone anyway (may timeout)"
+fi
+
 # Clone with minimal history and data - much faster
 # --depth 1: no history
 # --filter=blob:none: only get tree/commit objects, fetch blobs on demand (even smaller)
 # --single-branch: only main branch
-CLONE_RETRY=0
-CLONE_MAX_RETRY=3
-while [ $CLONE_RETRY -lt $CLONE_MAX_RETRY ]; do
-  rm -rf /tmp/gmweb 2>/dev/null || true
-  if timeout 120 git clone --depth 1 --filter=blob:none --single-branch --branch main \
-    https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3; then
-    if [ -d /tmp/gmweb/startup ]; then
-      log "✓ Git clone succeeded (attempt $((CLONE_RETRY + 1))/$CLONE_MAX_RETRY)"
-      break
-    fi
-  fi
-  CLONE_RETRY=$((CLONE_RETRY + 1))
-  if [ $CLONE_RETRY -lt $CLONE_MAX_RETRY ]; then
-    log "WARNING: Git clone failed, retrying (attempt $((CLONE_RETRY + 1))/$CLONE_MAX_RETRY)..."
-    sleep $((CLONE_RETRY * 5))
-  fi
-done
-
-if [ ! -d /tmp/gmweb/startup ]; then
-  log "ERROR: Git clone failed after $CLONE_MAX_RETRY attempts, startup files missing"
+rm -rf /tmp/gmweb 2>/dev/null || true
+if ! timeout 120 git clone --depth 1 --filter=blob:none --single-branch --branch main \
+  https://github.com/AnEntrypoint/gmweb.git /tmp/gmweb 2>&1 | tail -3; then
+  log "ERROR: Git clone failed (network or GitHub unavailable)"
   exit 1
 fi
+
+if [ ! -d /tmp/gmweb/startup ]; then
+  log "ERROR: Git clone completed but startup directory missing"
+  exit 1
+fi
+
+log "✓ Git clone succeeded"
 
 cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
 cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
@@ -697,20 +711,17 @@ log() {
   echo "[xfce-launcher] $(date '+%Y-%m-%d %H:%M:%S') $@"
 }
 
-# Wait for XFCE session manager to start (max 30 seconds)
-for i in {1..30}; do
-  if pgrep -u abc xfce4-session >/dev/null 2>&1; then
-    log "XFCE session detected (attempt $i/30)"
-    sleep 2  # Give session a moment to stabilize
-    break
-  fi
-  sleep 1
-done
+# Give XFCE session a moment to start (s6 manages it independently)
+# XFCE is started by s6-rc service manager, not by this script
+sleep 15
 
 if ! pgrep -u abc xfce4-session >/dev/null 2>&1; then
-  log "WARNING: XFCE session manager not detected after 30s, skipping component launch"
+  log "NOTE: XFCE session manager not running (desktop components skipped)"
   exit 0
 fi
+
+log "XFCE session detected, launching components..."
+sleep 2  # Give session a moment to stabilize
 
 # Launch XFCE components (they may already be running, that's OK)
 log "Launching XFCE desktop components..."
@@ -759,7 +770,6 @@ sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
 export NVM_DIR=/config/nvm
 export HOME=/config
 # Unset npm_config_prefix to avoid NVM conflicts (set by LinuxServer base image)
-unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 npm install -g better-sqlite3 2>&1 | tail -3
@@ -772,7 +782,6 @@ export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
 # Unset npm_config_prefix to avoid NVM conflicts (set by LinuxServer base image)
-unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -3
@@ -787,7 +796,6 @@ BCRYPT_INSTALL_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix NPM_CONFIG_PREFIX npm_config_cache NPM_CONFIG_CACHE
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 npm install -g agent-browser 2>&1 | tail -3
@@ -799,7 +807,6 @@ AGENT_BROWSER_INSTALL_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix NPM_CONFIG_PREFIX npm_config_cache NPM_CONFIG_CACHE
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 agent-browser install 2>&1 | tail -3
@@ -811,7 +818,6 @@ AGENT_BROWSER_SETUP_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix NPM_CONFIG_PREFIX npm_config_cache NPM_CONFIG_CACHE
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 agent-browser install --with-deps 2>&1 | tail -3
@@ -820,17 +826,6 @@ AGENT_BROWSER_DEPS_EOF
 } >> "$LOG_DIR/startup.log" 2>&1 &
 
 log "✓ Critical modules background install started (supervisor will handle retries)"
-
-# Link agent-browser from NVM node_modules to gmweb npm-global/bin (in case installed to NVM location)
-# This ensures agent-browser is accessible in PATH regardless of where npm installed it
-mkdir -p /config/.gmweb/npm-global/bin
-if [ -d /config/nvm/versions/node/v24*/lib/node_modules/agent-browser/bin ]; then
-  AGENT_BROWSER_PATH=$(ls -d /config/nvm/versions/node/v24*/lib/node_modules/agent-browser/bin 2>/dev/null | head -1)
-  if [ -f "$AGENT_BROWSER_PATH/agent-browser.js" ]; then
-    ln -sf "$AGENT_BROWSER_PATH/agent-browser.js" /config/.gmweb/npm-global/bin/agent-browser 2>/dev/null || true
-    log "✓ agent-browser linked to PATH"
-  fi
-fi
 
 # GitHub CLI already installed in Phase 0-apt (serial, consolidated)
 
@@ -947,6 +942,10 @@ fi
 log "Phase 1.7 complete - glootie-oc plugin ready for MCP tools"
 
 log "Starting supervisor..."
+# CRITICAL: Explicitly unset npm_config_prefix/NPM_CONFIG_PREFIX before supervisor
+# These conflict with NVM and must not be passed to child processes
+unset NPM_CONFIG_PREFIX
+
 if [ -f /opt/gmweb-startup/start.sh ]; then
   # CRITICAL: Do NOT pass npm_config_prefix/NPM_CONFIG_PREFIX to supervisor
   # start.sh will set these AFTER sourcing NVM (using .nvm_restore.sh)
@@ -982,45 +981,7 @@ fi
 bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1 &
 log "XFCE component launcher started (PID: $!)"
 
-# Phase 0-apt: System package installation in background (non-blocking)
-# CRITICAL: These packages (jq, unzip, ttyd, gh, gcloud) run in background so supervisor starts faster
-# Services use health checks to retry if packages not available yet
-# This optimization reduces supervisor startup time from 60+s to 30s
-{
-  log "Background Phase 0-apt: Starting consolidated system package installation"
-
-  # Step 1: jq and unzip (required for later phases)
-  log "  Background: Installing jq, unzip (JSON processing, Bun extraction)"
-  apt-get update -qq 2>/dev/null || true
-  apt-get install -y --no-install-recommends jq unzip 2>&1 | tail -2
-  log "  ✓ Background: jq and unzip installed"
-
-  # Step 2: ttyd (needed for webssh2 service)
-  log "  Background: Installing ttyd (web terminal)"
-  apt-get install -y ttyd 2>&1 | tail -2
-  log "  ✓ Background: ttyd installed"
-
-  # Step 3: GitHub CLI (gh)
-  log "  Background: Installing GitHub CLI (gh)"
-  # Add gh repository
-  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
-  echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
-  apt-get update -qq 2>/dev/null || true
-  apt-get install -y gh 2>&1 | tail -2
-  log "  ✓ Background: GitHub CLI installed"
-
-  # Step 4: Google Cloud CLI (gcloud)
-  log "  Background: Installing Google Cloud CLI (gcloud)"
-  # Add gcloud repository
-  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
-  curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
-  apt-get update -qq 2>/dev/null || true
-  apt-get install -y google-cloud-cli 2>&1 | tail -2
-  log "  ✓ Background: Google Cloud CLI installed"
-
-  log "✓ Background Phase 0-apt complete - all system packages installed"
-} >> "$LOG_DIR/startup.log" 2>&1 &
-log "Phase 0-apt background installation started (non-blocking - supervisor already running)"
+# All system packages are already installed in Phase 0-apt (consolidated, blocking phase)
 
 {
   # CRITICAL: Source NVM in subshell so npm/node commands work
@@ -1034,8 +995,9 @@ log "Phase 0-apt background installation started (non-blocking - supervisor alre
   [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
   # Restore npm config after NVM is loaded
   . /config/.nvm_restore.sh
-  
-  # All system packages already installed in Phase 0-apt (serial, consolidated)
+
+  # All system packages already installed in Phase 0-apt (BLOCKING phase before supervisor)
+  # This background block now handles npm-based installs only
 
   bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
   log "Background installations complete"
@@ -1050,7 +1012,7 @@ log "Phase 0-apt background installation started (non-blocking - supervisor alre
   touch /tmp/gmweb-installs-complete
   log "Installation marker file created"
 } >> "$LOG_DIR/startup.log" 2>&1 &
-log "Background installs started (PID: $!)"
+log "Background npm-based installs started (PID: $!)"
 
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
