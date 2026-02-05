@@ -787,7 +787,7 @@ BCRYPT_INSTALL_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix
+unset npm_config_prefix NPM_CONFIG_PREFIX npm_config_cache NPM_CONFIG_CACHE
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 npm install -g agent-browser 2>&1 | tail -3
@@ -799,7 +799,7 @@ AGENT_BROWSER_INSTALL_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix
+unset npm_config_prefix NPM_CONFIG_PREFIX npm_config_cache NPM_CONFIG_CACHE
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 agent-browser install 2>&1 | tail -3
@@ -811,7 +811,7 @@ AGENT_BROWSER_SETUP_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix
+unset npm_config_prefix NPM_CONFIG_PREFIX npm_config_cache NPM_CONFIG_CACHE
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 agent-browser install --with-deps 2>&1 | tail -3
@@ -820,6 +820,17 @@ AGENT_BROWSER_DEPS_EOF
 } >> "$LOG_DIR/startup.log" 2>&1 &
 
 log "✓ Critical modules background install started (supervisor will handle retries)"
+
+# Link agent-browser from NVM node_modules to gmweb npm-global/bin (in case installed to NVM location)
+# This ensures agent-browser is accessible in PATH regardless of where npm installed it
+mkdir -p /config/.gmweb/npm-global/bin
+if [ -d /config/nvm/versions/node/v24*/lib/node_modules/agent-browser/bin ]; then
+  AGENT_BROWSER_PATH=$(ls -d /config/nvm/versions/node/v24*/lib/node_modules/agent-browser/bin 2>/dev/null | head -1)
+  if [ -f "$AGENT_BROWSER_PATH/agent-browser.js" ]; then
+    ln -sf "$AGENT_BROWSER_PATH/agent-browser.js" /config/.gmweb/npm-global/bin/agent-browser 2>/dev/null || true
+    log "✓ agent-browser linked to PATH"
+  fi
+fi
 
 # GitHub CLI already installed in Phase 0-apt (serial, consolidated)
 
