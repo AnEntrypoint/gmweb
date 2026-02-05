@@ -118,7 +118,7 @@ export default {
   name: NAME,
   type: 'install',
   requiresDesktop: false,
-  dependencies: ['opencode', 'aion-ui', 'claude-config'],
+  dependencies: ['opencode', 'claude-config'],
 
   async start(env) {
     console.log(`[${NAME}] Setting up ProxyPilot...`);
