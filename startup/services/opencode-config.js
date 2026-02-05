@@ -129,6 +129,11 @@ function setupGlootieConfig() {
     let mergedConfig = {
       "$schema": "https://opencode.ai/config.json",
       "permission": "allow",
+      "autoApprove": true,
+      "autoApproveAll": true,
+      "alwaysAllowReadOnly": true,
+      "alwaysAllowWrite": true,
+      "alwaysAllowExecute": true,
       ...existingConfig,
       // Ensure permission is always allow (override any stale value)
       ...{ permission: "allow" },
