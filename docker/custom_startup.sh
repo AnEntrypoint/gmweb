@@ -42,8 +42,17 @@ export HOME=/config
 export GMWEB_DIR=/config/.gmweb
 export npm_config_cache=/config/.gmweb/npm-cache
 export npm_config_prefix=/config/.gmweb/npm-global
-export PATH="/config/.gmweb/npm-global/bin:$PATH"
+# Source NVM FIRST to get node/npm in PATH
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# THEN add npm-global to PATH (after NVM's PATH updates)
+export PATH="/config/.gmweb/npm-global/bin:$PATH"
+# CRITICAL: Verify npm exists before running command
+if ! command -v npm &>/dev/null; then
+  echo "ERROR: npm not available after NVM source" >&2
+  echo "DEBUG: NVM_DIR=$NVM_DIR" >&2
+  echo "DEBUG: PATH=$PATH" >&2
+  exit 1
+fi
 exec "$@"
 NPM_WRAPPER_EOF
 chmod +x /tmp/gmweb-wrappers/npm-as-abc.sh
@@ -154,15 +163,30 @@ if ! sudo grep -q '^abc:\$apr1\$' /etc/nginx/.htpasswd; then
   exit 1
 fi
 
-sudo nginx -s reload 2>/dev/null || log "WARNING: nginx reload failed (nginx may not be running yet)"
+# Start nginx immediately (it may not be running from s6 yet)
+sudo nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || log "WARNING: nginx start/reload failed"
+sleep 1
+# Verify nginx is listening
+if netstat -tuln 2>/dev/null | grep -q ":80 " || lsof -i :80 2>/dev/null | grep -q nginx; then
+  log "✓ nginx listening on port 80"
+else
+  log "WARNING: nginx may not be listening yet (will retry)"
+fi
 export PASSWORD
-log "✓ HTTP Basic Auth configured with valid apr1 hash"
+log "✓ HTTP Basic Auth configured and nginx started"
+
+# CRITICAL PHASE: Early APT installations (BLOCKING - required before Bun installation)
+# These MUST complete before we proceed to Bun installation
+log "Phase 0-early: Install critical tools (unzip, jq) needed before Bun"
+apt-get update -qq 2>/dev/null || true
+apt-get install -y --no-install-recommends unzip jq 2>&1 | tail -2
+log "✓ Phase 0-early complete - unzip and jq installed"
 
 # CRITICAL PHASE: Sequential APT installations (NO parallelism = NO race conditions)
-# ALL APT operations happen here, in order, before ANYTHING else starts
+# Remaining APT operations deferred to background
 
-log "Phase 0-apt: System package installation deferred to background (after supervisor starts)"
-log "  Note: jq, unzip, ttyd, gh, gcloud will be installed in parallel background process"
+log "Phase 0-apt: Remaining system packages deferred to background (after supervisor starts)"
+log "  Note: ttyd, gh, gcloud will be installed in parallel background process"
 log "  Services use health checks to retry if packages not available yet"
 
 # NOW SAFE: Start background installs (non-APT work only)
@@ -410,7 +434,7 @@ else
   log "WARNING: D-Bus socket not ready"
 fi
 
-# jq and unzip already installed in Phase 0-early (moved before background processes)
+# jq and unzip already installed in Phase 0-early (BLOCKING phase before Bun installation)
 
 # Verify /config ownership is set to abc:abc (UID 1000:GID 1000)
 # (This should already be done above, but verify again as safety check)
@@ -418,21 +442,7 @@ sudo chown -R 1000:1000 /config 2>/dev/null || true
 sudo chmod -R u+rwX,g+rX,o-rwx /config 2>/dev/null || true
 log "✓ /config ownership verified as abc:abc (UID:GID 1000:1000)"
 
-log "Phase 0: Kill all old gmweb processes from previous boots"
-# CRITICAL: On persistent volumes, old processes keep running after container restart
-# Kill all node processes running supervisor, services, or gmweb-related scripts
-# Use stronger kill signals and verify cleanup
-sudo pkill -9 -f "node.*supervisor" 2>/dev/null || true
-sudo pkill -9 -f "node.*/opt/gmweb-startup" 2>/dev/null || true
-sudo pkill -9 -f "node.*index.js" 2>/dev/null || true
-sudo pkill -9 -f "bunx.*fsbrowse" 2>/dev/null || true
-sudo pkill -9 -f "bunx.*agentgui" 2>/dev/null || true
-sudo pkill -9 -f "ttyd.*9999" 2>/dev/null || true
-# Kill any lingering processes on critical ports (use sudo for fuser)
-sudo fuser -k -9 9997/tcp 9998/tcp 9999/tcp 25808/tcp 8317/tcp 8082/tcp 2>/dev/null || true
-# Wait for processes to fully die
-sleep 3
-# Verify no old processes remain
+# Every boot is fresh - redeploy means new container, no old processes to kill
 if sudo lsof -i :9997 :9998 :9999 :25808 :8317 :8082 2>/dev/null | grep -q LISTEN; then
   log "WARNING: Some ports still in use, waiting additional 2s..."
   sleep 2
@@ -936,6 +946,11 @@ fi
 log "Phase 1.7 complete - glootie-oc plugin ready for MCP tools"
 
 log "Starting supervisor..."
+# CRITICAL: Explicitly unset npm_config_prefix/NPM_CONFIG_PREFIX before supervisor
+# These conflict with NVM and must not be passed to child processes
+unset npm_config_prefix
+unset NPM_CONFIG_PREFIX
+
 if [ -f /opt/gmweb-startup/start.sh ]; then
   # CRITICAL: Do NOT pass npm_config_prefix/NPM_CONFIG_PREFIX to supervisor
   # start.sh will set these AFTER sourcing NVM (using .nvm_restore.sh)
@@ -976,15 +991,9 @@ log "XFCE component launcher started (PID: $!)"
 # Services use health checks to retry if packages not available yet
 # This optimization reduces supervisor startup time from 60+s to 30s
 {
-  log "Background Phase 0-apt: Starting consolidated system package installation"
+  log "Background Phase 0-apt: Starting system package installation (unzip/jq already in Phase 0-early)"
 
-  # Step 1: jq and unzip (required for later phases)
-  log "  Background: Installing jq, unzip (JSON processing, Bun extraction)"
-  apt-get update -qq 2>/dev/null || true
-  apt-get install -y --no-install-recommends jq unzip 2>&1 | tail -2
-  log "  ✓ Background: jq and unzip installed"
-
-  # Step 2: ttyd (needed for webssh2 service)
+  # Step 1: ttyd (needed for webssh2 service)
   log "  Background: Installing ttyd (web terminal)"
   apt-get install -y ttyd 2>&1 | tail -2
   log "  ✓ Background: ttyd installed"
