@@ -1,25 +1,24 @@
 #!/usr/bin/with-contenv bash
 
 export XCURSOR_THEME=breeze
+export XDG_RUNTIME_DIR=/run/user/1000
+export PULSE_RUNTIME_PATH=/run/user/1000/pulse
 
 # Default sink setup
 if [ ! -f '/dev/shm/audio.lock' ]; then
-  # Wait for critical dependencies before setting up audio
-  # Wait for PulseAudio to be ready (max 30 seconds)
   WAIT_COUNT=0
   MAX_WAIT=60
-  until [ $WAIT_COUNT -ge $MAX_WAIT ] || pactl list sinks >/dev/null 2>&1; do
+  until [ $WAIT_COUNT -ge $MAX_WAIT ] || s6-setuidgid abc pactl list sinks >/dev/null 2>&1; do
     sleep 0.5
     WAIT_COUNT=$((WAIT_COUNT + 1))
   done
 
-  # Try to load audio sinks (non-blocking - if fails, Selkies continues anyway)
-  if pactl list sinks >/dev/null 2>&1; then
-    s6-setuidgid abc with-contenv pactl \
+  if s6-setuidgid abc pactl list sinks >/dev/null 2>&1; then
+    s6-setuidgid abc pactl \
       load-module module-null-sink \
       sink_name="output" \
       sink_properties=device.description="output" 2>/dev/null || true
-    s6-setuidgid abc with-contenv pactl \
+    s6-setuidgid abc pactl \
       load-module module-null-sink \
       sink_name="input" \
       sink_properties=device.description="input" 2>/dev/null || true
@@ -89,7 +88,6 @@ fi
 # Note: Selkies may fail to start if X11 is not ready, but we let s6 supervisor handle restarts
 exec s6-setuidgid abc \
   selkies \
-    --addr="localhost" \
     --mode="websockets" \
     --encoder=jpeg \
     --port=8082
