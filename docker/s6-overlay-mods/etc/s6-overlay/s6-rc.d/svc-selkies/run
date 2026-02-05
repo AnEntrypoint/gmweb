@@ -4,17 +4,26 @@ export XCURSOR_THEME=breeze
 
 # Default sink setup
 if [ ! -f '/dev/shm/audio.lock' ]; then
-  until [ -f /defaults/pid ]; do
-    sleep .5
+  # Wait for critical dependencies before setting up audio
+  # Wait for PulseAudio to be ready (max 30 seconds)
+  WAIT_COUNT=0
+  MAX_WAIT=60
+  until [ $WAIT_COUNT -ge $MAX_WAIT ] || pactl list sinks >/dev/null 2>&1; do
+    sleep 0.5
+    WAIT_COUNT=$((WAIT_COUNT + 1))
   done
-  s6-setuidgid abc with-contenv pactl \
-    load-module module-null-sink \
-    sink_name="output" \
-    sink_properties=device.description="output"
-  s6-setuidgid abc with-contenv pactl \
-    load-module module-null-sink \
-    sink_name="input" \
-    sink_properties=device.description="input"
+
+  # Try to load audio sinks (non-blocking - if fails, Selkies continues anyway)
+  if pactl list sinks >/dev/null 2>&1; then
+    s6-setuidgid abc with-contenv pactl \
+      load-module module-null-sink \
+      sink_name="output" \
+      sink_properties=device.description="output" 2>/dev/null || true
+    s6-setuidgid abc with-contenv pactl \
+      load-module module-null-sink \
+      sink_name="input" \
+      sink_properties=device.description="input" 2>/dev/null || true
+  fi
   touch /dev/shm/audio.lock
 fi
 
@@ -59,7 +68,25 @@ if [ ! -z ${DEV_MODE+x} ]; then
       --debug="true"
 fi
 
+# Ensure DISPLAY is set
+export DISPLAY=${DISPLAY:-:1}
+
+# Wait for X11 to be ready before starting Selkies (max 60 seconds)
+# If X11 is not available, Selkies will still start but may fail with xrandr errors
+WAIT_COUNT=0
+MAX_WAIT=120
+X11_READY=false
+until [ $WAIT_COUNT -ge $MAX_WAIT ] || DISPLAY=:1 xset q >/dev/null 2>&1; do
+  sleep 0.5
+  WAIT_COUNT=$((WAIT_COUNT + 1))
+done
+
+if [ $WAIT_COUNT -lt $MAX_WAIT ]; then
+  X11_READY=true
+fi
+
 # Start Selkies with JPEG encoder for universal browser compatibility
+# Note: Selkies may fail to start if X11 is not ready, but we let s6 supervisor handle restarts
 exec s6-setuidgid abc \
   selkies \
     --addr="localhost" \
