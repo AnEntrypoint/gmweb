@@ -1,0 +1,10 @@
+# gmweb Boot Sequence Fixes - Pending Test Verification
+
+All critical issues fixed and committed:
+- NPM_CONFIG_PREFIX repeated loop (a2e1338)
+- Bun installation before tools exist (cf7b06b)
+- npm wrapper path verification (cf7b06b)
+- Process killing removed (cf7b06b)
+- nginx starts early (cf7b06b)
+
+Awaiting test results from: https://buildesk.acc.l-inc.co.za/logs/supervisor.log
