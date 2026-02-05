@@ -810,6 +810,42 @@ BCRYPT_INSTALL_EOF
 
   sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>&1 | tail -1
   log "Background: Critical module installs complete"
+
+  log "Background: Installing agent-browser (global binary)..."
+  sudo -u abc bash << 'AGENT_BROWSER_INSTALL_EOF'
+export NVM_DIR=/config/nvm
+export HOME=/config
+export GMWEB_DIR=/config/.gmweb
+unset npm_config_prefix
+export npm_config_cache=/config/.gmweb/npm-cache
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+npm install -g agent-browser 2>&1 | tail -3
+AGENT_BROWSER_INSTALL_EOF
+  [ $? -eq 0 ] && log "✓ agent-browser installed" || log "WARNING: agent-browser install incomplete"
+
+  log "Background: Running agent-browser install (download Chromium)..."
+  sudo -u abc bash << 'AGENT_BROWSER_SETUP_EOF'
+export NVM_DIR=/config/nvm
+export HOME=/config
+export GMWEB_DIR=/config/.gmweb
+unset npm_config_prefix
+export npm_config_cache=/config/.gmweb/npm-cache
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+agent-browser install 2>&1 | tail -3
+AGENT_BROWSER_SETUP_EOF
+  [ $? -eq 0 ] && log "✓ agent-browser Chromium download complete" || log "WARNING: agent-browser setup incomplete"
+
+  log "Background: Running agent-browser install --with-deps..."
+  sudo -u abc bash << 'AGENT_BROWSER_DEPS_EOF'
+export NVM_DIR=/config/nvm
+export HOME=/config
+export GMWEB_DIR=/config/.gmweb
+unset npm_config_prefix
+export npm_config_cache=/config/.gmweb/npm-cache
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+agent-browser install --with-deps 2>&1 | tail -3
+AGENT_BROWSER_DEPS_EOF
+  [ $? -eq 0 ] && log "✓ agent-browser dependencies installed" || log "WARNING: agent-browser --with-deps incomplete"
 } >> "$LOG_DIR/startup.log" 2>&1 &
 
 log "✓ Critical modules background install started (supervisor will handle retries)"
