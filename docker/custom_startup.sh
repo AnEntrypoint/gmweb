@@ -787,8 +787,9 @@ sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
   sudo -u abc bash << 'SQLITE_INSTALL_EOF'
 export NVM_DIR=/config/nvm
 export HOME=/config
+# Unset npm_config_prefix to avoid NVM conflicts (set by LinuxServer base image)
+unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
-export npm_config_prefix=/config/.gmweb/npm-global
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 npm install -g better-sqlite3 2>&1 | tail -3
 SQLITE_INSTALL_EOF
@@ -799,8 +800,9 @@ SQLITE_INSTALL_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
+# Unset npm_config_prefix to avoid NVM conflicts (set by LinuxServer base image)
+unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
-export npm_config_prefix=/config/.gmweb/npm-global
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -3
 BCRYPT_INSTALL_EOF
