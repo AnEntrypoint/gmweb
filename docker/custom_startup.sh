@@ -355,13 +355,12 @@ sudo cp /tmp/npmrc /config/.npmrc 2>/dev/null || true
 sudo chown abc:abc /config/.npmrc 2>/dev/null || true
 rm -f /tmp/npmrc
 
-# 3. Environment variables - override everything, highest priority
-export npm_config_cache="/config/.gmweb/npm-cache"
-export npm_config_prefix="/config/.gmweb/npm-global"
-export NPM_CONFIG_CACHE="/config/.gmweb/npm-cache"
-export NPM_CONFIG_PREFIX="/config/.gmweb/npm-global"
+# 3. CRITICAL: Do NOT set npm_config_prefix/NPM_CONFIG_PREFIX as env vars
+# This interferes with NVM which refuses to load when these are set
+# npm will read config from .npmrc files instead (already configured above)
+# Only the npm wrapper will set these when needed, after NVM is sourced
 
-# 4. Add npm global binaries to PATH
+# 4. Add npm global binaries to PATH (NVM will add node bins later)
 export PATH="/config/.gmweb/npm-global/bin:$PATH"
 
 log "✓ Centralized gmweb directory configured at $GMWEB_DIR (system + user + env)"
@@ -769,7 +768,6 @@ sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
 export NVM_DIR=/config/nvm
 export HOME=/config
 # Unset npm_config_prefix to avoid NVM conflicts (set by LinuxServer base image)
-unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 npm install -g better-sqlite3 2>&1 | tail -3
@@ -782,7 +780,6 @@ export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
 # Unset npm_config_prefix to avoid NVM conflicts (set by LinuxServer base image)
-unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -3
@@ -797,7 +794,6 @@ BCRYPT_INSTALL_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 npm install -g agent-browser 2>&1 | tail -3
@@ -809,7 +805,6 @@ AGENT_BROWSER_INSTALL_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 agent-browser install 2>&1 | tail -3
@@ -821,7 +816,6 @@ AGENT_BROWSER_SETUP_EOF
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
-unset npm_config_prefix
 export npm_config_cache=/config/.gmweb/npm-cache
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 agent-browser install --with-deps 2>&1 | tail -3
@@ -948,7 +942,6 @@ log "Phase 1.7 complete - glootie-oc plugin ready for MCP tools"
 log "Starting supervisor..."
 # CRITICAL: Explicitly unset npm_config_prefix/NPM_CONFIG_PREFIX before supervisor
 # These conflict with NVM and must not be passed to child processes
-unset npm_config_prefix
 unset NPM_CONFIG_PREFIX
 
 if [ -f /opt/gmweb-startup/start.sh ]; then
