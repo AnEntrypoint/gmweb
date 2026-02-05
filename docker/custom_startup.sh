@@ -163,6 +163,22 @@ if ! sudo grep -q '^abc:\$apr1\$' /etc/nginx/.htpasswd; then
   exit 1
 fi
 
+# CRITICAL: Install nginx binary BEFORE attempting to start it
+# nginx-common is in base image but nginx binary itself is not installed
+log "Installing nginx binary package"
+apt-get update -qq 2>/dev/null || true
+apt-get install -y --no-install-recommends nginx 2>&1 | tail -2 || {
+  log "ERROR: Failed to install nginx"
+  exit 1
+}
+
+# Verify nginx binary is now available
+if ! which nginx > /dev/null 2>&1; then
+  log "ERROR: nginx binary not found after installation"
+  exit 1
+fi
+log "✓ nginx binary installed"
+
 # Start nginx immediately (it may not be running from s6 yet)
 sudo nginx 2>/dev/null || sudo nginx -s reload 2>/dev/null || log "WARNING: nginx start/reload failed"
 sleep 1
