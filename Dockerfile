@@ -5,4 +5,8 @@ COPY docker/99-gmweb-startup.sh /custom-cont-init.d/99-gmweb-startup.sh
 COPY docker/custom_startup.sh /custom-cont-init.d/custom_startup.sh
 RUN chmod +x /custom-cont-init.d/99-gmweb-startup.sh /custom-cont-init.d/custom_startup.sh
 
+# Copy s6-rc service overrides (to customize inherited services from LinuxServer image)
+COPY docker/s6-overlay-mods/ /
+RUN chmod +x /etc/s6-overlay/s6-rc.d/svc-selkies/run
+
 EXPOSE 80 443
