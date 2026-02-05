@@ -64,4 +64,5 @@ exec s6-setuidgid abc \
   selkies \
     --addr="localhost" \
     --mode="websockets" \
-    --encoder=jpeg
+    --encoder=jpeg \
+    --port=8082
