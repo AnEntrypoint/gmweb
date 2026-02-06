@@ -1,128 +1,66 @@
-.prd: Final deployment verification and live domain testing
+.prd: WebRTC deployment - critical bugs fixed, ready for final testing
 
-GOAL: Deploy WebRTC-enabled gmweb and verify it works on https://buildesk.acc.l-inc.co.za/desk/
+CRITICAL BUGS FOUND & FIXED:
 
-COMMITS READY FOR DEPLOYMENT:
-- 11630da: Fix: Include patch-selkies-webrtc.sh in Docker image for WebRTC mode activation (NEW - CRITICAL FIX)
-- 1950c32: Enable Selkies WebRTC mode for efficient desktop streaming
-- b1a99d4: Fix critical NPM_CONFIG_PREFIX conflict with NVM
-- c2419d4: Clear .prd - nginx /desk simplification and version-check service complete
-- 3fbc06c: Add version-check service for automatic bunx-based service updates
-- 91ccfed: Simplify /desk nginx configuration - proxy ALL paths directly to Selkies
+BUG #1: Grep syntax error in patch-selkies-webrtc.sh
+- Commit: 2ec48ed
+- Issue: grep -q '--mode="webrtc"' treated dashes as option instead of pattern
+- Fix: Changed to grep -q 'mode="webrtc"'
+- Impact: Selkies patch verification now passes correctly
 
-STATUS UPDATE - FEBRUARY 6, 2026:
-- ISSUE FOUND: Dockerfile was not copying patch-selkies-webrtc.sh to /custom-cont-init.d/
-- ROOT CAUSE: Startup script expects the patch file but it wasn't included in Docker image
-- CONSEQUENCE: Selkies stayed in WebSocket mode instead of switching to WebRTC
-- FIX APPLIED: Added COPY and chmod commands to Dockerfile (commit 11630da)
-- NEXT STEP: Docker rebuild required to include patch script
+BUG #2: background-installs.sh blocking supervisor startup (CRITICAL)
+- Commit: 1661600
+- Issue: rest-of-startup.sh Phase 5 called background-installs BLOCKING
+- Impact: background-installs has 5-10 min recursive find operations
+- Consequence: Supervisor never started, all services remain disabled, /desk/ unavailable
+- Fix: Reorder phases - supervisor starts immediately after XFCE
+- Result: background-installs now spawned async with nohup &
 
-EXECUTION ITEMS (dependency chain):
+CURRENT STATE:
+- All critical bugs fixed and pushed to origin/main
+- Ready for Docker rebuild and redeploy
+- Expected boot time: 60-70 seconds (vs. hanging indefinitely)
 
-Item 1: Verify Docker build with new changes
-  - Verify: Latest commits in origin/main
-  - Run: docker-compose build gmweb
-  - Verify: Build succeeds without errors
-  - Check: All startup scripts copied to image
-  - Check: patch-selkies-webrtc.sh executable
-  - BLOCKS: Item 2
-  - BLOCKED BY: none
+FINAL TESTING ITEMS (after redeploy):
 
-Item 2: Deploy to live domain
-  - Run: docker-compose up -d gmweb (or equivalent deploy command)
-  - Verify: Container starts successfully
-  - Monitor: Initial startup sequence
-  - Check: No startup errors in logs
-  - Wait: ~90 seconds for full startup
-  - BLOCKS: Item 3
-  - BLOCKED BY: Item 1
+Item 1: Verify fresh deployment with all fixes
+  - Rebuild Docker image with latest commits
+  - Deploy new container
+  - Monitor startup logs for successful completion
+  - Verify all phases complete within 90 seconds
 
-Item 3: Verify startup logs for WebRTC patch
-  - Check: "✓ Selkies patched to WebRTC mode" in logs
-  - Check: "✓ Selkies WebRTC patch applied" in logs
-  - Check: NO "ERROR: npm not available" in logs
-  - Check: "npm_config_prefix" unset messages
-  - Check: supervisor started and services running
-  - Verify: No startup failures or warnings
-  - BLOCKS: Item 4
-  - BLOCKED BY: Item 2
+Item 2: Test /desk endpoint returns WebRTC interface (not 404)
+  - Test: http://localhost/desk/
+  - Expected: 200 OK with Selkies interface HTML
+  - Verify: No 404 or 426 errors
 
-Item 4: Verify local system health (before external testing)
-  - Run: ps aux | grep selkies (verify process running with --mode="webrtc")
-  - Run: netstat -tlnp | grep 8082 (verify Selkies listening)
-  - Run: curl -I http://localhost/desk/ (verify endpoint responds)
-  - Check: Status code (should be 200 or 101 WebSocket upgrade)
-  - Run: supervisorctl status (verify services running)
-  - Check: No services in FATAL or failed state
-  - BLOCKS: Item 5
-  - BLOCKED BY: Item 3
-
-Item 5: Test /desk on live domain HTTPS
+Item 3: Test live domain https://buildesk.acc.l-inc.co.za/desk/
   - Navigate to: https://buildesk.acc.l-inc.co.za/desk/
-  - Verify: Page loads (not 426, not error)
-  - Verify: Selkies WebRTC interface appears
-  - Open: Browser DevTools → Console
-  - Check: No console errors
-  - Check: No permission errors (CORS, auth, etc.)
-  - Monitor: Network tab for WebRTC connections
-  - Verify: Connection established (no failed connections)
-  - BLOCKS: Item 6
-  - BLOCKED BY: Item 4
+  - Verify: Page loads (not 404)
+  - Verify: Selkies WebRTC interface visible
+  - Verify: No console errors
 
-Item 6: Test Selkies functionality on live domain
+Item 4: Test WebRTC connection and video streaming
+  - Verify: WebRTC connection established
   - Verify: Desktop video stream visible
-  - Test: Mouse movement responsive
-  - Test: Keyboard input working
-  - Test: Can interact with desktop
-  - Monitor: No disconnections or reconnections
-  - Monitor: Stable WebRTC connection (Network tab)
-  - Check: Video quality and frame rate good
-  - BLOCKS: Item 7
-  - BLOCKED BY: Item 5
+  - Verify: Mouse/keyboard input responsive
+  - Monitor: Stable connection (no reconnections)
 
-Item 7: Verify no regressions on other endpoints
-  - Test: https://buildesk.acc.l-inc.co.za/ (root, AionUI)
-  - Test: https://buildesk.acc.l-inc.co.za/files/ (file-manager with auth)
-  - Test: https://buildesk.acc.l-inc.co.za/ssh/ (webssh2 with auth)
-  - Test: https://buildesk.acc.l-inc.co.za/gm/ (AgentGUI with auth)
-  - Verify: All endpoints respond correctly
-  - Verify: HTTP Basic Auth working on protected endpoints
-  - Verify: /desk no longer requires auth (auth_basic off)
-  - BLOCKS: Item 8
-  - BLOCKED BY: Item 6
+Item 5: Verify other endpoints working
+  - Test: /files/, /ssh/, /gm/, / endpoints
+  - Verify: All services healthy
+  - Verify: No regressions from fixes
 
-Item 8: Final verification and cleanup
-  - Verify: All systems operational
-  - Verify: No errors in system logs
-  - Verify: npm cache clean (no permission issues)
-  - Verify: supervisor health checks passing
-  - Verify: version-check service running (if enabled)
-  - Document: Final status
-  - BLOCKS: nothing
-  - BLOCKED BY: Item 7
+ACCEPTANCE CRITERIA (all must pass):
+✓ Docker builds without errors
+✓ Container boots within 90 seconds
+✓ Supervisor starts successfully
+✓ /desk/ endpoint responds (not 404)
+✓ Live domain loads WebRTC interface
+✓ Video streaming works
+✓ Input responsive
+✓ All other endpoints functional
+✓ No errors in logs
 
-PARALLEL OPPORTUNITIES:
-- Items 1-7 are sequential (each depends on previous)
-- Item 8 is final verification
-
-ACCEPTANCE CRITERIA - ALL MUST BE TRUE:
-✓ Docker image builds without errors
-✓ Container deploys successfully
-✓ Startup logs show WebRTC patch applied
-✓ No npm errors in startup sequence
-✓ Supervisor and services running
-✓ Selkies process shows --mode="webrtc"
-✓ https://buildesk.acc.l-inc.co.za/desk/ loads and responds
-✓ Selkies WebRTC interface visible in browser
-✓ No console errors in DevTools
-✓ Desktop video stream visible and responsive
-✓ Mouse/keyboard input working
-✓ WebRTC connection stable (Network tab shows active connection)
-✓ Other endpoints (/files/, /ssh/, /gm/) still working
-✓ HTTP Basic Auth working on protected endpoints
-✓ No startup errors or warnings in logs
-✓ System stable for extended time
-
-EXECUTION MODE: Real deployment to production domain, real browser testing, witnessed verification
-
-GATE CONDITION: User can access https://buildesk.acc.l-inc.co.za/desk/, see video stream, interact with desktop, and confirm WebRTC working
+NEXT ACTION: User deploys fresh Docker image with fixes (commits 2ec48ed, 1661600, etc.)
+Then execute Items 1-5 to verify complete functionality
