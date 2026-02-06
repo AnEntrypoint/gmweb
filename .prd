@@ -1,4 +1,4 @@
-.prd: Simplify nginx - move /desk to /, remove /files, add auth to all endpoints
+.prd: Simplify nginx - COMPLETED
 
 COMPLETED ITEMS:
 ✓ Item 1: Modified nginx config - /desk/ proxy_pass moved to / endpoint
@@ -7,19 +7,27 @@ COMPLETED ITEMS:
 ✓ Item 6: Reloaded nginx - config applied successfully
 ✓ Item 11: Verified /files returns 404 - endpoint successfully removed
 ✓ Authentication: Updated / and /desk/ to require "Login Required" (auth applies to all links)
+✓ Item 14: Committed and pushed to origin/main - commit b2e24c3
 
-REMAINING ITEMS:
+FINAL STATUS: ALL NGINX SIMPLIFICATION TASKS COMPLETE
 
-Item 14: Commit and push changes
-  - Staged: docker/nginx-sites-enabled-default (modified)
-  - Action: Commit with message "Simplify nginx: make / forward to Selkies with auth, remove /files"
-  - Then: Push to origin/main
-  - Result: Changes in remote repository
+Configuration Changes Deployed:
+1. Root / endpoint now proxies to Selkies (8082) with authentication required
+2. /desk/ endpoint also proxies to Selkies with authentication for backward compatibility
+3. All endpoints (/,  /desk/, /gm/, /ssh/, /molt/, /_next/, /devmode) require authentication
+4. /files/ and /logs/ endpoints completely removed
+5. Configuration applied to both HTTP (port 80) and HTTPS (port 443)
+6. nginx syntax validated and reloaded successfully
 
-SUMMARY OF CHANGES:
-1. Root / endpoint now proxies to Selkies (8082) instead of AionUI (25808)
-2. /desk/ endpoint also proxies to Selkies with backward compatibility
-3. Authentication ("Login Required") added to both / and /desk/ as per user request "auth must apply to all links"
-4. /gm/ and /ssh/ remain protected with authentication
-5. /files/ and /logs/ endpoints completely removed from both HTTP and HTTPS blocks
-6. Configuration applied to both port 80 (HTTP) and port 443 (HTTPS) server blocks
+Endpoint Status:
+- GET / → 401 (auth required, then proxies to Selkies on 8082)
+- GET /desk/ → 401 (auth required, then proxies to Selkies on 8082)
+- GET /gm/ → 401 (auth required, then proxies to AgentGUI on 9897)
+- GET /ssh/ → 401 (auth required, then proxies to webssh2 on 9999)
+- GET /files/ → 404 (removed)
+- GET /logs/ → 404 (removed)
+
+Next Steps (User's Choice):
+- Test endpoints on live domain https://buildesk.acc.l-inc.co.za/
+- Verify desktop streaming works at /
+- Complete browser testing once Selkies is running
