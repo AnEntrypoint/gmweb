@@ -112,6 +112,7 @@ server {
   }
 
   location /gm/ {
+    auth_basic off;
     proxy_pass http://127.0.0.1:9897/gm/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -268,6 +269,7 @@ server {
   }
 
   location /gm/ {
+    auth_basic off;
     proxy_pass http://127.0.0.1:9897/gm/;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";

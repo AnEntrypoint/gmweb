@@ -54,6 +54,7 @@ export default {
       detached: true
     });
 
+    let lastExitCode = null;
     ps.stdout?.on('data', d => {
       console.log(`[${NAME}:acp] ${d.toString().trim()}`);
     });
@@ -66,8 +67,10 @@ export default {
     });
 
     ps.on('exit', (code, signal) => {
+      lastExitCode = code;
       if (code !== 0) {
         console.log(`[${NAME}:exit] Process exited with code ${code}, signal ${signal}`);
+        console.log(`[${NAME}] OpenCode ACP failed to start. AgentGUI will still work and list opencode as an available agent, but ACP features won't be available until this is fixed.`);
       }
     });
 
@@ -88,6 +91,8 @@ export default {
   async health() {
     try {
       const binPath = `${dirname(process.execPath)}/${NAME}`;
+      // OpenCode binary existence is acceptable - the ACP process may have failed to start
+      // but the binary is still available for discovery by agentgui
       return existsSync(binPath);
     } catch (e) {
       return false;
