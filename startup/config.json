@@ -61,6 +61,10 @@
     "proxypilot": {
       "enabled": true,
       "type": "install"
+    },
+    "version-check": {
+      "enabled": true,
+      "type": "system"
     }
   }
 }

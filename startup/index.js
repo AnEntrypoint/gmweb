@@ -45,7 +45,8 @@ async function main() {
         'moltbot',
         'claude-config',
         'playwriter',
-        'glootie-oc'
+        'glootie-oc',
+        'version-check'
       ];
 
     console.log('[startup] Loading services...');
