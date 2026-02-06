@@ -1,0 +1,101 @@
+PRD: Zero-blocking startup - all installations async after nginx
+
+GOAL:
+nginx-first blocking architecture with ZERO installations before nginx starts
+After nginx is ready, ALL remaining work (git, APT packages, NVM, supervisor, services) runs async
+/desk available in ~15-20 seconds with nothing blocking
+
+PRINCIPLE:
+- custom_startup.sh Phase 0 (BLOCKING): permissions ONLY
+- custom_startup.sh Phase 0 (BLOCKING): nginx-setup.sh
+- custom_startup.sh Phase 1 (NON-BLOCKING): spawn rest-of-startup.sh
+- rest-of-startup.sh (ASYNC): APT packages + git + NVM + supervisor + services
+
+NO APT packages in custom_startup.sh
+NO APT packages in Dockerfile (pre-install violates principle)
+ALL APT packages in rest-of-startup.sh (Phase 0 before git clone)
+
+WORK ITEMS (dependency chain):
+
+BLOCKING PHASE (custom_startup.sh):
+1. Remove Phase 0-apt from custom_startup.sh
+   - DELETE lines 105-115 (apt-get update, install unzip jq ttyd)
+   - Remove log messages about APT phase
+   - Result: custom_startup.sh has ZERO apt-get commands
+   - BLOCKS: Nothing (independent)
+
+2. Add Phase 0 (async) note to custom_startup.sh
+   - Add log message: "All system packages install async after nginx in rest-of-startup.sh"
+   - Result: clear documentation
+   - BLOCKS: Nothing
+
+ASYNC PHASE (rest-of-startup.sh - runs after nginx):
+3. Add APT package installation to rest-of-startup.sh Phase 0
+   - Install before git clone (packages needed by git operations)
+   - apt-get update
+   - apt-get install -y unzip jq ttyd
+   - Result: packages available before git clone
+   - BLOCKS: git clone phase
+   - BLOCKED BY: nginx completion (implicit via spawning)
+
+4. Verify rest-of-startup.sh flow
+   - Phase 0: APT packages (new)
+   - Phase 1: git clone
+   - Phase 2: NVM setup
+   - Phase 3: supervisor setup
+   - Phase 4: XFCE launcher
+   - Phase 5: background-installs.sh (gcloud, gh, modules)
+   - Result: everything async, nothing blocking nginx
+   - BLOCKS: Nothing
+   - BLOCKED BY: APT installation (Phase 0)
+
+VERIFICATION:
+5. Validate bash syntax
+   - bash -n custom_startup.sh
+   - bash -n rest-of-startup.sh
+   - Result: no syntax errors
+   - BLOCKS: commit
+   - BLOCKED BY: file modifications
+
+6. Commit changes
+   - git add docker/custom_startup.sh docker/rest-of-startup.sh
+   - git commit -m "Fix: Move all APT installations to async rest-of-startup.sh"
+   - Message: explains zero-blocking principle
+   - Result: changes in git
+   - BLOCKS: push
+   - BLOCKED BY: validation
+
+7. Push to remote
+   - git push origin main
+   - Result: changes on remote
+   - BLOCKS: nothing
+   - BLOCKED BY: commit
+
+PARALLEL WAVES:
+Wave 1 (independent):
+- Item 1: Remove Phase 0-apt from custom_startup.sh
+- Item 2: Add note about async packages
+- Item 3: Add APT phase to rest-of-startup.sh
+- Item 4: Verify flow
+
+Wave 2 (dependent on Wave 1):
+- Item 5: Validate syntax
+- Item 6: Commit
+- Item 7: Push
+
+EXPECTED RESULT:
+✓ custom_startup.sh: ZERO apt-get commands
+✓ custom_startup.sh: permissions → nginx-setup → spawn async
+✓ rest-of-startup.sh: APT packages → git → NVM → supervisor → services
+✓ nginx blocking phase: ~15 seconds (permissions + nginx-setup only)
+✓ /desk available at ~15-20 seconds
+✓ Everything else runs async in background
+✓ No installations blocking nginx whatsoever
+
+CRITICAL CHECKLIST:
+- NO apt-get in custom_startup.sh ✗ (will be done)
+- NO apt-get update in custom_startup.sh ✗ (will be done)
+- ALL APT packages in rest-of-startup.sh ✗ (will be done)
+- nginx-first blocking ✓ (already working)
+- Everything else async ✓ (already working)
+- Clean separation of concerns ✗ (will be done)

@@ -102,16 +102,9 @@ log "✓ Comprehensive permission setup complete"
 BOOT_ID="$(date '+%s')-$$"
 log "Boot ID: $BOOT_ID"
 
-# CRITICAL PHASE 0-apt: Consolidated APT installations (BLOCKING)
-log "Phase 0-apt: Consolidated system package installation (BLOCKING)"
-apt-get update -qq 2>/dev/null || true
-
-log "  Installing: unzip jq ttyd"
-apt-get install -y --no-install-recommends unzip jq ttyd 2>&1 | tail -2
-log "  ✓ Core packages installed"
-
-log "✓ Phase 0-apt complete - critical packages installed"
-log "NOTE: gh and gcloud install async in background-installs.sh (not needed for nginx/supervisor)"
+log "✓ Phase 0: Permissions and environment ready (BLOCKING)"
+log "NOTE: All APT packages (unzip, jq, ttyd, gcloud, gh) install async in rest-of-startup.sh"
+log "      Nothing blocks nginx startup"
 
 # Cleanup and centralize installations
 log "Cleaning up legacy installations and ensuring clean state..."
