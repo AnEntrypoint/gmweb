@@ -19,7 +19,7 @@ cp "$SELKIES_RUN" "$SELKIES_RUN.backup" 2>/dev/null || true
 sed -i 's/--mode="websockets"/--mode="webrtc"/g' "$SELKIES_RUN"
 
 # Verify patch was applied
-if grep -q '--mode="webrtc"' "$SELKIES_RUN"; then
+if grep -q 'mode="webrtc"' "$SELKIES_RUN"; then
   echo "[patch-selkies] ✓ Selkies patched to WebRTC mode"
   exit 0
 else
