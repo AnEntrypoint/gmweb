@@ -139,6 +139,14 @@ server {
     proxy_http_version 1.1;
   }
 
+  location /files/ {
+    return 404;
+  }
+
+  location /logs/ {
+    return 404;
+  }
+
   location / {
     auth_basic "Login Required";
     auth_basic_user_file /etc/nginx/.htpasswd;
@@ -303,6 +311,14 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_http_version 1.1;
+  }
+
+  location /files/ {
+    return 404;
+  }
+
+  location /logs/ {
+    return 404;
   }
 
   location / {
