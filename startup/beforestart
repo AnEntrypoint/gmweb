@@ -8,9 +8,10 @@ export GMWEB_DIR="/config/.gmweb"
 export BUN_INSTALL="/config/.gmweb/cache/.bun"
 
 # Temp directory on same filesystem as /config (prevents EXDEV rename errors)
-export TMPDIR="/config/.tmp"
-export TMP="/config/.tmp"
-export TEMP="/config/.tmp"
+# Using /config/tmp (without dot) for better visibility
+export TMPDIR="/config/tmp"
+export TMP="/config/tmp"
+export TEMP="/config/tmp"
 
 # XDG directories (prevent /config pollution)
 export XDG_CACHE_HOME="/config/.gmweb/cache"

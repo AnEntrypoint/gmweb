@@ -29,6 +29,13 @@ sudo mkdir -p "$LOG_DIR"
 sudo chmod 755 "$LOG_DIR"
 sudo chown 1000:1000 "$LOG_DIR"
 
+# CRITICAL: Setup persistent /config/tmp for Claude Code and other tools
+# This ensures temp files survive container restarts
+sudo mkdir -p "$HOME_DIR/tmp"
+sudo chmod 1777 "$HOME_DIR/tmp"
+sudo chown 1000:1000 "$HOME_DIR/tmp"
+export TMPDIR="$HOME_DIR/tmp"
+
 log() {
   local msg="[gmweb-startup] $(date '+%Y-%m-%d %H:%M:%S') $@"
   echo "$msg"
