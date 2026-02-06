@@ -64,6 +64,12 @@ chmod +x /tmp/gmweb-wrappers/npm-as-abc.sh
 
 log "Initial /config ownership and permissions fixed"
 
+# CRITICAL: Remove s6-rc service down markers to allow auto-start
+# LinuxServer creates these at boot, but we want services to auto-start
+log "Phase 0.1: Enabling s6-rc services (removing down markers)"
+sudo rm -f /run/service/svc-*/down 2>/dev/null || true
+log "✓ s6-rc services enabled for auto-start"
+
 # CRITICAL PHASE 0.5: Comprehensive Permission Management
 log "Phase 0.5: Comprehensive home directory permission setup"
 
