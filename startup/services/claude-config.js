@@ -4,7 +4,6 @@ import { execSync } from 'child_process';
 import { ensureServiceEnvironment } from '../lib/service-utils.js';
 
 const DEFAULT_SETTINGS = {
-  model: 'haiku',
   enabledPlugins: {
     'gm@glootie-cc': true,
     'agent-browser@agent-browser': true
@@ -36,7 +35,6 @@ function ensureDir(dir) {
 
 function mergeSettings(existing, defaults) {
   const merged = { ...defaults };
-  if (existing.model) merged.model = existing.model;
   merged.enabledPlugins = { ...defaults.enabledPlugins, ...existing.enabledPlugins };
   return merged;
 }
