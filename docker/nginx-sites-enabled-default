@@ -44,18 +44,15 @@ server {
   location /desk/ {
     auth_basic "Login Required";
     auth_basic_user_file /etc/nginx/.htpasswd;
-    proxy_pass http://127.0.0.1:8082/;
-    proxy_set_header Host $host;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_read_timeout 3600s;
-    proxy_send_timeout 3600s;
-    proxy_buffering off;
-    client_max_body_size 10M;
+
+    # Serve static HTML/JS files from public directory
+    root /opt/gmweb-startup/public;
+    try_files $uri $uri/ /index.html;
+
+    # WebSocket proxy for /index.html connections
+    location ~ \.js$ {
+      add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
   }
 
   location /devmode {
@@ -150,18 +147,15 @@ server {
   location / {
     auth_basic "Login Required";
     auth_basic_user_file /etc/nginx/.htpasswd;
-    proxy_pass http://127.0.0.1:8082/;
-    proxy_set_header Host $host;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_read_timeout 3600s;
-    proxy_send_timeout 3600s;
-    proxy_buffering off;
-    client_max_body_size 10M;
+
+    # Serve static HTML/JS files from public directory
+    root /opt/gmweb-startup/public;
+    try_files $uri $uri/ /index.html;
+
+    # WebSocket proxy for /index.html connections
+    location ~ \.js$ {
+      add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
   }
 
   error_page 500 502 503 504 /50x.html;
@@ -218,18 +212,15 @@ server {
   location /desk/ {
     auth_basic "Login Required";
     auth_basic_user_file /etc/nginx/.htpasswd;
-    proxy_pass http://127.0.0.1:8082/;
-    proxy_set_header Host $host;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_read_timeout 3600s;
-    proxy_send_timeout 3600s;
-    proxy_buffering off;
-    client_max_body_size 10M;
+
+    # Serve static HTML/JS files from public directory
+    root /opt/gmweb-startup/public;
+    try_files $uri $uri/ /index.html;
+
+    # WebSocket proxy for /index.html connections
+    location ~ \.js$ {
+      add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
   }
 
   location /devmode {
@@ -324,18 +315,15 @@ server {
   location / {
     auth_basic "Login Required";
     auth_basic_user_file /etc/nginx/.htpasswd;
-    proxy_pass http://127.0.0.1:8082/;
-    proxy_set_header Host $host;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_read_timeout 3600s;
-    proxy_send_timeout 3600s;
-    proxy_buffering off;
-    client_max_body_size 10M;
+
+    # Serve static HTML/JS files from public directory
+    root /opt/gmweb-startup/public;
+    try_files $uri $uri/ /index.html;
+
+    # WebSocket proxy for /index.html connections
+    location ~ \.js$ {
+      add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
   }
 
   error_page 500 502 503 504 /50x.html;
