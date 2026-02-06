@@ -756,190 +756,24 @@ XFCE_LAUNCHER_EOF
 chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
-log "Installing critical Node modules for AionUI (background - supervisor will retry)..."
-sudo mkdir -p "$GMWEB_DIR/deps"
-sudo chown 1000:1000 "$GMWEB_DIR/deps" 2>/dev/null || true
-sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
-
-# CRITICAL: These native module installs are SLOW on ARM64 (compile time)
-# Run in background so supervisor can start immediately
-# Services will gracefully handle missing modules via health checks
-{
-  log "Background: Installing better-sqlite3..."
-  sudo -u abc bash << 'SQLITE_INSTALL_EOF'
-export NVM_DIR=/config/nvm
-export HOME=/config
-# Unset npm_config_prefix to avoid NVM conflicts (set by LinuxServer base image)
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-npm install -g better-sqlite3 2>&1 | tail -3
-SQLITE_INSTALL_EOF
-  [ $? -eq 0 ] && log "✓ better-sqlite3 installed" || log "WARNING: better-sqlite3 install incomplete"
-
-  log "Background: Installing bcrypt..."
-  sudo -u abc bash << 'BCRYPT_INSTALL_EOF'
-export NVM_DIR=/config/nvm
-export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-# Unset npm_config_prefix to avoid NVM conflicts (set by LinuxServer base image)
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -3
-BCRYPT_INSTALL_EOF
-  [ $? -eq 0 ] && log "✓ bcrypt installed" || log "WARNING: bcrypt install incomplete"
-
-  sudo -u abc /tmp/gmweb-wrappers/npm-as-abc.sh npm cache clean --force 2>&1 | tail -1
-  log "Background: Critical module installs complete"
-
-  log "Background: Installing agent-browser (global binary)..."
-  sudo -u abc bash << 'AGENT_BROWSER_INSTALL_EOF'
-export NVM_DIR=/config/nvm
-export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-npm install -g agent-browser 2>&1 | tail -3
-AGENT_BROWSER_INSTALL_EOF
-  [ $? -eq 0 ] && log "✓ agent-browser installed" || log "WARNING: agent-browser install incomplete"
-
-  log "Background: Running agent-browser install (download Chromium)..."
-  sudo -u abc bash << 'AGENT_BROWSER_SETUP_EOF'
-export NVM_DIR=/config/nvm
-export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-agent-browser install 2>&1 | tail -3
-AGENT_BROWSER_SETUP_EOF
-  [ $? -eq 0 ] && log "✓ agent-browser Chromium download complete" || log "WARNING: agent-browser setup incomplete"
-
-  log "Background: Running agent-browser install --with-deps..."
-  sudo -u abc bash << 'AGENT_BROWSER_DEPS_EOF'
-export NVM_DIR=/config/nvm
-export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-agent-browser install --with-deps 2>&1 | tail -3
-AGENT_BROWSER_DEPS_EOF
-  [ $? -eq 0 ] && log "✓ agent-browser dependencies installed" || log "WARNING: agent-browser --with-deps incomplete"
-} >> "$LOG_DIR/startup.log" 2>&1 &
-
-log "✓ Critical modules background install started (supervisor will handle retries)"
-
-# GitHub CLI already installed in Phase 0-apt (serial, consolidated)
-
-log "Phase 1.5: Install Bun (BLOCKING - required by file-manager and agentgui services)"
-export BUN_INSTALL="/config/.gmweb/cache/.bun"
-log "  BUN_INSTALL=$BUN_INSTALL"
-
-# CRITICAL: Always force fresh Bun installation on every boot
-# Delete existing Bun to prevent stale cached state (gmweb philosophy)
-log "  Removing any existing Bun installation (force fresh state)..."
-rm -rf "$BUN_INSTALL" 2>/dev/null || true
-mkdir -p "$BUN_INSTALL"
-
-log "  Installing fresh latest Bun..."
-# CRITICAL: Bun must be available before supervisor starts
-# Detect system architecture
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64) BUN_ARCH="x64" ;;
-  aarch64) BUN_ARCH="aarch64" ;;
-  arm64) BUN_ARCH="aarch64" ;;  # macOS
-  *) BUN_ARCH="$ARCH" ;;
-esac
-
-# SIMPLE, DIRECT BUN INSTALLATION (NO FALLBACKS, NO CONDITIONALS)
-log "  Downloading Bun from GitHub..."
-BUN_URL="https://github.com/oven-sh/bun/releases/latest/download/bun-linux-${BUN_ARCH}.zip"
-
-# Step 1: Download
-curl -fsSL --connect-timeout 10 --max-time 60 "$BUN_URL" -o "$BUN_INSTALL/bun.zip"
-log "✓ Downloaded bun ($(du -h $BUN_INSTALL/bun.zip | cut -f1))"
-
-# Step 2: Extract (unzip GUARANTEED to exist from Phase 0-apt)
-/usr/bin/unzip -q "$BUN_INSTALL/bun.zip" -d "$BUN_INSTALL"
-log "✓ Bun archive extracted"
-
-# Step 3: Install binary
-mkdir -p "$BUN_INSTALL/bin"
-mv "$BUN_INSTALL/bun-linux-${BUN_ARCH}/bun" "$BUN_INSTALL/bin/bun"
-chmod +x "$BUN_INSTALL/bin/bun"
-ln -sf bun "$BUN_INSTALL/bin/bunx"
-rm -rf "$BUN_INSTALL/bun.zip" "$BUN_INSTALL/bun-linux-${BUN_ARCH}"
-
-# Step 4: Add to PATH and verify
-export PATH="$BUN_INSTALL/bin:$PATH"
-log "✓ Bun installed and verified: $($BUN_INSTALL/bin/bun --version)"
-
-log "Phase 1.6: Install CLI coding tools (opencode/Claude Code) - BLOCKING (required for services)"
-# CRITICAL: opencode must be installed BEFORE supervisor starts
-# Services need Claude Code in PATH - cannot wait for background installs
-export OPENCODE_INSTALL_DIR="$GMWEB_DIR/tools"
-mkdir -p "$OPENCODE_INSTALL_DIR"
-
-log "  Installing opencode CLI..."
-NPM_CONFIG_PREFIX= bash << 'OPENCODE_INSTALL_EOF'
-  export NVM_DIR=/config/nvm
-  export GMWEB_DIR=/config/.gmweb
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-   if [ -f "$GMWEB_DIR/tools/opencode/bin/opencode" ] || command -v opencode &>/dev/null; then
-     echo "  ✓ opencode already installed"
-   else
-     mkdir -p "$GMWEB_DIR/tools"
-     if timeout 60 curl -fsSL https://opencode.ai/install | bash 2>&1 | tail -3; then
-       if [ -f "$GMWEB_DIR/tools/opencode/bin/opencode" ] || command -v opencode &>/dev/null; then
-         echo "  ✓ Fresh opencode installed"
-       else
-         echo "  WARNING: opencode installer completed but binary not verified"
-       fi
-     else
-       echo "  WARNING: opencode installation failed (will retry in background)"
-     fi
-   fi
-OPENCODE_INSTALL_EOF
-
-# CRITICAL: After subshell completes, verify opencode exists and add to PATH in PARENT shell
-if [ -f "$OPENCODE_INSTALL_DIR/opencode/bin/opencode" ]; then
-  log "✓ opencode binary verified at $OPENCODE_INSTALL_DIR/opencode/bin/opencode"
-  export PATH="$OPENCODE_INSTALL_DIR/opencode/bin:$PATH"
-  log "✓ opencode bin directory added to PATH"
-elif command -v opencode &>/dev/null; then
-  log "✓ opencode available in PATH"
+log "Phase 3: Spawning background installs (non-blocking - runs in parallel with services)..."
+# CRITICAL: Background installs do NOT block supervisor or services
+# All slow operations (module compilation, Chromium download, etc) run async
+# Services degrade gracefully if modules missing via health checks
+# background-installs.sh will complete in parallel after this exits
+if [ -f /custom-cont-init.d/background-installs.sh ]; then
+  nohup /custom-cont-init.d/background-installs.sh > "$LOG_DIR/background-installs.log" 2>&1 &
+  log "✓ Background install process spawned (PID: $!)"
+  log "  - All services are NOW ready to start"
+  log "  - Background installs continue in parallel"
 else
-  log "WARNING: opencode not found, will proceed without it"
+  log "WARNING: background-installs.sh not found at /custom-cont-init.d/"
 fi
 
-log "Phase 1.7: Install glootie-oc opencode plugin (BLOCKING - required for MCP tool integration)"
-# CRITICAL: Install glootie-oc plugin from GitHub
-# This provides MCP tool integration and Claude Code agent capabilities
-GLOOTIE_PLUGIN_DIR="$HOME_DIR/.config/opencode/glootie-oc"
-log "  Setting up glootie-oc plugin directory: $GLOOTIE_PLUGIN_DIR"
-
-# Remove old directory and clone fresh
-rm -rf "$GLOOTIE_PLUGIN_DIR"
-mkdir -p "$GLOOTIE_PLUGIN_DIR"
-
-# Clone from GitHub
-log "  Cloning glootie-oc from GitHub..."
-if git clone --depth 1 https://github.com/AnEntrypoint/glootie-oc.git "$GLOOTIE_PLUGIN_DIR" 2>&1 | tail -3; then
-  log "✓ glootie-oc cloned from GitHub"
-  
-  # Try to install dependencies (may fail on native modules but that's ok)
-  log "  Installing dependencies..."
-  (cd "$GLOOTIE_PLUGIN_DIR" && npm install --silent 2>&1 | tail -3) || \
-    log "  Note: Some dependencies failed (plugin will work without them)"
-  
-  chown -R abc:abc "$GLOOTIE_PLUGIN_DIR"
-  chmod -R u+rwX,g+rX,o-rwx "$GLOOTIE_PLUGIN_DIR"
-  log "✓ glootie-oc plugin ready"
-else
-  log "WARNING: Failed to clone glootie-oc"
-fi
-
-log "Phase 1.7 complete - glootie-oc plugin ready for MCP tools"
+# Note: Bun, opencode, and glootie-oc previously blocked here
+# They are now installed earlier in Phase 1.x or by background installs
+# to avoid blocking supervisor startup. Phase 3 (background installs)
+# handles async module installations.
 
 log "Starting supervisor..."
 # CRITICAL: Explicitly unset npm_config_prefix/NPM_CONFIG_PREFIX before supervisor
@@ -981,106 +815,10 @@ fi
 bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1 &
 log "XFCE component launcher started (PID: $!)"
 
-# All system packages are already installed in Phase 0-apt (consolidated, blocking phase)
-
-{
-  # CRITICAL: Source NVM in subshell so npm/node commands work
-  # Must use NVM compat shim to hide NPM_CONFIG_PREFIX before sourcing NVM
-  export NVM_DIR=/config/nvm
-  export HOME=/config
-  export GMWEB_DIR=/config/.gmweb
-
-  # Hide NPM_CONFIG_PREFIX before NVM (NVM refuses to load with it set)
-  . /config/.nvm_compat.sh
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  # Restore npm config after NVM is loaded
-  . /config/.nvm_restore.sh
-
-  # All system packages already installed in Phase 0-apt (BLOCKING phase before supervisor)
-  # This background block now handles npm-based installs only
-
-  bash /opt/gmweb-startup/install.sh 2>&1 | tail -10
-  log "Background installations complete"
-
-  # Note: opencode already installed during blocking phase 1.6
-  # (moved before supervisor start to ensure it's available for services)
-
-  log "Installing cloud and deployment tools (wrangler)..."
-  npm install -g wrangler 2>&1 | tail -3 && log "wrangler installed" || log "WARNING: wrangler install failed"
-  log "Cloud and deployment tools installation complete"
-
-  touch /tmp/gmweb-installs-complete
-  log "Installation marker file created"
-} >> "$LOG_DIR/startup.log" 2>&1 &
-log "Background npm-based installs started (PID: $!)"
-
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
-# CRITICAL: Final comprehensive ownership and permissions pass
-# Ensures ZERO root-owned files exist in /config after entire boot process
-# This is THE MOST IMPORTANT STEP - catches any files created by background/parallel processes
-log "FINAL PHASE: Aggressive ownership enforcement (no root files allowed)..."
-
-# Stage 1: Recursively fix ALL files/dirs in critical directories
-for dir in /config/.gmweb /config/.nvm /config/.local /config/.cache /config/.config /config/workspace; do
-  if [ -d "$dir" ]; then
-    log "  Stage 1: Fixing all permissions in $dir..."
-    sudo find "$dir" -type d -exec chown abc:abc {} \; 2>/dev/null || true
-    sudo find "$dir" -type f -exec chown abc:abc {} \; 2>/dev/null || true
-    sudo find "$dir" -type d -exec chmod u+rwX,g+rX,o-rwx {} \; 2>/dev/null || true
-    sudo find "$dir" -type f -exec chmod u+rw,g+r,o-rwx {} \; 2>/dev/null || true
-  fi
-done
-
-# Stage 2: Delete npm cache if it has ANY root-owned files (corrupted state)
-if [ -d /config/.gmweb/npm-cache ]; then
-  if sudo find /config/.gmweb/npm-cache -not -user 1000 2>/dev/null | grep -q .; then
-    log "  Stage 2: Root-owned files found in npm cache - DELETING entire cache..."
-    sudo rm -rf /config/.gmweb/npm-cache
-    mkdir -p /config/.gmweb/npm-cache
-    chmod 777 /config/.gmweb/npm-cache
-    log "  ✓ npm cache deleted and recreated"
-  fi
-fi
-
-# Stage 3: Delete npm-global if it has ANY root-owned files (corrupted state)
-if [ -d /config/.gmweb/npm-global ]; then
-  if sudo find /config/.gmweb/npm-global -not -user 1000 2>/dev/null | grep -q .; then
-    log "  Stage 3: Root-owned files found in npm-global - DELETING entire directory..."
-    sudo rm -rf /config/.gmweb/npm-global
-    mkdir -p /config/.gmweb/npm-global
-    chmod 777 /config/.gmweb/npm-global
-    log "  ✓ npm-global deleted and recreated"
-  fi
-fi
-
-# Stage 4: Aggressive final pass - nuke any remaining root files
-ROOT_FILES=$(sudo find /config -not -user 1000 -not -path "/config/.git/*" 2>/dev/null | wc -l)
-if [ "$ROOT_FILES" -gt 0 ]; then
-  log "  Stage 4: Found $ROOT_FILES root-owned files - forcing ownership change..."
-  sudo find /config -not -user 1000 -not -path "/config/.git/*" -exec chown abc:abc {} \; 2>/dev/null || true
-  log "  ✓ All root-owned files reassigned to abc"
-fi
-
-# Stage 5: Final verification
-log "✓ Final ownership enforcement complete"
-
-# Verify absolutely ZERO root files remain (except .git which is ok)
-REMAINING_ROOT=$(sudo find /config -not -user 1000 -not -path "/config/.git/*" 2>/dev/null | wc -l)
-if [ "$REMAINING_ROOT" -gt 0 ]; then
-  log "ERROR: Still found $REMAINING_ROOT root-owned files after final pass!"
-  log "  List (first 10):"
-  sudo find /config -not -user 1000 -not -path "/config/.git/*" 2>/dev/null | head -10 | while read f; do
-    log "    - $f"
-  done
-  log "CRITICAL: This will cause npm EACCES errors"
-else
-  log "✓ VERIFIED: ZERO root-owned files in /config (excluding .git)"
-fi
-
-# Set working directory to /config for any subsequent processes
-cd /config
-log "✓ Working directory set to /config"
-
-log "===== GMWEB STARTUP COMPLETE ====="
+log "===== GMWEB BLOCKING STARTUP COMPLETE ====="
+log "nginx ready, supervisor running, services starting"
+log "Background installs continue async (see /config/logs/background-installs.log)"
+log "s6-rc services are now active (/desk/ endpoint available)"
 exit 0

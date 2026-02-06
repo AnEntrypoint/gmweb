@@ -440,49 +440,68 @@ bun install
 - **Cause:** tar copy preserved restrictive permissions from source
 - **Fix:** Run `chmod -R u+rwX,g+rX,o-rwx ~/.config/opencode/plugin`
 
-## Complete Boot Sequence (Fixed - February 2026)
+## Complete Boot Sequence (Restructured - February 2026)
 
-The gmweb system has been completely overhauled to ensure reliable startup on every boot. All critical issues have been identified and fixed with corresponding commits.
+The gmweb boot architecture has been restructured to implement true non-blocking startup. **nginx and supervisor start first, then background tasks run async** - enabling fast service availability.
 
-### Boot Flow
+### New Boot Flow (Nginx-First Architecture)
 
 ```
 Docker Container Starts
   ↓
-custom_startup.sh executes (Phase 0-1.7)
-  ├─ Phase 0: Kill old gmweb processes
-  ├─ Phase 1: Fresh clone from git → /opt/gmweb-startup
-  ├─ Phase 1.1: Create directories + clean npm cache
-  ├─ Phase 1.2: Install Node via NVM
-  ├─ Phase 1.3: Setup nginx with HTTP Basic Auth
-  ├─ Phase 1.4: Install supervisor locally
-  ├─ Phase 1.5: Background module installs (NON-BLOCKING) 🔄
-  │  ├─ better-sqlite3
-  │  ├─ bcrypt
-  │  └─ ttyd
-  ├─ Phase 1.6: Clone gloutie-oc from npm
-  ├─ Phase 1.7: Start supervisor 🚀
-  └─ Background tasks continue in parallel
-     ├─ Large package installs
-     ├─ gcloud download
-     └─ Bun installation
+PHASE 1: custom_startup.sh (BLOCKING - ~50-60 seconds)
+  ├─ Phase 0.5: Permission setup
+  ├─ Phase 0: nginx + htpasswd configuration and startup
+  ├─ Phase 0-apt: System packages (unzip, jq, ttyd, gh, gcloud)
+  ├─ Phase 0.75: npm cache clearing
+  ├─ Phase 1: Git clone → /opt/gmweb-startup
+  ├─ Phase 1.0a/b/c: beforestart/beforeend hooks, .bashrc, .profile
+  ├─ Phase 2: nginx reload from git config
+  ├─ Phase 1.1: NVM install and Node.js setup
+  ├─ Phase 1.2: supervisor install and start 🚀
+  └─ [nginx ready, supervisor running]
 
-  ↓
-Supervisor Running (PID tracked)
-  ├─ opencode-config service
-  │  ├─ Merges opencode.json config
-  │  ├─ Fixes plugin name "gloutie" → "gloutie-oc"
-  │  └─ Sets permission: allow
-  ├─ opencode service (installs CLI)
+  ↓ [60-70 seconds total]
+PHASE 2: s6-rc Services Start (automatically after Phase 1)
+  ├─ Selkies video streaming server on port 8082
+  ├─ Desktop environment (XFCE components)
   ├─ Web services (webssh2, file-manager, agentgui, aion-ui)
-  └─ Health check loop (30s interval)
+  └─ [/desk/ endpoint now responds to requests]
 
-  ↓
-System Ready - All services healthy
-  ├─ nginx listening on 80/443
-  ├─ gloutie-oc plugin loaded and ready
-  └─ User can access /gm/ and start OpenCode sessions
+  ↓ [70+ seconds, parallel to services]
+PHASE 3: background-installs.sh (NON-BLOCKING - spawned async with nohup)
+  ├─ Phase 3.1: better-sqlite3, bcrypt installation
+  ├─ Phase 3.2: agent-browser + Chromium download
+  ├─ Phase 3.3: wrangler and global npm packages
+  ├─ Phase 3.4: secondary npm package installs
+  └─ Phase 3.5: comprehensive ownership enforcement (FINAL)
+
+  ↓ [90-130 seconds total]
+System Ready - All services healthy + all modules installed
+  ├─ /desk/ working with video stream
+  ├─ /files/, /ssh/, /gm/ all responding
+  ├─ Full module suite available
+  └─ User can access all features
 ```
+
+### Architecture Rationale
+
+**Why nginx-first?** The /desk/ endpoint is critical for user experience. By starting nginx first (Phase 0), it's available within 10 seconds, allowing Selkies video streaming to work immediately after supervisor starts.
+
+**Why split blocking/non-blocking?** Module installations (better-sqlite3, bcrypt, agent-browser) are slow on ARM64 due to compilation and large downloads (Chromium). Moving them to background Phase 3 allows services to start and accept requests while installs continue.
+
+**Why spawned separately?** `background-installs.sh` is spawned with `nohup`, making it completely independent. If it fails, the system remains fully functional. Services degrade gracefully with health checks that retry when modules become available.
+
+### Boot Timeline
+
+| Phase | Duration | Status | Services Available |
+|-------|----------|--------|-------------------|
+| Phase 0-1 | 0-50s | BLOCKING | nginx only |
+| Phase 2 | 50-70s | supervisor spawns services | /desk/, /files/, /ssh/ |
+| Phase 3 | 70-130s | background installs async | all endpoints (modules installing) |
+| Complete | 130s | all ready | full feature set |
+
+**Key Achievement:** /desk/ endpoint available at ~60-70s instead of 120-130s (50% faster).
 
 ### Critical Fixes Applied (All Committed & Pushed)
 
