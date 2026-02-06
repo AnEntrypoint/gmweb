@@ -110,23 +110,8 @@ log "  Installing: unzip jq ttyd"
 apt-get install -y --no-install-recommends unzip jq ttyd 2>&1 | tail -2
 log "  ✓ Core packages installed"
 
-# GitHub CLI
-log "  Adding GitHub CLI repository and installing gh"
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
-echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
-apt-get update -qq 2>/dev/null || true
-apt-get install -y gh 2>&1 | tail -2
-log "  ✓ GitHub CLI (gh) installed"
-
-# Google Cloud CLI
-log "  Adding Google Cloud repository and installing gcloud"
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
-apt-get update -qq 2>/dev/null || true
-apt-get install -y google-cloud-cli 2>&1 | tail -2
-log "  ✓ Google Cloud CLI (gcloud) installed"
-
-log "✓ Phase 0-apt complete - all system packages installed"
+log "✓ Phase 0-apt complete - critical packages installed"
+log "NOTE: gh and gcloud install async in background-installs.sh (not needed for nginx/supervisor)"
 
 # Cleanup and centralize installations
 log "Cleaning up legacy installations and ensuring clean state..."

@@ -100,6 +100,25 @@ AGENT_BROWSER_DEPS_EOF
 
 log "✓ Phase 3.2: agent-browser ready"
 
+# Phase 3.1b: Install GitHub CLI (async - was blocking in custom_startup)
+log "Phase 3.1b: Installing GitHub CLI (gh)..."
+apt-get update -qq 2>/dev/null || true
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
+echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null 2>/dev/null || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y gh 2>&1 | tail -2
+[ $? -eq 0 ] && log "✓ GitHub CLI (gh) installed" || log "WARNING: gh install incomplete"
+
+# Phase 3.1c: Install Google Cloud CLI (async - was blocking in custom_startup)
+log "Phase 3.1c: Installing Google Cloud CLI (gcloud)..."
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
+curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
+apt-get update -qq 2>/dev/null || true
+apt-get install -y google-cloud-cli 2>&1 | tail -2
+[ $? -eq 0 ] && log "✓ Google Cloud CLI (gcloud) installed" || log "WARNING: gcloud install incomplete"
+
+log "✓ Phase 3.1b-c: CLI tools installed"
+
 # Phase 3.3: Install global npm packages (wrangler, etc)
 log "Phase 3.3: Installing global npm packages..."
 
