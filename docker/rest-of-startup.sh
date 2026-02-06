@@ -319,24 +319,24 @@ log "Launching XFCE desktop components..."
 if ! pgrep -u abc xfce4-panel >/dev/null 2>&1; then
   sudo -u abc HOME=/config DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
     XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
-    xfce4-panel >/dev/null 2>&1 &
-  log "xfce4-panel started (PID: $!)"
+    xfce4-panel >/dev/null 2>&1
+  log "xfce4-panel completed"
 fi
 
 # Desktop (wallpaper, icons)
 if ! pgrep -u abc xfdesktop >/dev/null 2>&1; then
   sudo -u abc HOME=/config DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
     XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
-    xfdesktop >/dev/null 2>&1 &
-  log "xfdesktop started (PID: $!)"
+    xfdesktop >/dev/null 2>&1
+  log "xfdesktop completed"
 fi
 
 # Window Manager (borders, titles, Alt+Tab)
 if ! pgrep -u abc xfwm4 >/dev/null 2>&1; then
   sudo -u abc HOME=/config DISPLAY=:1 DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
     XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" LD_PRELOAD=/opt/lib/libshim_close_range.so \
-    xfwm4 >/dev/null 2>&1 &
-  log "xfwm4 started (PID: $!)"
+    xfwm4 >/dev/null 2>&1
+  log "xfwm4 completed"
 fi
 
 log "XFCE component launcher complete"
@@ -346,14 +346,12 @@ chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
 # ===== PHASE 5: BACKGROUND INSTALLS =====
-log "Phase 5: Spawning background installs (non-blocking - runs in parallel with services)..."
+log "Phase 5: Running background installs (blocking/serial)..."
 
-# CRITICAL: Background installs do NOT block supervisor or services
+# Background installs now block - fully serial startup
 if [ -f /custom-cont-init.d/background-installs.sh ]; then
-  nohup /custom-cont-init.d/background-installs.sh > "$LOG_DIR/background-installs.log" 2>&1 &
-  log "✓ Background install process spawned (PID: $!)"
-  log "  - All services are NOW ready to start"
-  log "  - Background installs continue in parallel"
+  bash /custom-cont-init.d/background-installs.sh > "$LOG_DIR/background-installs.log" 2>&1
+  log "✓ Background install process completed"
 else
   log "WARNING: background-installs.sh not found at /custom-cont-init.d/"
 fi
@@ -381,25 +379,23 @@ if [ -f /opt/gmweb-startup/start.sh ]; then
   DOCKER_CONFIG="/config/.gmweb/cache/.docker" \
   BUN_INSTALL="/config/.gmweb/cache/.bun" \
   PASSWORD="$PASSWORD" \
-  sudo -E -u abc bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log" &
-  SUPERVISOR_PID=$!
-  sleep 2
-  kill -0 $SUPERVISOR_PID 2>/dev/null && log "Supervisor started (PID: $SUPERVISOR_PID)" || log "WARNING: Supervisor may have failed"
+  sudo -E -u abc bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
+  log "Supervisor process completed"
 else
   log "ERROR: start.sh not found at /opt/gmweb-startup/start.sh"
 fi
 
-# Launch XFCE components in background (after supervisor is running)
-bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1 &
-log "XFCE component launcher started (PID: $!)"
+# Launch XFCE components (after supervisor is running)
+bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1
+log "XFCE component launcher completed"
 
 # Optional: run any local startup.sh if it exists
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
 log "===== REST OF STARTUP COMPLETE ====="
-log "All services initialized in background"
-log "nginx ready, supervisor running, services starting"
-log "Background installs continue async (see /config/logs/background-installs.log)"
+log "All phases executed serially (fully blocking)"
+log "APT → git → NVM → supervisor → XFCE → background-installs (all serial)"
+log "nginx ready, supervisor completed, all services and components launched"
 log "s6-rc services are now active (/desk/ endpoint available)"
 
 exit 0
