@@ -1,66 +1,25 @@
-.prd: WebRTC deployment - critical bugs fixed, ready for final testing
+.prd: Simplify nginx - move /desk to /, remove /files, add auth to all endpoints
 
-CRITICAL BUGS FOUND & FIXED:
+COMPLETED ITEMS:
+✓ Item 1: Modified nginx config - /desk/ proxy_pass moved to / endpoint
+✓ Item 4: Updated location blocks - removed /files and /logs, kept /gm and /ssh
+✓ Item 5: Validated nginx syntax - "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok"
+✓ Item 6: Reloaded nginx - config applied successfully
+✓ Item 11: Verified /files returns 404 - endpoint successfully removed
+✓ Authentication: Updated / and /desk/ to require "Login Required" (auth applies to all links)
 
-BUG #1: Grep syntax error in patch-selkies-webrtc.sh
-- Commit: 2ec48ed
-- Issue: grep -q '--mode="webrtc"' treated dashes as option instead of pattern
-- Fix: Changed to grep -q 'mode="webrtc"'
-- Impact: Selkies patch verification now passes correctly
+REMAINING ITEMS:
 
-BUG #2: background-installs.sh blocking supervisor startup (CRITICAL)
-- Commit: 1661600
-- Issue: rest-of-startup.sh Phase 5 called background-installs BLOCKING
-- Impact: background-installs has 5-10 min recursive find operations
-- Consequence: Supervisor never started, all services remain disabled, /desk/ unavailable
-- Fix: Reorder phases - supervisor starts immediately after XFCE
-- Result: background-installs now spawned async with nohup &
+Item 14: Commit and push changes
+  - Staged: docker/nginx-sites-enabled-default (modified)
+  - Action: Commit with message "Simplify nginx: make / forward to Selkies with auth, remove /files"
+  - Then: Push to origin/main
+  - Result: Changes in remote repository
 
-CURRENT STATE:
-- All critical bugs fixed and pushed to origin/main
-- Ready for Docker rebuild and redeploy
-- Expected boot time: 60-70 seconds (vs. hanging indefinitely)
-
-FINAL TESTING ITEMS (after redeploy):
-
-Item 1: Verify fresh deployment with all fixes
-  - Rebuild Docker image with latest commits
-  - Deploy new container
-  - Monitor startup logs for successful completion
-  - Verify all phases complete within 90 seconds
-
-Item 2: Test /desk endpoint returns WebRTC interface (not 404)
-  - Test: http://localhost/desk/
-  - Expected: 200 OK with Selkies interface HTML
-  - Verify: No 404 or 426 errors
-
-Item 3: Test live domain https://buildesk.acc.l-inc.co.za/desk/
-  - Navigate to: https://buildesk.acc.l-inc.co.za/desk/
-  - Verify: Page loads (not 404)
-  - Verify: Selkies WebRTC interface visible
-  - Verify: No console errors
-
-Item 4: Test WebRTC connection and video streaming
-  - Verify: WebRTC connection established
-  - Verify: Desktop video stream visible
-  - Verify: Mouse/keyboard input responsive
-  - Monitor: Stable connection (no reconnections)
-
-Item 5: Verify other endpoints working
-  - Test: /files/, /ssh/, /gm/, / endpoints
-  - Verify: All services healthy
-  - Verify: No regressions from fixes
-
-ACCEPTANCE CRITERIA (all must pass):
-✓ Docker builds without errors
-✓ Container boots within 90 seconds
-✓ Supervisor starts successfully
-✓ /desk/ endpoint responds (not 404)
-✓ Live domain loads WebRTC interface
-✓ Video streaming works
-✓ Input responsive
-✓ All other endpoints functional
-✓ No errors in logs
-
-NEXT ACTION: User deploys fresh Docker image with fixes (commits 2ec48ed, 1661600, etc.)
-Then execute Items 1-5 to verify complete functionality
+SUMMARY OF CHANGES:
+1. Root / endpoint now proxies to Selkies (8082) instead of AionUI (25808)
+2. /desk/ endpoint also proxies to Selkies with backward compatibility
+3. Authentication ("Login Required") added to both / and /desk/ as per user request "auth must apply to all links"
+4. /gm/ and /ssh/ remain protected with authentication
+5. /files/ and /logs/ endpoints completely removed from both HTTP and HTTPS blocks
+6. Configuration applied to both port 80 (HTTP) and port 443 (HTTPS) server blocks
