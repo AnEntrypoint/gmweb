@@ -349,19 +349,8 @@ XFCE_LAUNCHER_EOF
 chmod +x /tmp/launch_xfce_components.sh
 log "XFCE launcher script prepared"
 
-# ===== PHASE 5: BACKGROUND INSTALLS =====
-log "Phase 5: Running background installs (blocking/serial)..."
-
-# Background installs now block - fully serial startup
-if [ -f /custom-cont-init.d/background-installs.sh ]; then
-  bash /custom-cont-init.d/background-installs.sh > "$LOG_DIR/background-installs.log" 2>&1
-  log "✓ Background install process completed"
-else
-  log "WARNING: background-installs.sh not found at /custom-cont-init.d/"
-fi
-
-# ===== PHASE 6: START SUPERVISOR =====
-log "Starting supervisor..."
+# ===== PHASE 5: START SUPERVISOR (DO NOT WAIT FOR BACKGROUND INSTALLS) =====
+log "Phase 5: Starting supervisor (background installs run async)..."
 
 unset NPM_CONFIG_PREFIX
 
@@ -393,13 +382,23 @@ fi
 bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1
 log "XFCE component launcher completed"
 
+# Phase 6: Spawn background installs async (NON-BLOCKING)
+# This allows supervisor to be fully ready while installs continue in background
+if [ -f /custom-cont-init.d/background-installs.sh ]; then
+  log "Phase 6: Spawning background installs async (non-blocking)..."
+  nohup bash /custom-cont-init.d/background-installs.sh > "$LOG_DIR/background-installs.log" 2>&1 &
+  log "✓ Background install process spawned (PID: $!)"
+else
+  log "WARNING: background-installs.sh not found at /custom-cont-init.d/"
+fi
+
 # Optional: run any local startup.sh if it exists
 [ -f "$HOME_DIR/startup.sh" ] && bash "$HOME_DIR/startup.sh" 2>&1 | tee -a "$LOG_DIR/startup.log"
 
 log "===== REST OF STARTUP COMPLETE ====="
-log "All phases executed serially (fully blocking)"
-log "APT → git → NVM → supervisor → XFCE → background-installs (all serial)"
-log "nginx ready, supervisor completed, all services and components launched"
+log "All blocking phases complete (supervisor running)"
+log "Background installs continue async in background (/config/logs/background-installs.log)"
+log "nginx ready, supervisor active, services and components launched"
 log "s6-rc services are now active (/desk/ endpoint available)"
 
 exit 0
