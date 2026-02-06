@@ -110,16 +110,30 @@ sleep 5
 if kill -0 $SUPERVISOR_PID 2>/dev/null; then
   echo "[start.sh] ✓ Supervisor is RUNNING (PID: $SUPERVISOR_PID)"
 
-    # Give services time to fully start
-    sleep 3
+    # Give services adequate time to fully initialize and bind sockets
+    # nginx initialization takes 3-5 seconds, kernel socket registration may lag
+    sleep 8
 
     # Verify nginx is listening on port 80
-    if command -v ss &> /dev/null; then
-      if ss -tlnp 2>/dev/null | grep -q ":80.*LISTEN"; then
-        echo "[start.sh] ✓ nginx is LISTENING on port 80"
-      else
-        echo "[start.sh] ✗ nginx NOT listening on port 80 (may still be starting)"
+    # Retry up to 5 times in case kernel socket table hasn't updated yet
+    NGINX_CHECK_ATTEMPTS=0
+    NGINX_LISTENING=false
+    while [ $NGINX_CHECK_ATTEMPTS -lt 5 ]; do
+      if command -v ss &> /dev/null; then
+        if ss -tlnp 2>/dev/null | grep -q ":80.*LISTEN"; then
+          echo "[start.sh] ✓ nginx is LISTENING on port 80"
+          NGINX_LISTENING=true
+          break
+        fi
       fi
+      NGINX_CHECK_ATTEMPTS=$((NGINX_CHECK_ATTEMPTS + 1))
+      if [ $NGINX_CHECK_ATTEMPTS -lt 5 ]; then
+        sleep 1
+      fi
+    done
+
+    if [ "$NGINX_LISTENING" = false ]; then
+      echo "[start.sh] ⚠ nginx NOT yet detected listening on port 80 (may still be initializing)"
     fi
 else
   echo "[start.sh] ✗ Supervisor exited (check logs)"
