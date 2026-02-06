@@ -45,12 +45,17 @@ cat > /tmp/gmweb-wrappers/npm-as-abc.sh << 'NPM_WRAPPER_EOF'
 export NVM_DIR=/config/nvm
 export HOME=/config
 export GMWEB_DIR=/config/.gmweb
+# CRITICAL: Unset conflicting npm config BEFORE sourcing NVM
+unset NPM_CONFIG_PREFIX
+unset npm_config_prefix
+# Set npm cache/prefix AFTER NVM is sourced
 export npm_config_cache=/config/.gmweb/npm-cache
 export npm_config_prefix=/config/.gmweb/npm-global
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 export PATH="/config/.gmweb/npm-global/bin:$PATH"
 if ! command -v npm &>/dev/null; then
   echo "ERROR: npm not available after NVM source" >&2
+  echo "DEBUG: PATH=$PATH NVM_DIR=$NVM_DIR" >&2
   exit 1
 fi
 exec "$@"

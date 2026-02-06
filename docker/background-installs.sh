@@ -9,6 +9,10 @@
 
 set +e  # Don't exit on individual failures
 
+# CRITICAL: Unset NPM_CONFIG_PREFIX which conflicts with NVM
+unset NPM_CONFIG_PREFIX
+unset npm_config_prefix
+
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 GMWEB_DIR="$HOME_DIR/.gmweb"
