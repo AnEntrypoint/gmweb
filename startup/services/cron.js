@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { existsSync, readFileSync, copyFileSync, chmodSync } from 'fs';
+import { existsSync, copyFileSync, chmodSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -36,20 +36,31 @@ function loadCrontab() {
   }
 }
 
-function killExisting() {
+function isCronRunning() {
   try {
-    execSync('sudo fuser -k 0/tcp 2>/dev/null || true', { stdio: 'pipe', shell: true });
-  } catch (e) {}
+    execSync('pgrep -x cron', { stdio: 'pipe' });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function startCronDaemon() {
   try {
-    execSync("sudo kill $(pgrep -x cron) 2>/dev/null || true", { stdio: 'pipe', shell: true });
-  } catch (e) {}
+    execSync('sudo cron', { stdio: 'pipe', timeout: 5000 });
+    console.log(`[${NAME}] crond started via sudo cron`);
+    return true;
+  } catch (e) {
+    console.log(`[${NAME}:err] Failed to start crond: ${e.message}`);
+    return false;
+  }
 }
 
 export default {
   name: NAME,
   type: 'system',
   requiresDesktop: false,
-  dependencies: ['proxypilot'],
+  dependencies: [],
 
   async start(env) {
     console.log(`[${NAME}] Starting cron service...`);
@@ -61,20 +72,16 @@ export default {
       return { pid: null, process: null, cleanup: async () => {} };
     }
 
-    killExisting();
-
     if (!ensureCrontab()) {
       console.log(`[${NAME}] No crontab available - starting crond without user crontab`);
     } else {
       loadCrontab();
     }
 
-    try {
-      execSync('sudo cron', { stdio: 'pipe', timeout: 5000 });
-      console.log(`[${NAME}] crond started`);
-    } catch (e) {
-      console.log(`[${NAME}:err] Failed to start crond: ${e.message}`);
-      return { pid: null, process: null, cleanup: async () => {} };
+    if (!isCronRunning()) {
+      startCronDaemon();
+    } else {
+      console.log(`[${NAME}] cron daemon already running (s6 svc-cron)`);
     }
 
     let pid = null;
@@ -85,19 +92,17 @@ export default {
     return {
       pid: pid || 0,
       process: null,
-      cleanup: async () => {
-        try {
-          execSync('sudo kill $(pgrep -x cron) 2>/dev/null || true', { stdio: 'pipe', shell: true });
-        } catch (e) {}
-      }
+      cleanup: async () => {}
     };
   },
 
   async health() {
-    try {
-      execSync('pgrep -x cron', { stdio: 'pipe' });
-    } catch (e) {
-      return false;
+    if (!isCronRunning()) {
+      console.log(`[${NAME}] cron daemon not running, restarting...`);
+      ensureCrontab();
+      loadCrontab();
+      startCronDaemon();
+      return isCronRunning();
     }
 
     if (existsSync(CRONTAB_PATH)) {

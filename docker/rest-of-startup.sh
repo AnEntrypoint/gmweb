@@ -71,6 +71,23 @@ cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
 cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
 log "✓ Startup files copied to /opt/gmweb-startup"
 
+# ===== PHASE 1.0-cron: EARLY CRONTAB SETUP =====
+# Copy default crontab to /config/crontab BEFORE s6 svc-cron or supervisor starts
+# s6's svc-cron checks crontab -l -u abc on start; if empty it sleeps forever
+# By loading the crontab early, s6 svc-cron starts the real cron daemon
+if [ ! -f /config/crontab ] && [ -f /opt/gmweb-startup/crontab.default ]; then
+  log "Phase 1.0-cron: Creating /config/crontab from default template..."
+  cp /opt/gmweb-startup/crontab.default /config/crontab
+  chmod 644 /config/crontab
+  chown abc:abc /config/crontab 2>/dev/null || true
+  crontab -u abc /config/crontab 2>/dev/null || true
+  log "✓ Default crontab installed and loaded for user abc"
+elif [ -f /config/crontab ]; then
+  log "Phase 1.0-cron: /config/crontab already exists, loading..."
+  crontab -u abc /config/crontab 2>/dev/null || true
+  log "✓ Existing crontab loaded for user abc"
+fi
+
 # ===== PHASE 1.0a: BEFORESTART/BEFOREEND HOOKS =====
 log "Phase 1.0a: Setting up beforestart and beforeend hooks..."
 cp /tmp/gmweb/startup/beforestart /config/beforestart
