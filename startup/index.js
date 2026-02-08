@@ -46,7 +46,8 @@ async function main() {
         'claude-config',
         'playwriter',
         'glootie-oc',
-        'version-check'
+        'version-check',
+        'cron'
       ];
 
     console.log('[startup] Loading services...');

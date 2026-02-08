@@ -65,6 +65,10 @@
     "version-check": {
       "enabled": true,
       "type": "system"
+    },
+    "cron": {
+      "enabled": true,
+      "type": "system"
     }
   }
 }
