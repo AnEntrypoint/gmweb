@@ -56,7 +56,7 @@ async function startAgentGuiProcess(env) {
 
   log('Spawning bunx agentgui@latest...');
 
-  const ps = spawn('bunx', ['--latest', 'agentgui@latest'], {
+  const ps = spawn('bunx', ['agentgui@latest'], {
     env: childEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true
