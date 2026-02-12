@@ -34,7 +34,7 @@ sudo apt-get install -y --no-install-recommends \
   software-properties-common apt-transport-https gnupg openssh-server \
   openssh-client tmux lsof \
   scrot xclip \
-  libgbm1 libgtk-3-0 libnss3 libxss1 libasound2 libatk-bridge2.0-0 \
+  libgbm1 libgtk-3-0 libnss3 libxss1 libasound2t64 libatk-bridge2.0-0 \
   libdrm2 libxcomposite1 libxdamage1 libxrandr2
 
 sudo rm -rf /var/lib/apt/lists/*
@@ -183,23 +183,6 @@ log "Permissions are set at boot time by custom_startup.sh"
 
 log "NHFS will be run via npx at startup (no pre-build needed)"
 log "✓ NHFS HTTP file server ready to launch"
-
-# ============================================================================
-# 12. INSTALL NPM PACKAGES FOR GLOBAL USE
-# ============================================================================
-
-log "Installing global npm packages..."
-
-npm install -g better-sqlite3 2>&1 | tail -3
-log "better-sqlite3 installed"
-
-mkdir -p /config/.gmweb-deps
-cd /config/.gmweb-deps && npm install bcrypt 2>&1 | tail -3
-log "bcrypt installed"
-
-npm install -g agent-browser 2>&1 | tail -3
-agent-browser install --with-deps 2>&1 | tail -5
-log "agent-browser installed"
 
 # ============================================================================
 # COMPLETION

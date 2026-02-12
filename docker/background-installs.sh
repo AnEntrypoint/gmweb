@@ -7,17 +7,12 @@
 # Usage: nohup /config/docker/background-installs.sh > /config/logs/background-installs.log 2>&1 &
 # (called from custom_startup.sh after supervisor starts)
 
-set +e  # Don't exit on individual failures
-
-# CRITICAL: Unset NPM_CONFIG_PREFIX which conflicts with NVM
-unset NPM_CONFIG_PREFIX
-unset npm_config_prefix
+set +e
 
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 GMWEB_DIR="$HOME_DIR/.gmweb"
 
-# Logging function (shared with main startup, but can work independently)
 log() {
   local msg="[gmweb-background] $(date '+%Y-%m-%d %H:%M:%S') $@"
   echo "$msg"
@@ -28,83 +23,63 @@ log() {
 log "===== GMWEB BACKGROUND INSTALLS STARTED (Phase 3) ====="
 log "This runs async after supervisor is ready - does not block services"
 
-# Ensure gmweb deps directory exists
 sudo mkdir -p "$GMWEB_DIR/deps"
 sudo chown 1000:1000 "$GMWEB_DIR/deps" 2>/dev/null || true
 sudo chmod u+rwX,g+rX,o-rwx "$GMWEB_DIR/deps" 2>/dev/null || true
 
-# Phase 3.1: Install native modules (better-sqlite3, bcrypt)
 log "Phase 3.1: Installing critical Node modules..."
 
 log "  Installing better-sqlite3..."
 sudo -u abc bash << 'SQLITE_INSTALL_EOF'
-export NVM_DIR=/config/nvm
 export HOME=/config
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+[ -f /config/beforestart ] && . /config/beforestart
 npm install -g better-sqlite3 2>&1 | tail -3
 SQLITE_INSTALL_EOF
 [ $? -eq 0 ] && log "✓ better-sqlite3 installed" || log "WARNING: better-sqlite3 install incomplete"
 
 log "  Installing bcrypt..."
 sudo -u abc bash << 'BCRYPT_INSTALL_EOF'
-export NVM_DIR=/config/nvm
 export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-cd "$GMWEB_DIR/deps" && npm install bcrypt 2>&1 | tail -3
+[ -f /config/beforestart ] && . /config/beforestart
+cd /config/.gmweb/deps && npm install bcrypt 2>&1 | tail -3
 BCRYPT_INSTALL_EOF
 [ $? -eq 0 ] && log "✓ bcrypt installed" || log "WARNING: bcrypt install incomplete"
 
-# Clean npm cache after modules
 sudo -u abc bash << 'CACHE_CLEAN_EOF'
-export NVM_DIR=/config/nvm
 export HOME=/config
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+[ -f /config/beforestart ] && . /config/beforestart
 npm cache clean --force 2>&1 | tail -1
 CACHE_CLEAN_EOF
 log "✓ npm cache cleaned"
 
-# Phase 3.2: Install agent-browser (Chromium-based testing)
 log "Phase 3.2: Installing agent-browser..."
 
 log "  Installing agent-browser package..."
 sudo -u abc bash << 'AGENT_BROWSER_INSTALL_EOF'
-export NVM_DIR=/config/nvm
 export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+[ -f /config/beforestart ] && . /config/beforestart
 npm install -g agent-browser 2>&1 | tail -3
 AGENT_BROWSER_INSTALL_EOF
 [ $? -eq 0 ] && log "✓ agent-browser installed" || log "WARNING: agent-browser install incomplete"
 
 log "  Running agent-browser setup (download Chromium)..."
 sudo -u abc bash << 'AGENT_BROWSER_SETUP_EOF'
-export NVM_DIR=/config/nvm
 export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-agent-browser install 2>&1 | tail -3
+[ -f /config/beforestart ] && . /config/beforestart
+agent-browser install 2>&1
 AGENT_BROWSER_SETUP_EOF
 [ $? -eq 0 ] && log "✓ agent-browser Chromium download complete" || log "WARNING: agent-browser setup incomplete"
 
 log "  Installing agent-browser system dependencies..."
 sudo -u abc bash << 'AGENT_BROWSER_DEPS_EOF'
-export NVM_DIR=/config/nvm
 export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-export npm_config_cache=/config/.gmweb/npm-cache
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-agent-browser install --with-deps 2>&1 | tail -3
+[ -f /config/beforestart ] && . /config/beforestart
+agent-browser install --with-deps 2>&1
 AGENT_BROWSER_DEPS_EOF
 [ $? -eq 0 ] && log "✓ agent-browser system dependencies installed" || log "WARNING: agent-browser --with-deps incomplete"
 
 log "✓ Phase 3.2: agent-browser ready"
 
-# Phase 3.1b: Install GitHub CLI (async - was blocking in custom_startup)
 log "Phase 3.1b: Installing GitHub CLI (gh)..."
 apt-get update -qq 2>/dev/null || true
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg 2>/dev/null | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null || true
@@ -113,7 +88,6 @@ apt-get update -qq 2>/dev/null || true
 apt-get install -y gh 2>&1 | tail -2
 [ $? -eq 0 ] && log "✓ GitHub CLI (gh) installed" || log "WARNING: gh install incomplete"
 
-# Phase 3.1c: Install Google Cloud CLI (async - was blocking in custom_startup)
 log "Phase 3.1c: Installing Google Cloud CLI (gcloud)..."
 echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null 2>/dev/null || true
 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg 2>/dev/null | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - 2>/dev/null || true
@@ -123,22 +97,12 @@ apt-get install -y google-cloud-cli 2>&1 | tail -2
 
 log "✓ Phase 3.1b-c: CLI tools installed"
 
-# Phase 3.3: Install global npm packages (wrangler, etc)
 log "Phase 3.3: Installing global npm packages..."
-
-# Source NVM for this block
-export NVM_DIR=/config/nvm
-export HOME=/config
-export GMWEB_DIR=/config/.gmweb
-export npm_config_cache=/config/.gmweb/npm-cache
-
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
 log "  Installing wrangler (Cloudflare deployment)..."
 sudo -u abc bash << 'WRANGLER_INSTALL_EOF'
-export NVM_DIR=/config/nvm
 export HOME=/config
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+[ -f /config/beforestart ] && . /config/beforestart
 npm install -g wrangler 2>&1 | tail -3
 WRANGLER_INSTALL_EOF
 [ $? -eq 0 ] && log "✓ wrangler installed" || log "WARNING: wrangler install incomplete"

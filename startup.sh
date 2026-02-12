@@ -126,7 +126,7 @@ apt-get update -qq 2>/dev/null || true
 apt-get install -y --no-install-recommends curl bash git build-essential ca-certificates jq wget \
   software-properties-common apt-transport-https gnupg openssh-server openssh-client tmux lsof \
   scrot xclip \
-  libgbm1 libgtk-3-0 libnss3 libxss1 libasound2 libatk-bridge2.0-0 \
+  libgbm1 libgtk-3-0 libnss3 libxss1 libasound2t64 libatk-bridge2.0-0 \
   libdrm2 libxcomposite1 libxdamage1 libxrandr2 2>&1 | tail -5
 
 echo "${ABC_UID}:${ABC_GID} ALL=(ALL) NOPASSWD: ALL" | sudo tee -a /etc/sudoers > /dev/null 2>&1 || true
