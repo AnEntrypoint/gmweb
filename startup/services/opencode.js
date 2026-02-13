@@ -1,4 +1,6 @@
-import { spawn, execSync } from 'child_process';
+// OpenCode CLI Service
+// Installs the opencode-ai CLI and platform-specific binary
+import { execSync } from 'child_process';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { arch, platform } from 'os';
@@ -46,22 +48,21 @@ export default {
   name: NAME,
   type: 'install',
   requiresDesktop: false,
-  dependencies: ['opencode-config', 'glootie-oc'],
+  dependencies: ['opencode-config'],
 
   async start(env) {
     const homeDir = env.HOME || '/config';
     const binPath = `${dirname(process.execPath)}/${NAME}`;
 
+    // Ensure directories exist
     const opencodeConfigDir = `${homeDir}/.config/opencode`;
     const opencodeStorageDir = `${homeDir}/.local/share/opencode/storage`;
     try {
       if (!existsSync(opencodeConfigDir)) {
         mkdirSync(opencodeConfigDir, { recursive: true });
-        console.log(`[${NAME}] Created opencode config directory: ${opencodeConfigDir}`);
       }
       if (!existsSync(opencodeStorageDir)) {
         mkdirSync(opencodeStorageDir, { recursive: true });
-        console.log(`[${NAME}] Created opencode storage directory: ${opencodeStorageDir}`);
       }
       execSync(`sudo chown -R abc:abc "${opencodeConfigDir}" 2>/dev/null || true`, { stdio: 'pipe' });
       execSync(`sudo chown -R abc:abc "${opencodeStorageDir}" 2>/dev/null || true`, { stdio: 'pipe' });
@@ -71,6 +72,7 @@ export default {
       console.log(`[${NAME}] Warning: Could not setup opencode directories: ${e.message}`);
     }
 
+    // Try to install platform-specific binary for better performance
     let opencodeBinPath = resolveOpencodeBinary();
     if (!opencodeBinPath) {
       installPlatformBinary();
@@ -79,70 +81,41 @@ export default {
 
     if (opencodeBinPath) {
       console.log(`[${NAME}] Using platform binary: ${opencodeBinPath}`);
-    } else {
-      console.log(`[${NAME}] Platform binary not found, falling back to npx wrapper`);
+      // Create a direct symlink to the platform binary for faster startup
+      try {
+        execSync(`ln -sf "${opencodeBinPath}" "${binPath}" 2>/dev/null || true`, { stdio: 'pipe' });
+        console.log(`[${NAME}] Created symlink to platform binary`);
+      } catch (e) {
+        // Fallback to npx wrapper
+        console.log(`[${NAME}] Falling back to npx wrapper`);
+      }
     }
 
-    console.log(`[${NAME}] Creating wrapper...`);
-    if (!createNpxWrapper(binPath, PKG)) {
-      console.log(`[${NAME}] Failed to create wrapper`);
-      return { pid: 0, process: null, cleanup: async () => {} };
+    // If no platform binary, create npx wrapper
+    if (!existsSync(binPath)) {
+      console.log(`[${NAME}] Creating npx wrapper...`);
+      if (!createNpxWrapper(binPath, PKG)) {
+        console.log(`[${NAME}] Failed to create wrapper`);
+        return { pid: 0, process: null, cleanup: async () => {} };
+      }
+      console.log(`[${NAME}] Wrapper created`);
     }
-    console.log(`[${NAME}] Wrapper created`);
+
+    // Precache the package for faster first use
     precacheNpmPackage(PKG, env);
 
-    const spawnEnv = { ...env, HOME: homeDir };
-    if (opencodeBinPath) {
-      spawnEnv.OPENCODE_BIN_PATH = opencodeBinPath;
-    }
+    console.log(`[${NAME}] OpenCode CLI installed successfully`);
 
-    console.log(`[${NAME}] Starting opencode acp...`);
-    const ps = spawn(binPath, ['acp'], {
-      cwd: homeDir,
-      env: spawnEnv,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      detached: true
-    });
-
-    let lastExitCode = null;
-    ps.stdout?.on('data', d => {
-      console.log(`[${NAME}:acp] ${d.toString().trim()}`);
-    });
-    ps.stderr?.on('data', d => {
-      console.log(`[${NAME}:acp:err] ${d.toString().trim()}`);
-    });
-
-    ps.on('error', (err) => {
-      console.log(`[${NAME}:error] Process error: ${err.message}`);
-    });
-
-    ps.on('exit', (code, signal) => {
-      lastExitCode = code;
-      if (code !== 0) {
-        console.log(`[${NAME}:exit] Process exited with code ${code}, signal ${signal}`);
-        console.log(`[${NAME}] OpenCode ACP failed to start. AgentGUI will still work and list opencode as an available agent, but ACP features won't be available until this is fixed.`);
-      }
-    });
-
-    ps.unref();
     return {
-      pid: ps.pid,
-      process: ps,
-      cleanup: async () => {
-        try {
-          process.kill(-ps.pid, 'SIGTERM');
-          await new Promise(r => setTimeout(r, 2000));
-          process.kill(-ps.pid, 'SIGKILL');
-        } catch (e) {}
-      }
+      pid: 0,
+      process: null,
+      cleanup: async () => {}
     };
   },
 
   async health() {
     try {
       const binPath = `${dirname(process.execPath)}/${NAME}`;
-      // OpenCode binary existence is acceptable - the ACP process may have failed to start
-      // but the binary is still available for discovery by agentgui
       return existsSync(binPath);
     } catch (e) {
       return false;

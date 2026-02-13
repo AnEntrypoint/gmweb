@@ -69,6 +69,10 @@
     "cron": {
       "enabled": true,
       "type": "system"
+    },
+    "gemini-cli": {
+      "enabled": true,
+      "type": "install"
     }
   }
 }
