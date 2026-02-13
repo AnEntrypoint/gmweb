@@ -47,7 +47,8 @@ async function main() {
         'playwriter',
         'glootie-oc',
         'version-check',
-        'cron'
+        'cron',
+        'gemini-cli'
       ];
 
     console.log('[startup] Loading services...');
