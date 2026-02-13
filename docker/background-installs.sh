@@ -78,6 +78,14 @@ agent-browser install --with-deps 2>&1
 AGENT_BROWSER_DEPS_EOF
 [ $? -eq 0 ] && log "✓ agent-browser system dependencies installed" || log "WARNING: agent-browser --with-deps incomplete"
 
+log "  Adding agent-browser skills..."
+sudo -u abc bash << 'AGENT_BROWSER_SKILLS_EOF'
+export HOME=/config
+[ -f /config/beforestart ] && . /config/beforestart
+npx skills add vercel-labs/agent-browser -g -y --all 2>&1 | tail -5
+AGENT_BROWSER_SKILLS_EOF
+[ $? -eq 0 ] && log "✓ agent-browser skills added" || log "WARNING: agent-browser skills add incomplete"
+
 log "✓ Phase 3.2: agent-browser ready"
 
 log "Phase 3.1b: Installing GitHub CLI (gh)..."
