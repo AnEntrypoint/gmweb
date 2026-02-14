@@ -86,6 +86,71 @@ npx skills add vercel-labs/agent-browser -g -y --all 2>&1 | tail -5
 AGENT_BROWSER_SKILLS_EOF
 [ $? -eq 0 ] && log "✓ agent-browser skills added" || log "WARNING: agent-browser skills add incomplete"
 
+log "Phase 3.2b: Verifying chromium headless launch..."
+CHROMIUM_VERIFIED=false
+if [ -x /usr/bin/chromium-browser ]; then
+  CHROMIUM_TEST=$(timeout 10 /usr/bin/chromium-browser --headless --no-sandbox --disable-gpu --dump-dom about:blank 2>&1)
+  if echo "$CHROMIUM_TEST" | grep -q '<html>'; then
+    CHROMIUM_VERSION=$(/usr/bin/chromium-browser --version 2>&1 | head -1)
+    log "✓ System chromium verified: $CHROMIUM_VERSION"
+    CHROMIUM_VERIFIED=true
+  else
+    log "WARNING: System chromium headless test failed"
+    log "  Output: $(echo "$CHROMIUM_TEST" | tail -3)"
+  fi
+else
+  log "WARNING: /usr/bin/chromium-browser not found (apt install may not have completed)"
+fi
+
+log "Phase 3.2c: Cleaning stale puppeteer cache versions..."
+PUPPETEER_CACHE="/config/.cache/puppeteer/chrome"
+if [ -d "$PUPPETEER_CACHE" ]; then
+  CURRENT_ARCH=$(uname -m)
+  ARCH_PREFIX="linux_arm"
+  [ "$CURRENT_ARCH" = "x86_64" ] && ARCH_PREFIX="linux"
+
+  for chrome_dir in "$PUPPETEER_CACHE"/*/; do
+    dir_name=$(basename "$chrome_dir")
+    case "$dir_name" in
+      linux-*)
+        if [ "$CURRENT_ARCH" != "x86_64" ]; then
+          log "  Removing wrong-arch puppeteer cache: $dir_name"
+          rm -rf "$chrome_dir"
+        fi
+        ;;
+    esac
+  done
+
+  KEPT=0
+  for chrome_dir in $(ls -1dt "$PUPPETEER_CACHE"/${ARCH_PREFIX}-* 2>/dev/null); do
+    KEPT=$((KEPT + 1))
+    if [ $KEPT -gt 1 ]; then
+      dir_name=$(basename "$chrome_dir")
+      log "  Removing old puppeteer cache: $dir_name"
+      rm -rf "$chrome_dir"
+    fi
+  done
+  log "✓ Puppeteer cache cleaned (kept newest matching arch)"
+fi
+
+HEADLESS_CACHE="/config/.cache/puppeteer/chrome-headless-shell"
+if [ -d "$HEADLESS_CACHE" ]; then
+  for shell_dir in $(ls -1dt "$HEADLESS_CACHE"/*/ 2>/dev/null | tail -n +2); do
+    dir_name=$(basename "$shell_dir")
+    log "  Removing old headless shell cache: $dir_name"
+    rm -rf "$shell_dir"
+  done
+fi
+
+if [ "$CHROMIUM_VERIFIED" = true ]; then
+  MARKER_FILE="/tmp/gmweb-chromium-ready"
+  echo "ready=$(date '+%Y-%m-%d %H:%M:%S')" > "$MARKER_FILE"
+  echo "path=/usr/bin/chromium-browser" >> "$MARKER_FILE"
+  echo "version=$CHROMIUM_VERSION" >> "$MARKER_FILE"
+  chmod 644 "$MARKER_FILE"
+  log "✓ Chromium readiness marker created at $MARKER_FILE"
+fi
+
 log "✓ Phase 3.2: agent-browser ready"
 
 log "Phase 3.1b: Installing GitHub CLI (gh)..."

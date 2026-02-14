@@ -311,6 +311,12 @@ export class Supervisor {
     if (!env.DOCKER_CONFIG) { env.DOCKER_CONFIG = '/config/.gmweb/cache/.docker'; }
     if (!env.BUN_INSTALL) { env.BUN_INSTALL = '/config/.gmweb/cache/.bun'; }
 
+    if (!env.PUPPETEER_EXECUTABLE_PATH) { env.PUPPETEER_EXECUTABLE_PATH = '/usr/bin/chromium-browser'; }
+    if (!env.CHROME_PATH) { env.CHROME_PATH = '/usr/bin/chromium-browser'; }
+    if (!env.CHROMIUM_PATH) { env.CHROMIUM_PATH = '/usr/bin/chromium-browser'; }
+    if (!env.PUPPETEER_SKIP_DOWNLOAD) { env.PUPPETEER_SKIP_DOWNLOAD = 'true'; }
+    if (!env.PUPPETEER_CACHE_DIR) { env.PUPPETEER_CACHE_DIR = '/config/.cache/puppeteer'; }
+
     if (!env.DBUS_SESSION_BUS_ADDRESS) {
       env.DBUS_SESSION_BUS_ADDRESS = `unix:path=/run/user/${uid}/bus`;
       this.logger.log('INFO', `D-Bus session configured: ${env.DBUS_SESSION_BUS_ADDRESS}`);

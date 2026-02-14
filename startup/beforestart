@@ -67,3 +67,12 @@ export NPM_CONFIG_CACHE="$GMWEB_DIR/npm-cache"
 export NPM_CONFIG_PREFIX="$GMWEB_DIR/npm-global"
 
 export NODE_OPTIONS="--no-warnings"
+
+# Chromium / Puppeteer configuration
+# Point all browser automation tools to system chromium (apt-installed, architecture-tested)
+# Prevents puppeteer from downloading its own Chrome binary (saves ~350MB per version)
+export PUPPETEER_EXECUTABLE_PATH="/usr/bin/chromium-browser"
+export CHROME_PATH="/usr/bin/chromium-browser"
+export CHROMIUM_PATH="/usr/bin/chromium-browser"
+export PUPPETEER_SKIP_DOWNLOAD="true"
+export PUPPETEER_CACHE_DIR="/config/.cache/puppeteer"

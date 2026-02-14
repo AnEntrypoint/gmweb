@@ -388,6 +388,11 @@ if [ -f /opt/gmweb-startup/start.sh ]; then
   DBUS_SESSION_BUS_ADDRESS="unix:path=$RUNTIME_DIR/bus" \
   DOCKER_CONFIG="/config/.gmweb/cache/.docker" \
   BUN_INSTALL="/config/.gmweb/cache/.bun" \
+  PUPPETEER_EXECUTABLE_PATH="/usr/bin/chromium-browser" \
+  CHROME_PATH="/usr/bin/chromium-browser" \
+  CHROMIUM_PATH="/usr/bin/chromium-browser" \
+  PUPPETEER_SKIP_DOWNLOAD="true" \
+  PUPPETEER_CACHE_DIR="/config/.cache/puppeteer" \
   PASSWORD="$PASSWORD" \
   sudo -E -u abc bash /opt/gmweb-startup/start.sh 2>&1 | tee -a "$LOG_DIR/startup.log"
   log "Supervisor process completed"
