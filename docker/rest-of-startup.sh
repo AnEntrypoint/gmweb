@@ -30,8 +30,8 @@ RUNTIME_DIR="/run/user/$ABC_UID"
 # ===== PHASE 0: SYSTEM PACKAGES =====
 log "Phase 0: Installing system packages (APT) - async after nginx"
 apt-get update -qq 2>/dev/null || true
-log "  Installing: unzip jq ttyd"
-apt-get install -y --no-install-recommends unzip jq ttyd 2>&1 | tail -2
+log "  Installing: unzip jq ttyd chromium"
+apt-get install -y --no-install-recommends unzip jq ttyd chromium 2>&1 | tail -2
 [ $? -eq 0 ] && log "✓ System packages installed" || log "WARNING: System package install incomplete"
 
 # ===== PHASE 1: GIT CLONE =====
