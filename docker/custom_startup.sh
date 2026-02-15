@@ -261,12 +261,12 @@ log "  - Phase 3: Supervisor and services"
 log "  - Phase 4: XFCE launcher"
 log "  - Phase 5: Background module installs"
 
-# Patch Selkies to use WebRTC mode (more efficient than WebSocket)
+# Ensure Selkies uses WebSocket mode (WebRTC requires GStreamer which is unavailable)
 # Must run BEFORE s6-rc services start
-log "Phase 0: Patching Selkies to WebRTC mode for efficient streaming..."
+log "Phase 0: Ensuring Selkies WebSocket mode..."
 if [ -f /custom-cont-init.d/patch-selkies-webrtc.sh ]; then
   bash /custom-cont-init.d/patch-selkies-webrtc.sh >> "$LOG_DIR/startup.log" 2>&1
-  [ $? -eq 0 ] && log "✓ Selkies WebRTC patch applied" || log "WARNING: Selkies WebRTC patch may have failed"
+  [ $? -eq 0 ] && log "Selkies WebSocket mode confirmed" || log "WARNING: Selkies mode patch may have failed"
 else
   log "WARNING: patch-selkies-webrtc.sh not found"
 fi
