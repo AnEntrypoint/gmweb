@@ -77,3 +77,37 @@ export CHROMIUM_PATH="/usr/bin/chromium-browser"
 export PUPPETEER_SKIP_DOWNLOAD="true"
 export PUPPETEER_CACHE_DIR="/config/.cache/puppeteer"
 export AGENT_BROWSER_EXECUTABLE_PATH="/usr/bin/chromium-browser"
+
+# Cleanup Chromium lock files on boot
+# Prevents "profile appears to be in use" errors after container restart
+_cleanup_chromium_locks() {
+  local count=0
+  # Find and remove SingletonLock files from Chromium profiles
+  while IFS= read -r lockfile; do
+    if [ -n "$lockfile" ]; then
+      local profile_dir=$(dirname "$lockfile")
+      rm -f "$profile_dir/SingletonLock" "$profile_dir/SingletonCookie" "$profile_dir/SingletonSocket" 2>/dev/null
+      count=$((count + 1))
+    fi
+  done < <(find /config -name "SingletonLock" -type f 2>/dev/null | grep -E "(chromium|Chrome)" || true)
+  
+  # Also check common tmp directories for playwright/puppeteer profiles
+  for tmp_dir in /config/tmp /tmp; do
+    if [ -d "$tmp_dir" ]; then
+      while IFS= read -r lockfile; do
+        if [ -n "$lockfile" ]; then
+          local profile_dir=$(dirname "$lockfile")
+          rm -f "$profile_dir/SingletonLock" "$profile_dir/SingletonCookie" "$profile_dir/SingletonSocket" 2>/dev/null
+          count=$((count + 1))
+        fi
+      done < <(find "$tmp_dir" -name "SingletonLock" -type f 2>/dev/null | head -20 || true)
+    fi
+  done
+  
+  if [ $count -gt 0 ]; then
+    echo "[beforestart] Cleaned up $count Chromium profile lock(s)" >&2
+  fi
+}
+
+# Run cleanup (silently ignore errors)
+_cleanup_chromium_locks 2>/dev/null || true
