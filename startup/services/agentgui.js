@@ -54,6 +54,14 @@ async function startAgentGuiProcess(env) {
     NODE_ENV: 'production'
   };
 
+  // Configure git to use HTTPS instead of SSH for GitHub (for private dep resolution)
+  try {
+    execSync('git config --global url."https://github.com/".insteadOf ssh://git@github.com/', { timeout: 5000 });
+    execSync('git config --global url."https://github.com/".insteadOf git@github.com:', { timeout: 5000 });
+  } catch (e) {
+    log(`Warning: Failed to configure git URL rewriting: ${e.message}`);
+  }
+
   log('Spawning bunx agentgui@latest...');
 
   const ps = spawn('bunx', ['agentgui@latest'], {
