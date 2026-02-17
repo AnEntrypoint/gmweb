@@ -73,6 +73,18 @@
     "gemini-cli": {
       "enabled": true,
       "type": "install"
+    },
+    "kilo-cli": {
+      "enabled": true,
+      "type": "install"
+    },
+    "glootie-kilo": {
+      "enabled": true,
+      "type": "install"
+    },
+    "glootie-gc": {
+      "enabled": true,
+      "type": "install"
     }
   }
 }

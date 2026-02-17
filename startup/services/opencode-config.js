@@ -9,9 +9,10 @@ import { ensureServiceEnvironment } from '../lib/service-utils.js';
 const OPENCODE_CONFIG_DIR = '/config/.config/opencode';
 const OPENCODE_STORAGE_DIR = '/config/.local/share/opencode/storage';
 const GLOOTIE_REPO = 'https://github.com/AnEntrypoint/glootie-oc.git';
-const GLOOTIE_DIR = join(OPENCODE_CONFIG_DIR, 'glootie-oc');
+const GLOOTIE_DIR = join(OPENCODE_CONFIG_DIR, 'plugin');
 
 // OpenCode settings that allow everything without prompting
+// Default model is Kimi K2.5 (free tier) - set preview features for Gemini 3 access
 const PERMISSIVE_SETTINGS = {
   "autoApprove": true,
   "autoApproveAll": true,
@@ -29,10 +30,41 @@ const PERMISSIVE_SETTINGS = {
     "list_dir": "always",
     "mcp": "always"
   },
-  "apiProvider": "anthropic",
-  "model": "claude-sonnet-4",
+  "apiProvider": "kimi-for-coding",
+  "model": "kimi-for-coding/k2.5",
   "workspaceRoot": "/config/workspace",
   "defaultAgent": "gm"
+};
+
+// Kimi K2.5 provider configuration (free tier compatible)
+const KIMI_PROVIDER_CONFIG = {
+  "kimi-for-coding": {
+    "name": "Kimi For Coding",
+    "npm": "@ai-sdk/anthropic",
+    "options": {
+      "baseURL": "https://api.kimi.com/coding/v1"
+    },
+    "models": {
+      "k2.5": {
+        "name": "Kimi K2.5",
+        "reasoning": true,
+        "attachment": true,
+        "limit": {
+          "context": 262144,
+          "output": 32768
+        },
+        "modalities": {
+          "input": ["text", "image", "video"],
+          "output": ["text"]
+        },
+        "options": {
+          "interleaved": {
+            "field": "reasoning_content"
+          }
+        }
+      }
+    }
+  }
 };
 
 function ensureDir(dir) {
@@ -42,37 +74,7 @@ function ensureDir(dir) {
 }
 
 function installGlootieOc() {
-  console.log('[opencode-config] Installing glootie-oc extension...');
-
-  try {
-    if (existsSync(GLOOTIE_DIR)) {
-      console.log('[opencode-config] glootie-oc exists, pulling updates...');
-      try {
-        execSync(`cd "${GLOOTIE_DIR}" && git pull origin main 2>/dev/null || true`, {
-          timeout: 30000,
-          stdio: 'pipe'
-        });
-      } catch (e) {
-        // Pull failed, try fresh clone
-        console.log('[opencode-config] Pull failed, re-cloning...');
-        execSync(`rm -rf "${GLOOTIE_DIR}"`, { stdio: 'pipe' });
-        execSync(`git clone --depth 1 "${GLOOTIE_REPO}" "${GLOOTIE_DIR}"`, {
-          timeout: 60000,
-          stdio: 'pipe'
-        });
-      }
-    } else {
-      console.log('[opencode-config] Cloning glootie-oc...');
-      execSync(`git clone --depth 1 "${GLOOTIE_REPO}" "${GLOOTIE_DIR}"`, {
-        timeout: 60000,
-        stdio: 'pipe'
-      });
-    }
-
-    console.log('[opencode-config] ✓ glootie-oc installed');
-  } catch (e) {
-    console.log(`[opencode-config] Warning: Could not install glootie-oc: ${e.message}`);
-  }
+  console.log('[opencode-config] Plugin directory preparation (glootie-oc service handles clone)...');
 }
 
 function configureOpenCode() {
@@ -103,13 +105,11 @@ function configureOpenCode() {
 }
 
 function setupGlootieConfig() {
-  console.log('[opencode-config] Setting up glootie-oc configuration...');
+  console.log('[opencode-config] Setting up opencode configuration with Kimi K2.5...');
 
   try {
-    const glootieConfigSrc = join(GLOOTIE_DIR, 'opencode.json');
     const opencodeConfigDest = join(OPENCODE_CONFIG_DIR, 'opencode.json');
 
-    // Start with existing config or empty object
     let existingConfig = {};
     if (existsSync(opencodeConfigDest)) {
       try {
@@ -117,15 +117,6 @@ function setupGlootieConfig() {
       } catch (e) {}
     }
 
-    // Merge glootie-oc's opencode.json if available
-    let glootieConfig = {};
-    if (existsSync(glootieConfigSrc)) {
-      try {
-        glootieConfig = JSON.parse(readFileSync(glootieConfigSrc, 'utf8'));
-      } catch (e) {}
-    }
-
-    // Build final config: schema + permission + glootie settings
     let mergedConfig = {
       "$schema": "https://opencode.ai/config.json",
       "permission": "allow",
@@ -134,60 +125,63 @@ function setupGlootieConfig() {
       "alwaysAllowReadOnly": true,
       "alwaysAllowWrite": true,
       "alwaysAllowExecute": true,
+      "model": "kimi-for-coding/k2.5",
       ...existingConfig,
-      // Ensure permission is always allow (override any stale value)
       ...{ permission: "allow" },
-      // Merge glootie-oc settings
-      ...(glootieConfig.default_agent ? { default_agent: glootieConfig.default_agent } : {}),
-      ...(glootieConfig.plugin ? { plugin: glootieConfig.plugin } : {}),
-      mcp: {
-        ...(existingConfig.mcp || {}),
-        ...(glootieConfig.mcp || {})
+      ...{ model: "kimi-for-coding/k2.5" },
+      provider: {
+        ...(existingConfig.provider || {}),
+        ...KIMI_PROVIDER_CONFIG
       }
     };
 
-    // CRITICAL: Fix plugin name if it's the generic "gloutie" instead of "gloutie-oc"
-    // This handles the case where gloutie-oc package still has old config
-    if (mergedConfig.plugin && Array.isArray(mergedConfig.plugin)) {
-      mergedConfig.plugin = mergedConfig.plugin.map(p => p === 'gloutie' ? 'gloutie-oc' : p);
+    if (existsSync(GLOOTIE_DIR)) {
+      const glootieConfigSrc = join(GLOOTIE_DIR, 'opencode.json');
+      if (existsSync(glootieConfigSrc)) {
+        try {
+          const glootieConfig = JSON.parse(readFileSync(glootieConfigSrc, 'utf8'));
+          mergedConfig = {
+            ...mergedConfig,
+            ...(glootieConfig.default_agent ? { default_agent: glootieConfig.default_agent } : {}),
+            ...(glootieConfig.plugin ? { plugin: glootieConfig.plugin } : {}),
+            mcp: {
+              ...(mergedConfig.mcp || {}),
+              ...(glootieConfig.mcp || {})
+            }
+          };
+        } catch (e) {}
+      }
+
+      const agentsSrcDir = join(GLOOTIE_DIR, 'agents');
+      const agentsDestDir = join(OPENCODE_CONFIG_DIR, 'agents');
+      if (existsSync(agentsSrcDir)) {
+        ensureDir(agentsDestDir);
+        execSync(`cp -r "${agentsSrcDir}"/* "${agentsDestDir}/" 2>/dev/null || true`, {
+          stdio: 'pipe'
+        });
+        console.log('[opencode-config] ✓ glootie agents copied');
+      }
+
+      const hooksSrcDir = join(GLOOTIE_DIR, 'hooks');
+      const hooksDestDir = join(OPENCODE_CONFIG_DIR, 'hooks');
+      if (existsSync(hooksSrcDir)) {
+        ensureDir(hooksDestDir);
+        execSync(`cp -r "${hooksSrcDir}"/* "${hooksDestDir}/" 2>/dev/null || true`, {
+          stdio: 'pipe'
+        });
+        console.log('[opencode-config] ✓ glootie hooks copied');
+      }
     }
 
-    // CRITICAL: Ensure gloutie-oc is ALWAYS in the plugin array
-    // If plugin array doesn't exist or doesn't include gloutie-oc, add it
-    if (!mergedConfig.plugin) {
-      mergedConfig.plugin = ['gloutie-oc'];
-    } else if (!mergedConfig.plugin.includes('gloutie-oc')) {
-      mergedConfig.plugin.push('gloutie-oc');
+    if (mergedConfig.plugin && Array.isArray(mergedConfig.plugin)) {
+      mergedConfig.plugin = mergedConfig.plugin.map(p => p === 'gloutie' ? 'glootie-oc' : p);
     }
 
     writeFileSync(opencodeConfigDest, JSON.stringify(mergedConfig, null, 2));
-    console.log('[opencode-config] ✓ opencode.json configured with permission:allow + gloutie-oc');
+    console.log('[opencode-config] ✓ opencode.json configured with Kimi K2.5 default model');
 
-    // Copy agents from glootie-oc
-    const agentsSrcDir = join(GLOOTIE_DIR, 'agents');
-    const agentsDestDir = join(OPENCODE_CONFIG_DIR, 'agents');
-
-    if (existsSync(agentsSrcDir)) {
-      ensureDir(agentsDestDir);
-      execSync(`cp -r "${agentsSrcDir}"/* "${agentsDestDir}/" 2>/dev/null || true`, {
-        stdio: 'pipe'
-      });
-      console.log('[opencode-config] ✓ glootie agents copied');
-    }
-
-    // Copy hooks from glootie-oc
-    const hooksSrcDir = join(GLOOTIE_DIR, 'hooks');
-    const hooksDestDir = join(OPENCODE_CONFIG_DIR, 'hooks');
-
-    if (existsSync(hooksSrcDir)) {
-      ensureDir(hooksDestDir);
-      execSync(`cp -r "${hooksSrcDir}"/* "${hooksDestDir}/" 2>/dev/null || true`, {
-        stdio: 'pipe'
-      });
-      console.log('[opencode-config] ✓ glootie hooks copied');
-    }
   } catch (e) {
-    console.log(`[opencode-config] Warning: Could not setup glootie config: ${e.message}`);
+    console.log(`[opencode-config] Warning: Could not setup config: ${e.message}`);
   }
 }
 

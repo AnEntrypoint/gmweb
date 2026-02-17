@@ -24,6 +24,7 @@ This directory contains all startup services for gmweb. Services are started in 
 - **claude-cli**: Claude command-line interface
 - **claude-marketplace**: Claude Marketplace plugin installer
 - **gemini-cli**: Google Gemini CLI wrapper
+- **kilo-cli**: Kilo AI CLI wrapper
 - **wrangler**: Cloudflare Wrangler CLI
 
 ### Utilities

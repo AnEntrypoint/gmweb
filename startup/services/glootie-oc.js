@@ -1,6 +1,6 @@
 // Glootie-OC OpenCode Plugin Installation/Update Service
-// Install if not present, or update to latest from GitHub if already installed
-// Always 1:1 with https://github.com/AnEntrypoint/glootie-oc
+// Installs to ~/.config/opencode/plugin (global installation)
+// Reference: https://github.com/AnEntrypoint/glootie-oc
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { promisify } from 'util';
@@ -15,23 +15,19 @@ export default {
   dependencies: ['opencode-config'],
 
   async start(env) {
-    const glootieDir = `${env.HOME || '/config'}/.opencode/glootie-oc`;
+    const homeDir = env.HOME || '/config';
+    const glootieDir = `${homeDir}/.config/opencode/plugin`;
     const { execSync } = await import('child_process');
     
     if (existsSync(glootieDir)) {
       console.log('[glootie-oc] Updating glootie-oc from GitHub...');
       
-      // Update existing installation
       return new Promise((resolve) => {
-        // Fix permissions
         try {
           execSync(`sudo chown -R abc:abc "${glootieDir}" 2>/dev/null || true`);
           execSync(`sudo -u abc git config --global --add safe.directory "${glootieDir}" 2>/dev/null || true`);
-        } catch (e) {
-          // Ignore permission errors
-        }
+        } catch (e) {}
         
-        // Pull latest from main branch
         const pullCmd = spawn('bash', ['-c', `cd "${glootieDir}" && timeout 30 git pull origin main`], {
           env: { ...env },
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -57,57 +53,12 @@ export default {
             if (pullError) console.log(`[glootie-oc] ${pullError.trim()}`);
           }
 
-          // Check if setup.sh exists before running it
-          const setupPath = join(glootieDir, 'setup.sh');
-          if (!existsSync(setupPath)) {
-            console.log('[glootie-oc] setup.sh not found, skipping setup');
-            resolve({
-              pid: process.pid,
-              process: null,
-              cleanup: async () => {}
-            });
-            return;
-          }
-
-          // Run setup.sh to apply any changes
-          const setupCmd = spawn('bash', ['./setup.sh'], {
-            env: { ...env },
-            stdio: ['ignore', 'pipe', 'pipe'],
-            detached: false,
-            cwd: glootieDir
-          });
-
-          let setupOutput = '';
-          let setupError = '';
-
-          setupCmd.stdout?.on('data', (data) => {
-            setupOutput += data.toString();
-            console.log(`[glootie-oc] ${data.toString().trim()}`);
-          });
-          setupCmd.stderr?.on('data', (data) => {
-            setupError += data.toString();
-            console.log(`[glootie-oc:err] ${data.toString().trim()}`);
-          });
-
-          setupCmd.on('exit', (setupCode) => {
-            if (setupCode === 0) {
-              console.log('[glootie-oc] ✓ Setup completed successfully');
-            } else {
-              console.log(`[glootie-oc] WARNING: Setup exited with code ${setupCode}`);
-              if (setupError) console.log(`[glootie-oc] Setup stderr: ${setupError.trim()}`);
-            }
-            resolve({
-              pid: process.pid,
-              process: null,
-              cleanup: async () => {}
-            });
-          });
+          this.installDeps(glootieDir, env, resolve);
         });
       });
     } else {
       console.log('[glootie-oc] Installing glootie-oc from GitHub...');
       
-      // Clone new installation
       const cloneCmd = spawn('git', [
         'clone',
         'https://github.com/AnEntrypoint/glootie-oc.git',
@@ -116,7 +67,7 @@ export default {
         env: { ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: false,
-        cwd: env.HOME || '/config'
+        cwd: `${homeDir}/.config/opencode`
       });
 
       return new Promise((resolve) => {
@@ -145,58 +96,41 @@ export default {
             return;
           }
 
-          // Check if setup.sh exists before running it
-          const setupPath = join(glootieDir, 'setup.sh');
-          if (!existsSync(setupPath)) {
-            console.log('[glootie-oc] setup.sh not found, skipping setup');
-            resolve({
-              pid: process.pid,
-              process: null,
-              cleanup: async () => {}
-            });
-            return;
-          }
-
-          // Run setup.sh
-          const setupCmd = spawn('bash', ['./setup.sh'], {
-            env: { ...env },
-            stdio: ['ignore', 'pipe', 'pipe'],
-            detached: false,
-            cwd: glootieDir
-          });
-
-          let setupOutput = '';
-          let setupError = '';
-
-          setupCmd.stdout?.on('data', (data) => {
-            setupOutput += data.toString();
-            console.log(`[glootie-oc] ${data.toString().trim()}`);
-          });
-          setupCmd.stderr?.on('data', (data) => {
-            setupError += data.toString();
-            console.log(`[glootie-oc:err] ${data.toString().trim()}`);
-          });
-
-          setupCmd.on('exit', (setupCode) => {
-            if (setupCode === 0) {
-              console.log('[glootie-oc] ✓ Setup completed successfully');
-            } else {
-              console.log(`[glootie-oc] WARNING: Setup exited with code ${setupCode}`);
-              if (setupError) console.log(`[glootie-oc] Setup stderr: ${setupError.trim()}`);
-            }
-            resolve({
-              pid: process.pid,
-              process: null,
-              cleanup: async () => {}
-            });
-          });
+          this.installDeps(glootieDir, env, resolve);
         });
       });
     }
   },
 
+  installDeps(glootieDir, env, resolve) {
+    if (existsSync(join(glootieDir, 'package.json'))) {
+      console.log('[glootie-oc] Installing plugin dependencies...');
+      const { execSync } = require('child_process');
+      try {
+        execSync(`cd "${glootieDir}" && bun install 2>&1 || npm install 2>&1`, {
+          timeout: 120000,
+          stdio: 'pipe',
+          env: { ...process.env, ...env }
+        });
+        console.log('[glootie-oc] ✓ Dependencies installed');
+      } catch (e) {
+        console.log(`[glootie-oc] Warning: Could not install dependencies: ${e.message}`);
+      }
+    }
+
+    try {
+      const { execSync } = require('child_process');
+      execSync(`sudo chown -R abc:abc "${glootieDir}" 2>/dev/null || true`, { stdio: 'pipe' });
+    } catch (e) {}
+
+    resolve({
+      pid: process.pid,
+      process: null,
+      cleanup: async () => {}
+    });
+  },
+
   async health() {
-    // Always healthy - this is an install service
     return true;
   }
 };

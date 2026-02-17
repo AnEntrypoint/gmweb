@@ -48,7 +48,8 @@ async function main() {
         'glootie-oc',
         'version-check',
         'cron',
-        'gemini-cli'
+        'gemini-cli',
+        'kilo-cli'
       ];
 
     console.log('[startup] Loading services...');
