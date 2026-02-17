@@ -30,9 +30,16 @@ RUNTIME_DIR="/run/user/$ABC_UID"
 # ===== PHASE 0: SYSTEM PACKAGES =====
 log "Phase 0: Installing system packages (APT) - async after nginx"
 apt-get update -qq 2>/dev/null || true
-log "  Installing: unzip jq ttyd chromium"
-apt-get install -y --no-install-recommends unzip jq ttyd chromium 2>&1 | tail -2
+log "  Installing: unzip jq ttyd chromium git-lfs"
+apt-get install -y --no-install-recommends unzip jq ttyd chromium git-lfs 2>&1 | tail -2
 [ $? -eq 0 ] && log "✓ System packages installed" || log "WARNING: System package install incomplete"
+git lfs install 2>/dev/null || true
+
+# Configure git to use HTTPS for GitHub SSH URLs (for npm dependencies from GitHub)
+log "  Configuring git HTTPS URL rewriting for GitHub..."
+git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" 2>/dev/null || true
+git config --global url."https://github.com/".insteadOf "git@github.com:" 2>/dev/null || true
+log "  ✓ Git URL rewriting configured"
 
 # ===== PHASE 1: GIT CLONE =====
 log "Phase 1: Git clone - get startup files and nginx config (minimal history)"
