@@ -1,0 +1,45 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC
+ENV PUID=1000
+ENV PGID=1000
+
+RUN apt-get update && apt-get install -y \
+    sudo \
+    curl \
+    wget \
+    git \
+    jq \
+    unzip \
+    xz-utils \
+    openssl \
+    apache2-utils \
+    nginx \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash abc && \
+    echo "abc:abc" | chpasswd && \
+    echo "abc ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/abc
+
+COPY docker/99-gmweb-startup.sh /custom-cont-init.d/99-gmweb-startup.sh
+COPY docker/custom_startup.sh /custom-cont-init.d/custom_startup.sh
+COPY docker/nginx-setup.sh /custom-cont-init.d/nginx-setup.sh
+COPY docker/rest-of-startup.sh /custom-cont-init.d/rest-of-startup.sh
+COPY docker/background-installs.sh /custom-cont-init.d/background-installs.sh
+COPY docker/patch-selkies-webrtc.sh /custom-cont-init.d/patch-selkies-webrtc.sh
+
+RUN chmod +x /custom-cont-init.d/99-gmweb-startup.sh && \
+    chmod -x /custom-cont-init.d/custom_startup.sh \
+             /custom-cont-init.d/nginx-setup.sh \
+             /custom-cont-init.d/rest-of-startup.sh \
+             /custom-cont-init.d/background-installs.sh \
+             /custom-cont-init.d/patch-selkies-webrtc.sh
+
+RUN mkdir -p /var/run/supervisor && \
+    mkdir -p /var/log/supervisor
+
+COPY docker/s6-overlay-mods/ /
+
+EXPOSE 80 443

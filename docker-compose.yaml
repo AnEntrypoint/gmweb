@@ -4,13 +4,17 @@ x-bake:
       platforms:
         - linux/amd64
         - linux/arm64
+    gmweb-headless:
+      platforms:
+        - linux/amd64
+        - linux/arm64
 
 services:
   gmweb:
     build:
       context: .
       dockerfile: Dockerfile
-    image: gmweb:latest
+    image: almagest/gmweb:latest
     environment:
       - PUID=1000
       - PGID=1000
@@ -26,8 +30,32 @@ services:
       - traefik.enable=true
       - traefik.http.services.gmweb.loadbalancer.server.port=80
 
+  gmweb-headless:
+    build:
+      context: .
+      dockerfile: Dockerfile.headless
+    image: almagest/gmweb-headless:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Etc/UTC}
+      - PASSWORD=${PASSWORD:-password}
+      - FILE_MANAGER_PATH=/config/Desktop
+    volumes:
+      - gmweb-headless-config:/config
+      - gmweb-headless-local:/usr/local
+    shm_size: "1gb"
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.gmweb-headless.loadbalancer.server.port=80
+
 volumes:
   gmweb-config:
     driver: local
   gmweb-local:
+    driver: local
+  gmweb-headless-config:
+    driver: local
+  gmweb-headless-local:
     driver: local

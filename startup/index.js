@@ -49,6 +49,7 @@ async function main() {
         'version-check',
         'cron',
         'gemini-cli',
+        'glootie-gc',
         'kilo-cli',
         'glootie-kilo'
       ];
