@@ -43,7 +43,7 @@ async function getRunningVersion() {
   }
 }
 
-// Start agentgui process with bunx
+// Start agentgui process with npx (more reliable with native deps)
 async function startAgentGuiProcess(env) {
   const childEnv = {
     ...env,
@@ -62,9 +62,9 @@ async function startAgentGuiProcess(env) {
     log(`Warning: Failed to configure git URL rewriting: ${e.message}`);
   }
 
-  log('Spawning bunx agentgui@latest...');
+  log('Spawning npx agentgui@latest...');
 
-  const ps = spawn('bunx', ['agentgui@latest'], {
+  const ps = spawn('npx', ['agentgui@latest'], {
     env: childEnv,
     cwd: '/config',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -170,7 +170,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    log('Starting agentgui with bunx agentgui@latest...');
+    log('Starting agentgui with npx agentgui@latest...');
 
     try {
       // Get initial version

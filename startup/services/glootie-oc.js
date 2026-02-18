@@ -1,7 +1,7 @@
 // Glootie-OC OpenCode Plugin Installation/Update Service
 // Installs to ~/.config/opencode/plugin (global installation)
 // Reference: https://github.com/AnEntrypoint/glootie-oc
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { existsSync } from 'fs';
 import { promisify } from 'util';
 import { join } from 'path';
@@ -17,7 +17,6 @@ export default {
   async start(env) {
     const homeDir = env.HOME || '/config';
     const glootieDir = `${homeDir}/.config/opencode/plugin`;
-    const { execSync } = await import('child_process');
     
     if (existsSync(glootieDir)) {
       console.log('[glootie-oc] Updating glootie-oc from GitHub...');
@@ -105,7 +104,6 @@ export default {
   installDeps(glootieDir, env, resolve) {
     if (existsSync(join(glootieDir, 'package.json'))) {
       console.log('[glootie-oc] Installing plugin dependencies...');
-      const { execSync } = require('child_process');
       try {
         execSync(`cd "${glootieDir}" && bun install 2>&1 || npm install 2>&1`, {
           timeout: 120000,
@@ -119,7 +117,6 @@ export default {
     }
 
     try {
-      const { execSync } = require('child_process');
       execSync(`sudo chown -R abc:abc "${glootieDir}" 2>/dev/null || true`, { stdio: 'pipe' });
     } catch (e) {}
 
