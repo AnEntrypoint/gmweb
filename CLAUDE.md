@@ -235,11 +235,11 @@ All npm install commands happen AFTER cleanup layers.
 
 **Paths:** All runtime files in `/opt/gmweb-startup/` (cloned from git every boot). Persistent files in `/config/`.
 
-**Ports:** nginx 80/443, Selkies 8082, webssh2 9999, file-manager 9998, AionUI 25808.
+**Ports:** nginx 80/443, Selkies 8082, webssh2 9999, file-manager 9998.
 
-**Environment:** PASSWORD (all auth), AIONUI_PASSWORD (optional override), AIONUI_USERNAME (default: admin), CUSTOM_PORT (external only, doesn't change internal routing).
+**Environment:** PASSWORD (all auth), CUSTOM_PORT (external only, doesn't change internal routing).
 
-**Services:** webssh2, file-manager, opencode, aion-ui (enabled). wrangler, gcloud, scrot, chromium-ext, playwriter, glootie-oc, tmux (disabled).
+**Services:** webssh2, file-manager, opencode, agentgui (enabled). wrangler, gcloud, scrot, chromium-ext, playwriter, glootie-oc, tmux (disabled).
 
 **Logging:** `/config/logs/supervisor.log` (main log, rotated at 100MB). Per-service logs in `services/`. Archived logs named `*.archive-{timestamp}`.
 
@@ -465,7 +465,7 @@ PHASE 1: custom_startup.sh (BLOCKING - ~50-60 seconds)
 PHASE 2: s6-rc Services Start (automatically after Phase 1)
   ├─ Selkies video streaming server on port 8082
   ├─ Desktop environment (XFCE components)
-  ├─ Web services (webssh2, file-manager, agentgui, aion-ui)
+  ├─ Web services (webssh2, file-manager, agentgui)
   └─ [/desk/ endpoint now responds to requests]
 
   ↓ [70+ seconds, parallel to services]
@@ -543,8 +543,7 @@ System Ready - All services healthy + all modules installed
 
 **Group 3 (Async - Web services):**
 1. agentgui - GMGUI chat interface on /gm/
-2. aion-ui - Admin UI on /admin/
-3. claude-config - Claude plugin sync
+2. claude-config - Claude plugin sync
 4. proxypilot - Proxy management
 5. gloutie-oc - MCP tools and agents (async)
 

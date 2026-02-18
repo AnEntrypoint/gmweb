@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  build-gmweb:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -22,7 +22,7 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
       
-      - name: Build and push Docker image
+      - name: Build and push gmweb image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -42,3 +42,33 @@ jobs:
         run: |
           echo "Docker image pushed to Docker Hub successfully"
           echo "Image: almagest/gmweb:latest"
+
+  build-gmweb-headless:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Build and push gmweb-headless image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.headless
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            almagest/gmweb-headless:latest
+            almagest/gmweb-headless:${{ github.sha }}
+          build-args: |
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

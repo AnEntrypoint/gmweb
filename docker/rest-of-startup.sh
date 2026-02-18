@@ -23,6 +23,14 @@ log() {
 log "===== REST OF STARTUP PHASES (NON-BLOCKING) ====="
 log "This runs async while nginx and s6-rc proceed independently"
 
+# Detect headless mode
+if [ "$GMWEB_HEADLESS" = "1" ]; then
+  log "Running in HEADLESS mode - desktop features disabled"
+  IS_HEADLESS=true
+else
+  IS_HEADLESS=false
+fi
+
 # Get runtime directory
 ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
 RUNTIME_DIR="/run/user/$ABC_UID"
@@ -419,9 +427,13 @@ else
   log "ERROR: start.sh not found at /opt/gmweb-startup/start.sh"
 fi
 
-# Launch XFCE components (after supervisor is running)
-bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1
-log "XFCE component launcher completed"
+# Launch XFCE components (after supervisor is running) - skip in headless mode
+if [ "$IS_HEADLESS" = "true" ]; then
+  log "Skipping XFCE launcher (headless mode)"
+else
+  bash /tmp/launch_xfce_components.sh >> "$LOG_DIR/startup.log" 2>&1
+  log "XFCE component launcher completed"
+fi
 
 # Phase 6: Spawn background installs async (NON-BLOCKING)
 # This allows supervisor to be fully ready while installs continue in background

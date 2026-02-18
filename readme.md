@@ -57,7 +57,6 @@ export default {
 | Service | Source | Package | Notes |
 |---------|--------|---------|-------|
 | agentgui | npm | `agentgui` | Claude Code agent UI on /gm/ |
-| aion-ui | npm | `aion-ui` | Admin UI (internal service) |
 | opencode | npm | `opencode-ai` | OpenCode ACP provider |
 | gloutie-oc | GitHub | `AnEntrypoint/gloutie-oc` | MCP tools and agents plugin |
 | proxypilot | npm | `proxypilot` | Proxy management service |
