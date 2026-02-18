@@ -172,13 +172,34 @@ else
 fi
 
 # ============================================================================
-# 10. PERMISSIONS (moved to custom_startup.sh)
+# 10. BUN RUNTIME
+# ============================================================================
+
+log "Installing Bun runtime..."
+
+ARCH=$(uname -m)
+BUN_ARCH=$([ "$ARCH" = "x86_64" ] && echo "x64" || echo "aarch64")
+
+# Install bun to a system location that will be available in PATH
+curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash 2>&1 | tail -3
+
+# Create bunx symlink
+ln -sf /usr/local/bin/bun /usr/local/bin/bunx 2>/dev/null || true
+
+if [ -x /usr/local/bin/bun ]; then
+  log "✓ Bun installed: $(/usr/local/bin/bun --version)"
+else
+  log "WARNING: Bun installation failed - some services may fall back to npx"
+fi
+
+# ============================================================================
+# 11. PERMISSIONS (moved to custom_startup.sh)
 # ============================================================================
 
 log "Permissions are set at boot time by custom_startup.sh"
 
 # ============================================================================
-# 11. NHFS PRE-BUILDING
+# 12. NHFS PRE-BUILDING
 # ============================================================================
 
 log "NHFS will be run via npx at startup (no pre-build needed)"
