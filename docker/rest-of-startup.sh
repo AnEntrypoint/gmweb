@@ -35,6 +35,18 @@ apt-get install -y --no-install-recommends unzip jq ttyd chromium git-lfs 2>&1 |
 [ $? -eq 0 ] && log "✓ System packages installed" || log "WARNING: System package install incomplete"
 git lfs install 2>/dev/null || true
 
+# Install Bun runtime (required for bunx in services)
+log "  Installing Bun runtime..."
+if [ ! -x /usr/local/bin/bun ]; then
+  curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash 2>&1 | tail -2
+  ln -sf /usr/local/bin/bun /usr/local/bin/bunx 2>/dev/null || true
+fi
+if [ -x /usr/local/bin/bun ]; then
+  log "  ✓ Bun installed: $(/usr/local/bin/bun --version)"
+else
+  log "  WARNING: Bun installation failed - services will fall back to npx"
+fi
+
 # Configure git to use HTTPS for GitHub SSH URLs (for npm dependencies from GitHub)
 log "  Configuring git HTTPS URL rewriting for GitHub..."
 git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" 2>/dev/null || true
