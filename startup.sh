@@ -107,8 +107,12 @@ server {
     proxy_pass http://127.0.0.1:5173;
   }
 
+  location = / {
+    return 301 /gm/;
+  }
+
   location / {
-    proxy_pass http://127.0.0.1:25808;
+    proxy_pass http://127.0.0.1:9897;
   }
 }
 NGINX_EOF

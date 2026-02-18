@@ -17,7 +17,6 @@ const NAME = 'version-check';
 // Format: { serviceName, bundleName, type: 'npm' | 'github' }
 const SERVICES_TO_MONITOR = [
   { serviceName: 'agentgui', bundleName: 'agentgui', type: 'npm' },
-  { serviceName: 'aion-ui', bundleName: 'aion-ui', type: 'npm' },
   { serviceName: 'opencode', bundleName: 'opencode-ai', type: 'npm' },
   { serviceName: 'gloutie-oc', bundleName: 'gloutie-oc', type: 'github', github: 'AnEntrypoint/gloutie-oc' },
   { serviceName: 'proxypilot', bundleName: 'proxypilot', type: 'npm' },

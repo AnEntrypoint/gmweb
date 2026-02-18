@@ -104,10 +104,16 @@ server {
   listen 80 default_server;
   listen [::]:80 default_server;
 
+  location = / {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    return 301 /gm/;
+  }
+
   location / {
     auth_basic "Login Required";
     auth_basic_user_file /etc/nginx/.htpasswd;
-    return 503;
+    proxy_pass http://127.0.0.1:9897;
   }
 
   location /desk {
@@ -127,6 +133,19 @@ server {
     proxy_read_timeout 3600s;
     proxy_send_timeout 3600s;
     proxy_buffering off;
+  }
+
+  location /gm/ {
+    auth_basic off;
+    proxy_pass http://127.0.0.1:9897/gm/;
+  }
+
+  location /ssh/ {
+    proxy_pass http://127.0.0.1:9999/;
+  }
+
+  location /files/ {
+    proxy_pass http://127.0.0.1:9998/;
   }
 
   error_page 500 502 503 504 /50x.html;

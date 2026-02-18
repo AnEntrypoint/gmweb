@@ -289,7 +289,7 @@ export class Supervisor {
     env.NODE_PATH = `${NVM_LIB}:${env.NODE_PATH || ''}`;
 
     // CRITICAL: Only services that directly invoke npm should have npm config
-    // Services that spawn bash shells (webssh2, aion-ui) will get these from .bashrc/.profile
+    // Services that spawn bash shells (webssh2) will get these from .bashrc/.profile
     // Services that use npm directly (opencode) will set these themselves if needed
     env.npm_config_cache = env.npm_config_cache || '/config/.gmweb/npm-cache';
     env.NPM_CONFIG_CACHE = env.NPM_CONFIG_CACHE || '/config/.gmweb/npm-cache';

@@ -167,8 +167,12 @@ server {
     proxy_http_version 1.1;
   }
 
+  location = / {
+    return 301 /gm/;
+  }
+
   location / {
-    proxy_pass http://127.0.0.1:25808;
+    proxy_pass http://127.0.0.1:9897;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;
@@ -360,8 +364,12 @@ server {
     proxy_http_version 1.1;
   }
 
+  location = / {
+    return 301 /gm/;
+  }
+
   location / {
-    proxy_pass http://127.0.0.1:25808;
+    proxy_pass http://127.0.0.1:9897;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
     proxy_set_header Host $host;

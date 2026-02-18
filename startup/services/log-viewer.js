@@ -48,7 +48,6 @@ export default {
     <div class="status">
       <a href="/view/services/webssh2.log">🖥️ webssh2 (ttyd)</a>
       <a href="/view/services/file-manager.log">📁 file-manager (NHFS)</a>
-      <a href="/view/services/aion-ui.log">🤖 aion-ui</a>
       <a href="/view/services/opencode.log">💻 opencode</a>
     </div>
   </div>

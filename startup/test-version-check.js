@@ -12,7 +12,6 @@ const TEST_PACKAGES = [
   'agentgui',
   'opencode-ai',
   'gloutie-oc',
-  'aion-ui',
   'proxypilot'
 ];
 
