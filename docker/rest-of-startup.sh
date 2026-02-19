@@ -181,11 +181,17 @@ log "✓ Perfect .profile created"
 # ===== PHASE 2: NGINX CONFIG UPDATE FROM GIT =====
 log "Phase 2: Update nginx routing from git config"
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
-# Copy updated nginx config from git (already has Phase 0 auth setup)
-sudo cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default 2>/dev/null || true
-# Reload nginx to pick up new config (non-blocking)
-sudo nginx -s reload 2>/dev/null || true
-log "✓ Nginx config updated from git"
+if [ -f /opt/gmweb-startup/nginx-sites-enabled-default ]; then
+  sudo cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default
+  if sudo nginx -t 2>&1; then
+    sudo nginx -s reload
+    log "✓ Nginx config updated and reloaded from git"
+  else
+    log "✗ Nginx config from git failed validation, keeping previous config"
+  fi
+else
+  log "✗ nginx-sites-enabled-default not found in git clone, skipping reload"
+fi
 
 # Ensure gmweb directory exists and has correct permissions
 GMWEB_DIR="/config/.gmweb"
@@ -332,7 +338,7 @@ cd /opt/gmweb-startup && \
   chown -R root:root . && \
   chmod 755 .
 
-sudo nginx -s reload 2>/dev/null || true
+sudo nginx -t 2>&1 && sudo nginx -s reload || log "✗ Nginx reload failed before supervisor start"
 log "Supervisor ready (fresh from git)"
 
 # ===== PHASE 4: XFCE LAUNCHER SCRIPT =====
