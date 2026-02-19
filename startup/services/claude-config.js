@@ -98,15 +98,19 @@ function installClaudeCode() {
       execSync(`sudo chmod 755 "${claudeBin}" 2>/dev/null || true`, { stdio: 'pipe' });
       console.log('[claude-config] Checking for Claude Code updates...');
       try {
-        const result = execSync(`"${claudeBin}" update`, {
+        const result = execSync(`"${claudeBin}" update 2>&1 || true`, {
           stdio: 'pipe',
-          timeout: 60000,
+          timeout: 120000,
           env: { ...process.env, HOME: '/config' }
         });
         console.log(`[claude-config] ✓ Claude Code update complete: ${result.toString().trim().split('\n').pop()}`);
       } catch (e) {
         console.log(`[claude-config] Warning: Claude Code update failed: ${e.message}`);
       }
+      try {
+        const ver = execSync(`"${claudeBin}" --version`, { stdio: 'pipe', timeout: 10000, env: { ...process.env, HOME: '/config' } });
+        console.log(`[claude-config] ✓ Claude Code version: ${ver.toString().trim()}`);
+      } catch (e) {}
     }
   } catch (e) {
     console.log(`[claude-config] Warning: Claude Code install/update failed: ${e.message}`);
