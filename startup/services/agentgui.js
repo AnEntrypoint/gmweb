@@ -43,8 +43,12 @@ async function getRunningVersion() {
   }
 }
 
-// Start agentgui process with npx (more reliable with native deps)
+// Start agentgui process with bunx (bun has built-in SQLite support)
 async function startAgentGuiProcess(env) {
+  const bunxBin = env.BUN_INSTALL
+    ? `${env.BUN_INSTALL}/bin/bunx`
+    : '/config/.gmweb/cache/.bun/bin/bunx';
+
   const childEnv = {
     ...env,
     HOME: '/config',
@@ -62,9 +66,9 @@ async function startAgentGuiProcess(env) {
     log(`Warning: Failed to configure git URL rewriting: ${e.message}`);
   }
 
-  log('Spawning npx agentgui@latest...');
+  log(`Spawning bunx agentgui@latest (bunx: ${bunxBin})...`);
 
-  const ps = spawn('npx', ['agentgui@latest'], {
+  const ps = spawn(bunxBin, ['agentgui@latest'], {
     env: childEnv,
     cwd: '/config',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -170,7 +174,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    log('Starting agentgui with npx agentgui@latest...');
+    log('Starting agentgui with bunx agentgui@latest...');
 
     try {
       // Get initial version
