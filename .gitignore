@@ -1,5 +1,6 @@
 .glootie-stop-verified
 .env
+telemetry-id
 
 .code-search/
 # Screenshots and temporary files
