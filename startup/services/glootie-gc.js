@@ -101,7 +101,7 @@ export default {
 
     let settings = {
       "enablePreviewFeatures": true,
-      "extensions": ["gm"]
+      "extensions": { "gm": true }
     };
 
     if (existsSync(settingsPath)) {
@@ -109,11 +109,15 @@ export default {
         const existing = JSON.parse(readFileSync(settingsPath, 'utf8'));
         settings = { ...settings, ...existing };
         settings.enablePreviewFeatures = true;
-        if (!settings.extensions) {
-          settings.extensions = ["gm"];
-        } else if (!settings.extensions.includes("gm")) {
-          settings.extensions.push("gm");
+        if (Array.isArray(settings.extensions)) {
+          const extObj = {};
+          settings.extensions.forEach(ext => { extObj[ext] = true; });
+          settings.extensions = extObj;
         }
+        if (!settings.extensions || typeof settings.extensions !== 'object') {
+          settings.extensions = {};
+        }
+        settings.extensions.gm = true;
       } catch (e) {
         console.log('[glootie-gc] Could not parse existing settings, using defaults');
       }

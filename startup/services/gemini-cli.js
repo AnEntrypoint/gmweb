@@ -58,7 +58,8 @@ export default {
     const settingsPath = join(GEMINI_CONFIG_DIR, 'settings.json');
     
     let settings = {
-      "enablePreviewFeatures": true
+      "enablePreviewFeatures": true,
+      "extensions": {}
     };
 
     if (existsSync(settingsPath)) {
@@ -66,6 +67,14 @@ export default {
         const existing = JSON.parse(readFileSync(settingsPath, 'utf8'));
         settings = { ...settings, ...existing };
         settings.enablePreviewFeatures = true;
+        if (Array.isArray(settings.extensions)) {
+          const extObj = {};
+          settings.extensions.forEach(ext => { extObj[ext] = true; });
+          settings.extensions = extObj;
+        }
+        if (!settings.extensions || typeof settings.extensions !== 'object') {
+          settings.extensions = {};
+        }
       } catch (e) {
         console.log('[gemini-cli] Could not parse existing settings, using defaults');
       }
