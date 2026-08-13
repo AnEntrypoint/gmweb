@@ -1,0 +1,12 @@
+{
+  "name": "gmweb-startup",
+  "version": "1.0.0",
+  "description": "Modular startup supervisor for gmweb Kasm environment",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "dependencies": {}
+}

@@ -1,0 +1,90 @@
+{
+  "healthCheckInterval": 30000,
+  "logDirectory": "/config/logs",
+  "services": {
+    "wrangler": {
+      "enabled": false,
+      "type": "install"
+    },
+    "gcloud": {
+      "enabled": false,
+      "type": "install"
+    },
+    "scrot": {
+      "enabled": false,
+      "type": "system"
+    },
+    "webssh2": {
+      "enabled": true,
+      "type": "web"
+    },
+    "file-manager": {
+      "enabled": true,
+      "type": "web"
+    },
+    "log-viewer": {
+      "enabled": true,
+      "type": "web"
+    },
+    "tmux": {
+      "enabled": false,
+      "type": "system"
+    },
+    "opencode-config": {
+      "enabled": false,
+      "type": "install"
+    },
+    "opencode": {
+      "enabled": false,
+      "type": "install"
+    },
+    "agentgui": {
+      "enabled": true,
+      "type": "system"
+    },
+    "moltbot": {
+      "enabled": false,
+      "type": "web"
+    },
+    "gm-oc": {
+      "enabled": false,
+      "type": "install"
+    },
+    "claude-config": {
+      "enabled": false,
+      "type": "install"
+    },
+    "playwriter": {
+      "enabled": false,
+      "type": "system"
+    },
+    "proxypilot": {
+      "enabled": true,
+      "type": "install"
+    },
+    "version-check": {
+      "enabled": false,
+      "type": "system"
+    },
+    "cron": {
+      "enabled": true,
+      "type": "system"
+    },
+    "gemini-cli": {
+      "enabled": false,
+      "type": "install"
+    },
+    "kilo-cli": {
+      "enabled": false,
+      "type": "install"
+    },
+    "gm-kilo": {
+      "enabled": false,
+      "type": "install"
+    },
+    "gm-gc": {
+      "enabled": false,
+      "type": "install"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+.glootie-stop-verified
+telemetry-id
+
+.code-search/
+# Screenshots and temporary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+.gm-stop-verified
+.gm/pw-sock-*/
+.gm/browser-profile/
+.gm/browser-profile-*/
+.gm/exec-spool/.*
+.gm/exec-spool/in/
+.gm/exec-spool/out/
+.gm/last-dispatch-ts
+.codeinsight
+
+# gm-managed: plugkit runtime emissions (transient; disciplines/instructions stay tracked)
+.gm/exec-spool/
+.gm/last-*
+.gm/turn-state.json
+.gm/next-step.md
+.gm/long-gap-retry-state
+.gm/prd.yml
+.gm/last-prompt.txt
+.gm/disciplines/codeinsight
+.gm/disciplines/codeinsight-manifest/
+.gm/disciplines/codeinsight-vec
+.gm/residual-check-fired
+.gm/witness/
+config.bat
+node_modules
