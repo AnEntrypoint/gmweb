@@ -156,6 +156,19 @@ if [ "$CHROMIUM_VERIFIED" = true ]; then
   log "✓ Chromium readiness marker created at $MARKER_FILE"
 fi
 
+log "Phase 3.2d: Wrapping any Puppeteer-downloaded chrome binaries to force --no-sandbox..."
+for chrome_bin in "$PUPPETEER_CACHE"/*/chrome-linux*/chrome "$HEADLESS_CACHE"/*/chrome-linux*/chrome-headless-shell; do
+  [ -x "$chrome_bin" ] || continue
+  [ -x "${chrome_bin}.real" ] && continue
+  cp "$chrome_bin" "${chrome_bin}.real"
+  cat > "$chrome_bin" <<CHROMIUM_WRAPPER_EOF
+#!/bin/bash
+exec "${chrome_bin}.real" --no-sandbox --disable-setuid-sandbox "\$@"
+CHROMIUM_WRAPPER_EOF
+  chmod 755 "$chrome_bin"
+  log "  ✓ Wrapped $chrome_bin"
+done
+
 log "✓ Phase 3.2: agent-browser ready"
 
 log "Phase 3.1b: Installing GitHub CLI (gh)..."

@@ -43,6 +43,29 @@ apt-get install -y --no-install-recommends unzip jq ttyd chromium git-lfs 2>&1 |
 [ $? -eq 0 ] && log "✓ System packages installed" || log "WARNING: System package install incomplete"
 git lfs install 2>/dev/null || true
 
+# Force --no-sandbox on every chromium launch (container runs as root; sandbox always fails).
+# Wrap the real binary so Puppeteer/Playwright/agent-browser get the flag even when they don't pass it.
+log "  Wrapping chromium-browser to always force --no-sandbox..."
+CHROMIUM_REAL_BIN=$(readlink -f /usr/bin/chromium-browser 2>/dev/null || readlink -f /usr/bin/chromium 2>/dev/null)
+if [ -n "$CHROMIUM_REAL_BIN" ] && [ -x "$CHROMIUM_REAL_BIN" ]; then
+  if [ ! -x "${CHROMIUM_REAL_BIN}.real" ]; then
+    cp "$CHROMIUM_REAL_BIN" "${CHROMIUM_REAL_BIN}.real" 2>/dev/null
+  fi
+  cat > "$CHROMIUM_REAL_BIN" <<CHROMIUM_WRAPPER_EOF
+#!/bin/bash
+exec "${CHROMIUM_REAL_BIN}.real" --no-sandbox --disable-setuid-sandbox "\$@"
+CHROMIUM_WRAPPER_EOF
+  chmod 755 "$CHROMIUM_REAL_BIN"
+  for alias_path in /usr/bin/chromium-browser /usr/bin/chromium /usr/bin/google-chrome /usr/bin/google-chrome-stable; do
+    if [ "$alias_path" != "$CHROMIUM_REAL_BIN" ] && [ ! -e "$alias_path" ]; then
+      ln -sf "$CHROMIUM_REAL_BIN" "$alias_path" 2>/dev/null
+    fi
+  done
+  log "  ✓ chromium wrapper installed (real binary at ${CHROMIUM_REAL_BIN}.real)"
+else
+  log "  WARNING: chromium binary not found, cannot install --no-sandbox wrapper"
+fi
+
 # Install Bun runtime (required for bunx in services)
 log "  Installing Bun runtime..."
 if [ ! -x /usr/local/bin/bun ]; then
