@@ -35,6 +35,34 @@ fi
 ABC_UID=$(id -u abc 2>/dev/null || echo 1000)
 RUNTIME_DIR="/run/user/$ABC_UID"
 
+# ===== PHASE 0 (PRE): D-BUS SESSION BUS =====
+# Headed Chromium (and XFCE's panel/desktop/wm below) hang indefinitely without a
+# real session bus - headless mode skips this dependency entirely, which is why the
+# gap went unnoticed for a long time. Everything downstream (XFCE launcher, the
+# supervisor's own env at Phase 5, agentgui's browser automation) only EXPORTS
+# DBUS_SESSION_BUS_ADDRESS and assumes a daemon is already listening on that socket -
+# nothing did, because the only actual `dbus-daemon --session` invocation in this repo
+# lived in the top-level startup.sh, which line ~483 below only runs if a user has
+# placed a copy at $HOME_DIR/startup.sh - never true on a fresh container. Launch it
+# here, unconditionally, so production boots (no local startup.sh override) get a
+# working bus too.
+mkdir -p "$RUNTIME_DIR"
+chown abc:abc "$RUNTIME_DIR" 2>/dev/null || true
+chmod 700 "$RUNTIME_DIR" 2>/dev/null || true
+if [ ! -S "$RUNTIME_DIR/bus" ]; then
+  log "Starting D-Bus session bus at $RUNTIME_DIR/bus..."
+  rm -f "$RUNTIME_DIR/bus"
+  sudo -u abc XDG_RUNTIME_DIR="$RUNTIME_DIR" \
+    dbus-daemon --session --address="unix:path=$RUNTIME_DIR/bus" --nofork >/dev/null 2>&1 &
+  for i in $(seq 1 10); do
+    [ -S "$RUNTIME_DIR/bus" ] && { log "✓ D-Bus session bus ready (attempt $i/10)"; break; }
+    sleep 0.5
+  done
+  [ -S "$RUNTIME_DIR/bus" ] || log "WARNING: D-Bus session bus socket did not appear after 10 attempts - headed Chromium/XFCE will hang"
+else
+  log "D-Bus session bus already present at $RUNTIME_DIR/bus"
+fi
+
 # ===== PHASE 0: SYSTEM PACKAGES =====
 log "Phase 0: Installing system packages (APT) - async after nginx"
 apt-get update -qq 2>/dev/null || true
