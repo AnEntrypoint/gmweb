@@ -11,6 +11,10 @@ services:
       context: .
       dockerfile: Dockerfile
     image: almagest/gmweb:latest
+    ports:
+      - "4096:4096"
+      - "3000:3000"
+      - "1337:1337"
     environment:
       - PUID=1000
       - PGID=1000
