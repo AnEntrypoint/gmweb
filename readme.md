@@ -56,7 +56,6 @@ export default {
 
 | Service | Source | Package | Notes |
 |---------|--------|---------|-------|
-| agentgui | npm | `agentgui` | Claude Code agent UI on /gm/ |
 | opencode | npm | `opencode-ai` | OpenCode ACP provider |
 | gm-oc | GitHub | `AnEntrypoint/gm-oc` | MCP tools and agents plugin |
 | proxypilot | npm | `proxypilot` | Proxy management service |
@@ -138,10 +137,7 @@ The service implements defensive error handling:
 
 ```
 2026-02-06T12:00:00.000Z [version-check] Starting version check cycle
-2026-02-06T12:00:00.200Z [version-check:agentgui] Update available: 1.0.100 -> 1.0.110
-2026-02-06T12:00:00.300Z [version-check:agentgui] Killed process(es) for restart
-2026-02-06T12:00:00.300Z [version-check:agentgui] Restarted service for update
-2026-02-06T12:00:00.400Z [version-check:opencode] Already on latest version: 1.1.53
+2026-02-06T12:00:00.200Z [version-check:opencode] Already on latest version: 1.1.53
 2026-02-06T12:00:00.600Z [version-check] Version check cycle complete
 ```
 
@@ -151,34 +147,15 @@ The service implements defensive error handling:
 - **WARN**: Registry timeouts, network errors, parsing failures
 - **ERROR**: Check cycle failures (non-fatal)
 
-### Testing
+### Verification
 
-Test script: `startup/test-version-check.js`
-
-```bash
-node startup/test-version-check.js
-```
-
-**Tests:**
-- Service definition validation
-- npm registry connectivity
-- GitHub API connectivity
-- Package version availability
-- Semantic version comparison logic
-
-**Expected Output:**
-```
-✓ Service definition is correct
-✓ npm registry connection successful
-✓ All monitored packages available
-✓ Version comparison tests pass
-```
+Validate the service definition with `node --check startup/services/version-check.js`. Registry reachability can be inspected with the npm and GitHub requests shown below.
 
 ### Performance
 
 - **Memory:** Minimal (background task)
 - **CPU:** Negligible (~100ms per check cycle)
-- **Network:** ~6 requests per cycle (one per service)
+- **Network:** ~5 requests per cycle (one per service)
 - **Latency:** Staggered to prevent thundering herd
 
 ### Adding New Services
@@ -248,9 +225,8 @@ The version-check service integrates with gmweb's supervisor system:
 ### Files Modified
 
 1. **Created:** `startup/services/version-check.js` (300+ lines)
-2. **Created:** `startup/test-version-check.js` (200+ lines)
-3. **Modified:** `startup/config.json` (added version-check service config)
-4. **Modified:** `startup/index.js` (added version-check to service loader)
+2. **Modified:** `startup/config.json` (added version-check service config)
+3. **Modified:** `startup/index.js` (added version-check to service loader)
 
 ### Next Steps
 

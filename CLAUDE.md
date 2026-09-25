@@ -416,7 +416,7 @@ curl -u abc:password -X POST http://localhost/gm/api/conversations \
 spawn('bash', ['-c', `PORT=${PORT} HOT_RELOAD=false bunx --latest agentgui@latest`], { env: childEnv })
 
 // After (fixed):
-spawn('bunx', ['--latest', 'agentgui@latest'], { env: childEnv })
+spawn('bunx', ['agentgui@1.0.1126'], { env: childEnv })
 ```
 
 This ensures all environment variables in `childEnv` (including `HOT_RELOAD`, `BASE_URL`, `NODE_ENV`) are properly passed to the bunx/agentgui process.

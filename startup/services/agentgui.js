@@ -1,48 +1,18 @@
 import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 import net from 'net';
-import http from 'http';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
 
 const sleep = promisify(setTimeout);
 const NAME = 'agentgui';
 const PORT = 9897;
-const VERSION_CHECK_INTERVAL = 60000;
+const AGENTGUI_PACKAGE = 'agentgui@1.0.1126';
 
 let currentProcess = null;
-let currentVersion = null;
-let versionCheckTimer = null;
 let lastRestartTime = 0;
 
 const log = (msg) => console.log(`[${NAME}] [${new Date().toISOString()}] ${msg}`);
 
-async function getLatestVersion() {
-  try {
-    return execSync('npm view agentgui version', { timeout: 5000, encoding: 'utf-8' }).trim();
-  } catch (e) {
-    log(`Warning: Failed to fetch latest version: ${e.message}`);
-    return null;
-  }
-}
-
-async function getRunningVersion() {
-  return new Promise((resolve) => {
-    const req = http.get(`http://localhost:${PORT}/api/version`, { timeout: 3000 }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data).version || null); } catch { resolve(null); }
-      });
-    });
-    req.on('error', () => resolve(null));
-    req.on('timeout', () => { req.destroy(); resolve(null); });
-  });
-}
-
 function getPortPids(port) {
-  // ss is always available; lsof may not be
   try {
     const out = execSync(`ss -tlnp 2>/dev/null | grep ":${port} "`, { encoding: 'utf8' }).trim();
     const pids = [];
@@ -161,7 +131,7 @@ async function startAgentGuiProcess(env) {
     });
     ps._isWorkspace = true;
   } else {
-    ps = spawn(bunxBin, ['agentgui@latest'], {
+    ps = spawn(bunxBin, [AGENTGUI_PACKAGE], {
       env: { ...env, PATH: augmentedPath, HOME: '/config', PORT: String(PORT), BASE_URL: '/gm', HOT_RELOAD: 'false', NODE_ENV: 'production', STARTUP_CWD: '/config' },
       cwd: '/config',
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -175,56 +145,6 @@ async function startAgentGuiProcess(env) {
   return ps;
 }
 
-async function restartAgentGui(env, oldVersion, newVersion) {
-  const now = Date.now();
-  if (now - lastRestartTime < 30000) {
-    log(`Skipping restart (last restart was ${Math.round((now - lastRestartTime) / 1000)}s ago)`);
-    return;
-  }
-  lastRestartTime = now;
-  log(`Version mismatch: ${oldVersion} -> ${newVersion}. Restarting...`);
-  await killCurrentProcess();
-  try {
-    currentProcess = await startAgentGuiProcess(env);
-    currentVersion = newVersion;
-    log(`Service restarted with version ${newVersion} (PID: ${currentProcess.pid})`);
-  } catch (e) {
-    log(`Error: Failed to restart service: ${e.message}`);
-  }
-}
-
-async function startVersionChecker(env) {
-  async function checkVersion() {
-    try {
-      const latestVersion = await getLatestVersion();
-      if (!latestVersion) { log('Skipping version check (npm registry unreachable)'); return; }
-      // Query the running server's actual version (not cached startup version)
-      const runningVersion = await getRunningVersion();
-      if (!runningVersion) {
-        log(`Version check: server not responding, latest=${latestVersion}`);
-        // If server is down and we have a newer version, restart
-        if (currentVersion && latestVersion !== currentVersion) {
-          await restartAgentGui(env, currentVersion, latestVersion);
-        }
-        return;
-      }
-      if (runningVersion !== latestVersion) {
-        log(`Version check: running=${runningVersion}, latest=${latestVersion} - updating`);
-        await restartAgentGui(env, runningVersion, latestVersion);
-      } else {
-        log(`Version check: ${runningVersion} (up to date)`);
-        currentVersion = runningVersion;
-      }
-    } catch (e) {
-      log(`Error during version check: ${e.message}`);
-    }
-  }
-
-  await checkVersion();
-  versionCheckTimer = setInterval(async () => { await checkVersion(); }, VERSION_CHECK_INTERVAL);
-  log(`Version checker started (interval: ${VERSION_CHECK_INTERVAL / 1000}s)`);
-}
-
 export default {
   name: NAME,
   type: 'system',
@@ -232,41 +152,27 @@ export default {
   dependencies: [],
 
   async start(env) {
-    log('Starting agentgui with bunx agentgui@latest...');
+    log(`Starting agentgui with bunx ${AGENTGUI_PACKAGE}...`);
     lastRestartTime = Date.now();
     try {
-      // If port is already occupied (e.g. local dev server), skip spawning
       const occupyingPids = getPortPids(PORT);
       if (occupyingPids.length > 0) {
         log(`Port ${PORT} already occupied by PID(s) ${occupyingPids.join(',')} - skipping spawn, adopting existing process`);
         const { existsSync } = await import('fs');
-        if (existsSync('/config/workspace/agentgui/bin/gmgui.cjs')) {
-          log('Workspace binary detected: skipping npm version checker (manual updates only)');
-        } else {
-          currentVersion = await getLatestVersion() || 'unknown';
-          Promise.resolve(startVersionChecker(env)).catch(e => log(`Error starting version checker: ${e.message}`));
-        }
+        if (existsSync('/config/workspace/agentgui/bin/gmgui.cjs')) log('Workspace binary detected');
         return {
           pid: occupyingPids[0],
           process: null,
           cleanup: async () => { await killCurrentProcess(); }
         };
       }
-      currentVersion = await getLatestVersion() || 'unknown';
-      log(`Initial version: ${currentVersion}`);
       currentProcess = await startAgentGuiProcess(env);
       log(`Service started in background (PID: ${currentProcess.pid})`);
       await sleep(3000);
-      if (currentProcess._isWorkspace) {
-        log('Workspace mode: skipping npm version checker (manual updates only)');
-      } else {
-        Promise.resolve(startVersionChecker(env)).catch(e => log(`Error starting version checker: ${e.message}`));
-      }
       return {
         pid: currentProcess.pid,
         process: currentProcess,
         cleanup: async () => {
-          if (versionCheckTimer) { clearInterval(versionCheckTimer); versionCheckTimer = null; }
           await killCurrentProcess();
         }
       };
