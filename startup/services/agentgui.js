@@ -115,29 +115,12 @@ async function startAgentGuiProcess(env) {
   ].join(':');
   const augmentedPath = env.PATH ? `${extraPaths}:${env.PATH}` : extraPaths;
 
-  const workspaceDir = '/config/workspace/agentgui';
-  const workspaceBin = `${workspaceDir}/bin/gmgui.cjs`;
-  const useWorkspace = fs.existsSync(workspaceBin);
-
-  let ps;
-  if (useWorkspace) {
-    log(`Running agentgui from local workspace: ${workspaceDir} (version checks disabled)`);
-    const nodeBin = execSync('which node', { encoding: 'utf-8', env: { ...process.env, PATH: augmentedPath } }).trim();
-    ps = spawn(nodeBin, [workspaceBin], {
-      env: { ...env, PATH: augmentedPath, HOME: '/config', PORT: String(PORT), BASE_URL: '/gm', HOT_RELOAD: 'false', NODE_ENV: 'production', STARTUP_CWD: '/config' },
-      cwd: workspaceDir,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true
-    });
-    ps._isWorkspace = true;
-  } else {
-    ps = spawn(bunxBin, [AGENTGUI_PACKAGE], {
-      env: { ...env, PATH: augmentedPath, HOME: '/config', PORT: String(PORT), BASE_URL: '/gm', HOT_RELOAD: 'false', NODE_ENV: 'production', STARTUP_CWD: '/config' },
-      cwd: '/config',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true
-    });
-  }
+  const ps = spawn(bunxBin, [AGENTGUI_PACKAGE], {
+    env: { ...env, PATH: augmentedPath, HOME: '/config', PORT: String(PORT), BASE_URL: '/gm', HOT_RELOAD: 'false', NODE_ENV: 'production', STARTUP_CWD: '/config' },
+    cwd: '/config',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true
+  });
 
   ps.unref();
   ps.stdout.on('data', (d) => d.toString().split('\n').filter(l => l.trim()).forEach(l => log(`[stdout] ${l}`)));
@@ -157,14 +140,8 @@ export default {
     try {
       const occupyingPids = getPortPids(PORT);
       if (occupyingPids.length > 0) {
-        log(`Port ${PORT} already occupied by PID(s) ${occupyingPids.join(',')} - skipping spawn, adopting existing process`);
-        const { existsSync } = await import('fs');
-        if (existsSync('/config/workspace/agentgui/bin/gmgui.cjs')) log('Workspace binary detected');
-        return {
-          pid: occupyingPids[0],
-          process: null,
-          cleanup: async () => { await killCurrentProcess(); }
-        };
+        log(`Port ${PORT} occupied by PID(s) ${occupyingPids.join(',')} - replacing with ${AGENTGUI_PACKAGE}`);
+        await killCurrentProcess();
       }
       currentProcess = await startAgentGuiProcess(env);
       log(`Service started in background (PID: ${currentProcess.pid})`);

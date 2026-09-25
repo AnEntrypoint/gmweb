@@ -8,7 +8,7 @@ unset npm_config_prefix
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 STARTUP_SOURCE_URL="https://github.com/AnEntrypoint/gmweb.git"
-STARTUP_COMMIT="cc13961fb60f263f2047debf8fa217926363d128"
+STARTUP_COMMIT="b8dc2ec5155862f0516c3f69c449d7d0e3d924f8"
 
 log() {
   local msg="[rest-of-startup] $(date '+%Y-%m-%d %H:%M:%S') $@"
