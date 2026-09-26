@@ -75,8 +75,15 @@ log "✓ nginx binary installed and verified"
 
 log "Step 4: Deploying nginx configuration"
 
-if [ ! -f /opt/gmweb-startup/nginx-sites-enabled-default ]; then
-  log "  WARNING: nginx-sites-enabled-default not in /opt/gmweb-startup yet"
+NGINX_CONFIG_SOURCE=""
+if [ -f /opt/gmweb-startup/nginx-sites-enabled-default ]; then
+  NGINX_CONFIG_SOURCE="/opt/gmweb-startup/nginx-sites-enabled-default"
+elif [ -f /custom-cont-init.d/nginx-sites-enabled-default ]; then
+  NGINX_CONFIG_SOURCE="/custom-cont-init.d/nginx-sites-enabled-default"
+fi
+
+if [ -z "$NGINX_CONFIG_SOURCE" ]; then
+  log "  WARNING: nginx-sites-enabled-default is unavailable"
   log "  Using embedded minimal config"
 
   sudo tee /etc/nginx/sites-available/default > /dev/null << 'NGINX_EOF'
@@ -102,6 +109,20 @@ server {
     alias /usr/share/selkies/web/;
     index index.html index.htm;
     try_files $uri $uri/ =404;
+  }
+
+  location ^~ /desk/api/ {
+    auth_basic "Login Required";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+    rewrite ^/desk/(.*)$ /$1 break;
+    proxy_pass http://127.0.0.1:8082;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_http_version 1.1;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    proxy_buffering off;
   }
 
   location ~ /desk/websockets? {
@@ -168,8 +189,8 @@ server {
 }
 NGINX_EOF
 else
-  log "  Deploying nginx config from git"
-  sudo cp /opt/gmweb-startup/nginx-sites-enabled-default /etc/nginx/sites-available/default 2>/dev/null || true
+  log "  Deploying nginx config from $NGINX_CONFIG_SOURCE"
+  sudo cp "$NGINX_CONFIG_SOURCE" /etc/nginx/sites-available/default 2>/dev/null || true
 fi
 
 sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true

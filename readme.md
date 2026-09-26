@@ -28,12 +28,9 @@ export default {
   dependencies: [],
 
   async start(env) {
-    // Start background checker process
-    // Return immediately (don't block supervisor)
   },
 
   async health() {
-    // Always return true (no port binding to verify)
     return true;
   }
 };
@@ -78,7 +75,7 @@ export default {
 
 **Change Check Interval:** Edit `startup/services/version-check.js` line:
 ```javascript
-this.checkInterval = 60000; // milliseconds
+this.checkInterval = 60000;
 ```
 
 ### Implementation Details
@@ -166,14 +163,12 @@ To monitor additional services:
 2. **Add to SERVICES_TO_MONITOR:**
 
 ```javascript
-// npm package:
 {
   serviceName: 'my-service',
   bundleName: 'my-npm-package',
   type: 'npm'
 }
 
-// GitHub repository:
 {
   serviceName: 'my-service',
   bundleName: 'my-service',
@@ -189,24 +184,19 @@ To monitor additional services:
 **Q: Version check not running?**
 ```bash
 tail -100 /config/logs/supervisor.log | grep version-check
-# Should show: "Starting version check service..."
 ```
 
 **Q: Service not restarting on updates?**
 ```bash
 ps aux | grep version-check
-# Verify process is running
 
 ps aux | grep agentgui
-# Check if service process is being killed/restarted
 ```
 
 **Q: Registry connectivity issues?**
 ```bash
-# Test npm registry
 curl -I https://registry.npmjs.org/express
 
-# Test GitHub API
 curl -I https://api.github.com/repos/AnEntrypoint/gm-oc/releases/latest
 ```
 
@@ -244,7 +234,7 @@ After deployment:
 
 3. **Monitor service restarts:**
    ```bash
-   ps aux | grep agentgui  # Should see new process
+   ps aux | grep agentgui
    ```
 
 ### Security Notes
