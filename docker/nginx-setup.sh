@@ -16,12 +16,12 @@ mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 log "===== NGINX BLOCKING SETUP (Phase 0) ====="
 
-if [ -z "${PASSWORD}" ]; then
-  PASSWORD="password"
-  log "WARNING: PASSWORD not set in environment, using fallback 'password'"
-else
-  log "✓ PASSWORD from environment (${#PASSWORD} chars)"
+if [ -z "${PASSWORD:-}" ]; then
+  log "ERROR: PASSWORD must be set before nginx can start"
+  exit 1
 fi
+
+log "PASSWORD received from environment (${#PASSWORD} chars)"
 
 log "Step 1: Generating HTTP Basic Auth credentials"
 
@@ -36,7 +36,7 @@ if ! echo "$HASH" | grep -q '^\$apr1\$'; then
   exit 1
 fi
 
-log "✓ APR1 hash generated successfully"
+log "APR1 hash generated successfully"
 
 log "Step 2: Setting up nginx directories and htpasswd"
 
@@ -55,7 +55,7 @@ if ! sudo grep -q '^abc:\$apr1\$' /etc/nginx/.htpasswd 2>/dev/null; then
   exit 1
 fi
 
-log "✓ htpasswd file created and verified"
+log "htpasswd file created and verified"
 
 log "Step 3: Installing nginx binary package"
 
@@ -71,7 +71,7 @@ if ! command -v nginx &>/dev/null; then
   exit 1
 fi
 
-log "✓ nginx binary installed and verified"
+log "nginx binary installed and verified"
 
 log "Step 4: Deploying nginx configuration"
 
@@ -190,14 +190,22 @@ server {
 NGINX_EOF
 else
   log "  Deploying nginx config from $NGINX_CONFIG_SOURCE"
-  sudo cp "$NGINX_CONFIG_SOURCE" /etc/nginx/sites-available/default 2>/dev/null || true
+  if [ -r /config/ssl/cert.pem ] && [ -r /config/ssl/cert.key ]; then
+    sudo cp "$NGINX_CONFIG_SOURCE" /etc/nginx/sites-available/default 2>/dev/null || true
+  else
+    log "  TLS certificate files unavailable; deploying HTTP configuration only"
+    if ! awk 'BEGIN { server_count = 0 } /^server \{$/ { server_count++; if (server_count == 2) exit } { print }' "$NGINX_CONFIG_SOURCE" | sudo tee /etc/nginx/sites-available/default > /dev/null; then
+      log "ERROR: Failed to deploy HTTP-only nginx configuration"
+      exit 1
+    fi
+  fi
 fi
 
 sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
 
 sudo ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
 
-log "✓ nginx configuration deployed"
+log "nginx configuration deployed"
 
 log "Step 5: Verifying nginx configuration syntax"
 
@@ -207,7 +215,7 @@ if ! sudo nginx -t 2>&1 | grep -q "successful"; then
   exit 1
 fi
 
-log "✓ nginx configuration syntax verified"
+log "nginx configuration syntax verified"
 
 log "Step 6: Starting nginx daemon"
 
@@ -219,7 +227,7 @@ if ! sudo nginx 2>&1; then
   exit 1
 fi
 
-log "✓ nginx daemon started"
+log "nginx daemon started"
 
 log "Step 7: Verifying nginx is listening on port 80 (with retries)"
 
@@ -250,7 +258,7 @@ if [ $NGINX_READY -eq 0 ]; then
   exit 1
 fi
 
-log "✓ nginx listening on port 80"
+log "nginx listening on port 80"
 
 log "Step 8: Verifying HTTP Basic Auth is working"
 
@@ -258,19 +266,19 @@ HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1/ 2>&1)
 if [ "$HTTP_STATUS" != "401" ] && [ "$HTTP_STATUS" != "503" ]; then
   log "WARNING: HTTP Basic Auth may not be configured correctly (got $HTTP_STATUS, expected 401 or 503)"
 else
-  log "✓ HTTP Basic Auth configured (status: $HTTP_STATUS)"
+  log "HTTP Basic Auth configured (status: $HTTP_STATUS)"
 fi
 
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1/desk/ 2>&1)
 if [ "$HTTP_STATUS" = "401" ]; then
-  log "✓ /desk endpoint enforcing HTTP Basic Auth (status: $HTTP_STATUS)"
+  log "/desk endpoint enforcing HTTP Basic Auth (status: $HTTP_STATUS)"
 else
   log "WARNING: /desk endpoint NOT enforcing auth (got $HTTP_STATUS, expected 401)"
 fi
 
 export PASSWORD
 
-log "✓ nginx setup complete and verified"
+log "nginx setup complete and verified"
 log "===== NGINX PHASE 0 BLOCKING COMPLETE ====="
 log ""
 
