@@ -76,10 +76,10 @@ log "nginx binary installed and verified"
 log "Step 4: Deploying nginx configuration"
 
 NGINX_CONFIG_SOURCE=""
-if [ -f /opt/gmweb-startup/nginx-sites-enabled-default ]; then
-  NGINX_CONFIG_SOURCE="/opt/gmweb-startup/nginx-sites-enabled-default"
-elif [ -f /custom-cont-init.d/nginx-sites-enabled-default ]; then
+if [ -f /custom-cont-init.d/nginx-sites-enabled-default ]; then
   NGINX_CONFIG_SOURCE="/custom-cont-init.d/nginx-sites-enabled-default"
+elif [ -f /opt/gmweb-startup/nginx-sites-enabled-default ]; then
+  NGINX_CONFIG_SOURCE="/opt/gmweb-startup/nginx-sites-enabled-default"
 fi
 
 if [ -z "$NGINX_CONFIG_SOURCE" ]; then
