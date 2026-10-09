@@ -71,8 +71,9 @@ if [ $WAIT_COUNT -lt $MAX_WAIT ]; then
   X11_READY=true
 fi
 
+# Transport and encoder come from SELKIES_* env (Dockerfile defaults, compose overrides).
+# No --mode/--encoder flags here: CLI flags outrank env, which would silently pin the stream.
+# --port must match the nginx /desk/ upstream (127.0.0.1:8082).
 exec s6-setuidgid abc \
   selkies \
-    --mode="websockets" \
-    --encoder=jpeg \
     --port=8082

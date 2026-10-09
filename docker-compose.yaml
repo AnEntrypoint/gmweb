@@ -17,6 +17,11 @@ services:
       - TZ=${TZ:-Etc/UTC}
       - PASSWORD=${PASSWORD:-password}
       - FILE_MANAGER_PATH=/config/Desktop
+      # Host's public IP, advertised in WebRTC host candidates. Required behind 1:1 NAT.
+      - SELKIES_WEBRTC_PUBLIC_IP=${SELKIES_WEBRTC_PUBLIC_IP:-}
+    # WebRTC media is UDP and does not traverse the HTTP proxy, so the mux port is published directly.
+    ports:
+      - "59000:59000/udp"
     volumes:
       - gmweb-config:/config
       - gmweb-local:/usr/local
