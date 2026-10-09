@@ -20,9 +20,13 @@ RUN chmod +x /etc/s6-overlay/s6-rc.d/svc-selkies/run
 # SELKIES_WEBRTC_UDP_MUX_PORT must be published as udp on the host (see docker-compose.yaml).
 # SELKIES_WEBRTC_PUBLIC_IP must be the host's public IP when behind 1:1 NAT (Oracle, most clouds).
 # SELKIES_ENABLE_DUAL_MODE lets a client fall back to WebSockets when ICE cannot connect.
+# Direct path only: rtc.json is STUN-only, so no TURN relay is ever offered to the browser.
+# The file overrides every SELKIES_STUN_*/SELKIES_TURN_* setting (confirmed in Selkies docs).
+COPY docker/selkies/rtc.json /etc/selkies/rtc.json
 ENV SELKIES_MODE=webrtc \
     SELKIES_ENABLE_DUAL_MODE=true \
     SELKIES_WEBRTC_UDP_MUX_PORT=59000 \
-    SELKIES_WEBRTC_ICE_LITE=true
+    SELKIES_WEBRTC_ICE_LITE=true \
+    SELKIES_RTC_CONFIG_JSON=/etc/selkies/rtc.json
 
 EXPOSE 80 443 59000/udp
