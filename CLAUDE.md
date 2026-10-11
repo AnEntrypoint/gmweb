@@ -136,14 +136,19 @@ No client can route to it, so ICE never completes no matter what the firewall al
 
 **Verifying a host's WebRTC path** needs a check from outside the advertised address, which a machine inside the same NAT cannot do — a host-to-own-public-IP test is confounded by hairpinning (on `boxone`, TCP 443 hairpins and answers, UDP may not). What is checkable locally is the software half: pair with `/desk/api/webrtc/signaling/` as a client (`HELLO client {"client_type":"controller","client_slot":-1}`, then `SESSION server`) and read the offer it sends — that prints the advertised candidate. A STUN binding request to the container's own address returns Binding Success, proving the ICE agent accepts checks; the same request to the advertised public address fails, which is the firewall or hairpinning, not Selkies.
 
-**The `boxone.off.l-inc.co.za` host sits behind a SonicWALL** that forwards TCP 80/443/8080 (and Coolify's 6001/6002) inward. Whether it forwards UDP 59000 could not be settled from inside the NAT. Until that is confirmed, the default is `SELKIES_MODE=websockets`, which rides the already-forwarded HTTPS port and works everywhere. To make WebRTC the transport once the UDP path is confirmed, add a SonicWALL NAT/access rule forwarding UDP 59000 to this host and switch with:
+**The `boxone.off.l-inc.co.za` host sits behind a SonicWALL** that forwards TCP 80/443/8080 (and Coolify's 6001/6002) inward. It does **not** forward UDP 59000: a GitHub runner with validated UDP egress sent ten datagrams to `169.1.28.36:59000` and this host captured none. Only TCP 80 and 443 reach it (both Traefik's; TCP 22 is a different device), and there is no global IPv6, so nothing software-side can open a media path. The default is therefore `SELKIES_MODE=websockets`, which rides the already-forwarded HTTPS port and works everywhere. WebRTC needs one of:
+
+- **A SonicWALL NAT + access rule forwarding UDP 59000** to `192.168.168.94`/`.118` — the direct, private path.
+- **A TURN relay**, which needs no firewall change: both sides reach a public relay outbound. Selkies has Cloudflare TURN built in — set `SELKIES_ENABLE_CLOUDFLARE_TURN=true`, `SELKIES_CLOUDFLARE_TURN_TOKEN_ID` and `SELKIES_CLOUDFLARE_TURN_API_TOKEN` (from a Cloudflare TURN key; the domain does not need to be on Cloudflare). `svc-selkies/run` drops ICE-lite automatically whenever a TURN key is present, because an ICE-lite agent never gathers the relay. Media then relays through Cloudflare rather than the client directly.
+
+Either way, switch transport with:
 
 ```bash
 curl -u abc:"$PASSWORD" -X POST https://boxone.off.l-inc.co.za/desk/api/switch \
   -H 'Content-Type: application/json' -d '{"mode":"webrtc"}'
 ```
 
-Check `/desk/api/status` for `current_mode`. The selkies log line `WebRTC UDP mux: every session's host candidates share UDP port 59000 on <ip>` shows the address actually advertised — it must be the public IP, not `10.0.x.x`.
+Check `/desk/api/status` for `current_mode`. The selkies log line `WebRTC UDP mux: every session's host candidates share UDP port 59000 on <ip>` shows the address actually advertised — it must be the public IP, not `10.0.x.x`. Once a client is known to reach the server, flip the default by setting `SELKIES_MODE=webrtc`.
 
 Confirm reachability from outside before switching: a host inside the same NAT cannot test it (hairpinning), and public "UDP port check" sites are unreliable. Send datagrams from a real external vantage — a GitHub Actions runner works, with a STUN request to a public server as the egress control — while capturing `udp port 59000` on this host. That is how the port was confirmed closed here.
 

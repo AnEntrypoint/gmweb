@@ -86,6 +86,13 @@ if [ -z "${SELKIES_WEBRTC_PUBLIC_IP:-}" ]; then
   fi
 fi
 
+# A relay only helps if the server gathers one, and an ICE-lite agent offers host
+# candidates only and never touches STUN/TURN. When a TURN relay is supplied, drop
+# ICE-lite so the server allocates a relay candidate the client can actually reach.
+if [ -n "${SELKIES_CLOUDFLARE_TURN_TOKEN_ID:-}" ]; then
+  export SELKIES_WEBRTC_ICE_LITE=false
+fi
+
 # Transport and encoder come from SELKIES_* env (Dockerfile defaults, compose overrides).
 # No --mode/--encoder flags here: CLI flags outrank env, which would silently pin the stream.
 # --port must match the nginx /desk/ upstream (127.0.0.1:8082).

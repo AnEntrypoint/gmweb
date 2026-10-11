@@ -20,6 +20,13 @@ services:
       # Host's public IP, advertised in WebRTC host candidates. Required behind 1:1 NAT.
       # Left blank, the container autodetects it at boot (see svc-selkies/run).
       - SELKIES_WEBRTC_PUBLIC_IP=${SELKIES_WEBRTC_PUBLIC_IP:-}
+      # Optional WebRTC relay for an edge firewall that forwards no inbound UDP: set the
+      # Cloudflare TURN key and both sides reach the relay outbound, so no firewall change
+      # is needed. svc-selkies/run turns ICE-lite off whenever these are set, because an
+      # ICE-lite agent offers host candidates only and never gathers the relay.
+      - SELKIES_ENABLE_CLOUDFLARE_TURN=${SELKIES_ENABLE_CLOUDFLARE_TURN:-}
+      - SELKIES_CLOUDFLARE_TURN_TOKEN_ID=${SELKIES_CLOUDFLARE_TURN_TOKEN_ID:-}
+      - SELKIES_CLOUDFLARE_TURN_API_TOKEN=${SELKIES_CLOUDFLARE_TURN_API_TOKEN:-}
     # WebRTC media is UDP and does not traverse the HTTP proxy, so the mux port is published
     # directly. Publishing it here is not enough on its own: the edge firewall must also
     # forward UDP 59000 to this host, or WebRTC candidates stay unreachable from outside and
