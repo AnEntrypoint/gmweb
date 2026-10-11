@@ -145,7 +145,17 @@ a=candidate:… 1 udp 1694498815 169.1.28.36 59000 typ srflx raddr 169.1.28.36 r
 
 The selkies log line `WebRTC UDP mux: … share UDP port 59000 on <ip>` prints the *mux* address (`10.0.2.2`, the bridge IP) and will look wrong; `SELKIES_WEBRTC_PUBLIC_IP` rewrites it to the public address in the offer, which is where to look instead. Note a full-ICE agent answers an unauthenticated check with a Binding **Error** (`0x0111`) where the old ICE-lite agent answered blindly, so a probe that used to return Binding Success now returns an error — that is expected, not a regression.
 
-**The end-to-end UDP path can only be proven from outside the NAT.** A host-to-own-public-IP check is confounded by hairpinning, and this one times out (TCP 443 hairpins and answers; UDP does not). A GitHub runner with validated UDP egress sent ten datagrams to `169.1.28.36:59000` and this host captured none — that measured *unsolicited* inbound, which the cone NAT above does not admit and which is exactly why `SELKIES_WEBRTC_ICE_LITE=false` matters. To confirm a real client, use a browser on a genuinely external network (a phone on cellular) and watch for the server's own checks leaving `59000` while capturing `udp port 59000` on this host.
+**A real client over WebRTC has been verified end to end** — the whole handshake and media pipeline, not just the offer. The recipe is a headless Chromium driving the real page, which is worth reusing:
+
+```bash
+# inside the container; the playwright tree at /config/workspace/zellous/node_modules
+PW=$PASSWORD NODE_PATH=/config/workspace/zellous/node_modules \
+  /config/nvm/versions/node/v24.16.0/bin/node /tmp/wrtc_test.cjs
+```
+
+It launches `chromium` headless, opens `https://boxone.off.l-inc.co.za/desk/` with `httpCredentials`, then reads `window.__SELKIES_STREAMING_MODE__` and the `<video>` element. A healthy run logs `[webrtc] Connection complete`, `Received incoming video stream from peer` and `Received incoming audio stream from peer`, and after clicking the `Play Stream` affordance the element reports `paused:false`, `readyState:4` with `currentTime` advancing. Expect `paused:true` until that click — Selkies needs a user gesture, so do not read it as a failure. A screenshot of the run shows the live XFCE desktop, which is the clearest single proof the pipeline works.
+
+**What that still does not cover is the NAT crossing** — the client in the recipe lives inside this host, so ICE completes over the LAN/docker path. A host-to-own-public-IP check cannot stand in: hairpinning confounds it and this one times out (TCP 443 hairpins and answers; UDP does not). The GitHub-runner datagram test also does not apply — it measured *unsolicited* inbound, which the cone NAT above never admits, which is exactly why `SELKIES_WEBRTC_ICE_LITE=false` matters. So for a genuinely external client, watch the server's own checks leave `59000` while capturing `udp port 59000` on this host, or just have someone load `/desk/` from a phone on cellular.
 
 If the media path still cannot be carried, in order of preference:
 
