@@ -72,16 +72,24 @@ async function killCurrentProcess() {
 }
 
 async function startAgentGuiProcess(env) {
-  const bunxBin = env.BUN_INSTALL
-    ? `${env.BUN_INSTALL}/bin/bunx`
-    : '/config/.gmweb/cache/.bun/bin/bunx';
+  const fs = await import('fs');
+
+  // Bun is not always installed under BUN_INSTALL. This image installs it into
+  // /usr/local/bin and leaves BUN_INSTALL unset, so the old hard-coded fallback
+  // (/config/.gmweb/cache/.bun/bin/bunx) never existed and spawn failed with ENOENT —
+  // agentgui never started. Take the first bunx that is actually there.
+  const bunxCandidates = [
+    env.BUN_INSTALL ? `${env.BUN_INSTALL}/bin/bunx` : null,
+    '/usr/local/bin/bunx',
+    '/config/.gmweb/cache/.bun/bin/bunx',
+  ].filter(Boolean);
+  const bunxBin = bunxCandidates.find((candidate) => fs.existsSync(candidate)) || 'bunx';
+  log(`Using bunx at ${bunxBin}`);
 
   try {
     execSync('git config --global url."https://github.com/".insteadOf ssh://git@github.com/', { timeout: 5000 });
     execSync('git config --global url."https://github.com/".insteadOf git@github.com:', { timeout: 5000 });
   } catch (e) {}
-
-  const fs = await import('fs');
 
   try {
     const gmExecDir = '/config/.gmweb/npm-global/lib/node_modules/gm-exec';
