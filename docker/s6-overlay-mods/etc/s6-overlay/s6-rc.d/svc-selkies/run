@@ -2,7 +2,13 @@
 
 export XCURSOR_THEME=breeze
 export XDG_RUNTIME_DIR=/run/user/1000
-export PULSE_RUNTIME_PATH=/run/user/1000/pulse
+# PULSE_RUNTIME_PATH comes from the base image as /defaults, and svc-pulseaudio
+# puts its socket exactly there (/defaults/native). Repointing it elsewhere makes
+# every pactl call and the whole audio pipeline fail with "Connection refused",
+# which is what turns audio and microphone forwarding off. Only fill it in when
+# nothing set it.
+: "${PULSE_RUNTIME_PATH:=/run/user/1000/pulse}"
+export PULSE_RUNTIME_PATH
 
 if [ ! -f '/dev/shm/audio.lock' ]; then
   WAIT_COUNT=0
