@@ -145,6 +145,10 @@ curl -u abc:"$PASSWORD" -X POST https://boxone.off.l-inc.co.za/desk/api/switch \
 
 Check `/desk/api/status` for `current_mode`. The selkies log line `WebRTC UDP mux: every session's host candidates share UDP port 59000 on <ip>` shows the address actually advertised — it must be the public IP, not `10.0.x.x`.
 
+Confirm reachability from outside before switching: a host inside the same NAT cannot test it (hairpinning), and public "UDP port check" sites are unreliable. Send datagrams from a real external vantage — a GitHub Actions runner works, with a STUN request to a public server as the egress control — while capturing `udp port 59000` on this host. That is how the port was confirmed closed here.
+
+If opening UDP is not an option, Selkies supports **ICE-TCP** instead: `--webrtc-tcp-mux-port` (`SELKIES_WEBRTC_TCP_MUX_PORT`) advertises a passive TCP candidate, so a client that cannot send UDP still connects over TCP. It needs an inbound TCP port too — which this host does not have free (only 80 and 443 reach it, and Coolify's Traefik terminates TLS on both), so it still means a firewall rule, but a TCP one. Publish the port and set the variable that matches it.
+
 ### startup/start.sh: Node.js Binary Resolution
 
 **Issue:** start.sh tried `which node` without sourcing NVM. Node installed via NVM at `/config/nvm/versions/node/vX.X.X/bin/node`. Default fallback `/usr/local/bin/node` doesn't exist.
