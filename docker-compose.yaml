@@ -18,8 +18,12 @@ services:
       - PASSWORD=${PASSWORD:-password}
       - FILE_MANAGER_PATH=/config/Desktop
       # Host's public IP, advertised in WebRTC host candidates. Required behind 1:1 NAT.
+      # Left blank, the container autodetects it at boot (see svc-selkies/run).
       - SELKIES_WEBRTC_PUBLIC_IP=${SELKIES_WEBRTC_PUBLIC_IP:-}
-    # WebRTC media is UDP and does not traverse the HTTP proxy, so the mux port is published directly.
+    # WebRTC media is UDP and does not traverse the HTTP proxy, so the mux port is published
+    # directly. Publishing it here is not enough on its own: the edge firewall must also
+    # forward UDP 59000 to this host, or WebRTC candidates stay unreachable from outside and
+    # the deployment falls back to WebSockets over the proxied HTTPS port.
     ports:
       - "59000:59000/udp"
     volumes:

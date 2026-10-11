@@ -71,6 +71,21 @@ if [ $WAIT_COUNT -lt $MAX_WAIT ]; then
   X11_READY=true
 fi
 
+# WebRTC host candidates must name an address the client can reach. Left unset, Selkies
+# advertises the container's own private IP (10.0.x.x), which no client can route to, so
+# ICE never completes. The operator's SELKIES_WEBRTC_PUBLIC_IP wins when set; otherwise ask
+# an external service for the host's public address. Non-fatal and short-timeout: if the
+# lookup fails the stream still runs (over WebSockets), just without a usable WebRTC path.
+if [ -z "${SELKIES_WEBRTC_PUBLIC_IP:-}" ]; then
+  DETECTED_PUBLIC_IP="$(curl -fsS -m 5 https://api.ipify.org 2>/dev/null || true)"
+  case "$DETECTED_PUBLIC_IP" in
+    *[!0-9a-fA-F:.]*|'') DETECTED_PUBLIC_IP='' ;;
+  esac
+  if [ -n "$DETECTED_PUBLIC_IP" ]; then
+    export SELKIES_WEBRTC_PUBLIC_IP="$DETECTED_PUBLIC_IP"
+  fi
+fi
+
 # Transport and encoder come from SELKIES_* env (Dockerfile defaults, compose overrides).
 # No --mode/--encoder flags here: CLI flags outrank env, which would silently pin the stream.
 # --port must match the nginx /desk/ upstream (127.0.0.1:8082).

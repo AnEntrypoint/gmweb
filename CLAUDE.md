@@ -117,6 +117,34 @@ Each checkpoint is a verifiable state, not just "wait a little longer."
 
 **Fix:** Let the `/desk*` locations inherit the server-level `auth_basic "Login Required"; auth_basic_user_file /etc/nginx/.htpasswd;`. Browsers resend the cached Basic credentials on the `/desk/websocket` upgrade, so the video stream still connects. Selkies' own login (if any) layers on top.
 
+### Selkies Transport: WebRTC Needs Inbound UDP, WebSockets Does Not
+
+Selkies runs exactly one media transport at a time. `SELKIES_MODE` picks the one the server starts with, and because clients read the server's mode (`/desk/api/status`, and the `409` responses from `/api/websockets` and `/api/webrtc/signaling`) they follow it — there is no client-side automatic fallback. `SELKIES_ENABLE_DUAL_MODE=true` lets a controller switch at runtime: `POST /desk/api/switch` with `{"mode":"webrtc"|"websockets"}`.
+
+- **WebSockets** carries media over the same websocket the browser already upgrades on the proxied HTTPS port. It needs nothing beyond TCP 443 reaching the container, so it works from the internet on any network.
+- **WebRTC** sends media as UDP straight to the client, bypassing the proxy. The client can only connect if a host candidate it is offered is actually reachable — i.e. the edge firewall forwards that UDP port inbound to this host. That is why the deployment publishes `59000/udp` and why `SELKIES_WEBRTC_PUBLIC_IP` must name the public address (autodetected at boot; see `svc-selkies/run`). With the default STUN-only `rtc.json` and ICE-lite there is no TURN relay, so a blocking firewall cannot be worked around.
+
+**The advertised candidate is what usually breaks first, and it is our bug.** Selkies' UDP mux binds the container's own address (`10.0.2.2` on the Coolify bridge) and, with `SELKIES_WEBRTC_PUBLIC_IP` empty, names exactly that in the offer:
+
+```
+a=candidate:… 1 udp 2130706431 10.0.2.2 59000 typ host
+```
+
+No client can route to it, so ICE never completes no matter what the firewall allows. `SELKIES_WEBRTC_PUBLIC_IP` maps the private address through NAT1TO1 onto that mux candidate (verified: with it set, the same offer line reads `169.1.28.36 59000`). `svc-selkies/run` autodetects it at boot, so this needs no operator action.
+
+**Watch out: s6 runs the service from `/run/service/svc-selkies/run`,** a copy of `/etc/s6-overlay/s6-rc.d/svc-selkies/run` taken at boot. Editing the `/etc` copy in a *live* container changes nothing until the container restarts, which is exactly how the public-IP fix first appeared not to work. Edit `/run/service/…` to affect a running service; the `/etc` copy is the one that matters at boot and is what this repo ships.
+
+**Verifying a host's WebRTC path** needs a check from outside the advertised address, which a machine inside the same NAT cannot do — a host-to-own-public-IP test is confounded by hairpinning (on `boxone`, TCP 443 hairpins and answers, UDP may not). What is checkable locally is the software half: pair with `/desk/api/webrtc/signaling/` as a client (`HELLO client {"client_type":"controller","client_slot":-1}`, then `SESSION server`) and read the offer it sends — that prints the advertised candidate. A STUN binding request to the container's own address returns Binding Success, proving the ICE agent accepts checks; the same request to the advertised public address fails, which is the firewall or hairpinning, not Selkies.
+
+**The `boxone.off.l-inc.co.za` host sits behind a SonicWALL** that forwards TCP 80/443/8080 (and Coolify's 6001/6002) inward. Whether it forwards UDP 59000 could not be settled from inside the NAT. Until that is confirmed, the default is `SELKIES_MODE=websockets`, which rides the already-forwarded HTTPS port and works everywhere. To make WebRTC the transport once the UDP path is confirmed, add a SonicWALL NAT/access rule forwarding UDP 59000 to this host and switch with:
+
+```bash
+curl -u abc:"$PASSWORD" -X POST https://boxone.off.l-inc.co.za/desk/api/switch \
+  -H 'Content-Type: application/json' -d '{"mode":"webrtc"}'
+```
+
+Check `/desk/api/status` for `current_mode`. The selkies log line `WebRTC UDP mux: every session's host candidates share UDP port 59000 on <ip>` shows the address actually advertised — it must be the public IP, not `10.0.x.x`.
+
 ### startup/start.sh: Node.js Binary Resolution
 
 **Issue:** start.sh tried `which node` without sourcing NVM. Node installed via NVM at `/config/nvm/versions/node/vX.X.X/bin/node`. Default fallback `/usr/local/bin/node` doesn't exist.
