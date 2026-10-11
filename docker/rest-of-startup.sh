@@ -8,7 +8,13 @@ unset npm_config_prefix
 HOME_DIR="/config"
 LOG_DIR="$HOME_DIR/logs"
 STARTUP_SOURCE_URL="https://github.com/AnEntrypoint/gmweb.git"
-STARTUP_COMMIT="1b183446751c633b4c52cd703022482bd5a5be9c"
+# The boot fetch used to be pinned to a frozen commit hash, bumped by hand one
+# commit at a time. It stopped being bumped, so the services under startup/ ran
+# ~15 commits behind main and a push no longer changed them — the deployment
+# looked fresh while serving stale code, which is the exact failure the rest of
+# this file works to avoid. Track the branch instead; override with STARTUP_REF
+# to pin a revision again for a specific deployment.
+STARTUP_REF="${STARTUP_REF:-main}"
 
 log() {
   local msg="[rest-of-startup] $(date '+%Y-%m-%d %H:%M:%S') $@"
@@ -93,7 +99,7 @@ sudo chown abc:abc "$HOME_DIR/.gitconfig" 2>/dev/null || true
 sudo chown abc:abc "$HOME_DIR/.git-credentials" 2>/dev/null || true
 log "  ✓ Git URL rewriting configured"
 
-log "Phase 1: Fetching startup revision ${STARTUP_COMMIT}"
+log "Phase 1: Fetching startup revision ${STARTUP_REF}"
 
 sudo rm -rf /tmp/gmweb /opt/gmweb-startup/node_modules /opt/gmweb-startup/lib \
        /opt/gmweb-startup/services /opt/gmweb-startup/package* \
@@ -112,10 +118,10 @@ fi
 rm -rf /tmp/gmweb 2>/dev/null || true
 if ! timeout 120 git init --quiet /tmp/gmweb || \
    ! timeout 120 git -C /tmp/gmweb remote add origin "$STARTUP_SOURCE_URL" || \
-   ! timeout 120 git -C /tmp/gmweb fetch --depth 1 --filter=blob:none origin "$STARTUP_COMMIT" || \
+   ! timeout 120 git -C /tmp/gmweb fetch --depth 1 --filter=blob:none origin "$STARTUP_REF" || \
    ! timeout 120 git -C /tmp/gmweb checkout --detach --quiet FETCH_HEAD || \
-   [ "$(git -C /tmp/gmweb rev-parse HEAD)" != "$STARTUP_COMMIT" ]; then
-  log "ERROR: Startup revision fetch or integrity verification failed"
+   ! git -C /tmp/gmweb rev-parse --verify HEAD >/dev/null; then
+  log "ERROR: Startup revision fetch failed for ${STARTUP_REF}"
   exit 1
 fi
 

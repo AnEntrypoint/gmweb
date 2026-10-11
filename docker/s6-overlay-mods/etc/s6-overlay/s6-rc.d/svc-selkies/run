@@ -92,12 +92,18 @@ if [ -z "${SELKIES_WEBRTC_PUBLIC_IP:-}" ]; then
   fi
 fi
 
-# A relay only helps if the server gathers one, and an ICE-lite agent offers host
-# candidates only and never touches STUN/TURN. When a TURN relay is supplied, drop
-# ICE-lite so the server allocates a relay candidate the client can actually reach.
-if [ -n "${SELKIES_CLOUDFLARE_TURN_TOKEN_ID:-}" ]; then
-  export SELKIES_WEBRTC_ICE_LITE=false
-fi
+# ICE-lite is only correct when the advertised host candidate is reachable as advertised.
+# A lite agent answers connectivity checks but never sends its own, so it pushes nothing
+# out and the client waits. This host sits behind a SonicWALL that forwards no rule for
+# UDP 59000: inbound traffic is admitted only by a mapping the host created itself first.
+# A lite server therefore never opens that mapping and the browser stays at "connecting",
+# which is exactly the failure seen in the field. The firewall preserves source ports and
+# maps independently of destination (measured against four separate STUN servers), so full
+# ICE — the server sending its own checks out of 59000 first — opens 59000 end to end and
+# the client's checks then match it. Keep a relay working too: a full agent is the only one
+# that can gather a TURN candidate.
+: "${SELKIES_WEBRTC_ICE_LITE:=false}"
+export SELKIES_WEBRTC_ICE_LITE
 
 # Transport and encoder come from SELKIES_* env (Dockerfile defaults, compose overrides).
 # No --mode/--encoder flags here: CLI flags outrank env, which would silently pin the stream.
