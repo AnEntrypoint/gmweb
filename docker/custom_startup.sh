@@ -14,9 +14,16 @@ ABC_GID=$(id -g abc 2>/dev/null || echo "")
 PUID="${ABC_UID:-${PUID:-1000}}"
 PGID="${ABC_GID:-${PGID:-1000}}"
 
-sudo chown -R "$PUID:$PGID" "/config" 2>/dev/null || true
+sudo chown "$PUID:$PGID" "/config" 2>/dev/null || true
+sudo chmod u+rwX,g+rX "/config" 2>/dev/null || true
 
-sudo chmod -R u+rwX,g+rX,o-rwx "/config" 2>/dev/null || true
+# /config can hold hundreds of GB (workspace projects); a recursive walk here blocks
+# nginx for many minutes and Traefik answers 502 meanwhile. Run it in the background,
+# skipping workspace; .gmweb is fixed explicitly below.
+(
+  find /config -mindepth 1 -maxdepth 1 ! -name workspace -exec sudo chown -R "$PUID:$PGID" {} + 2>/dev/null
+  find /config -mindepth 1 -maxdepth 1 ! -name workspace -exec sudo chmod -R u+rwX,g+rX,o-rwx {} + 2>/dev/null
+) >/dev/null 2>&1 &
 
 if [ ! -w "/config" ]; then
   sudo chmod 755 "/config" 2>/dev/null || true
