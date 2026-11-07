@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gmweb: a browser desktop you deploy as one container</title>
+<meta name="description" content="gmweb packages a streamed XFCE desktop, web terminal, file manager and AgentGUI behind one password, ready to run on Coolify.">
+<style>
+  :root { --ink:#1b1f24; --muted:#5b6470; --line:#d9dee5; --bg:#ffffff; --panel:#f5f7fa; --accent:#1f6feb; --accent2:#0e7c66; --warn:#9a6700; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e6edf3; --muted:#9aa4b2; --line:#30363d; --bg:#0d1117; --panel:#161b22; --accent:#58a6ff; --accent2:#3fb9a0; --warn:#d29922; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 2.2rem; margin: .2em 0 .1em; }
+  h2 { font-size: 1.5rem; margin: 2.2em 0 .5em; border-bottom:1px solid var(--line); padding-bottom:.25em; }
+  h3 { font-size: 1.1rem; margin: 1.4em 0 .3em; }
+  p.lede { font-size: 1.15rem; color: var(--muted); margin: .4em 0 1em; }
+  a { color: var(--accent); }
+  code { font: 0.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; background: var(--panel); padding: .1em .35em; border-radius: 4px; }
+  pre { background: var(--panel); padding: 12px 14px; border-radius: 6px; overflow-x: auto; border:1px solid var(--line); }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: .6em 0 1em; font-size: .95rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 14px; margin: 1em 0; }
+  .card { background: var(--panel); border:1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+  .card h3 { margin-top: 0; }
+  .card p { margin: .3em 0; font-size: .95rem; }
+  .tag { display:inline-block; font-size:.75rem; padding:1px 7px; border-radius:10px; border:1px solid var(--line); color:var(--muted); margin-left:4px; vertical-align:middle; }
+  .note { border-left: 3px solid var(--warn); padding: 6px 12px; background: var(--panel); margin: 1em 0; font-size: .95rem; }
+  svg text { font: 13px system-ui, sans-serif; fill: var(--ink); }
+  svg .sub { fill: var(--muted); font-size: 11px; }
+  svg .box { fill: var(--panel); stroke: var(--line); }
+  svg .hi { fill: none; stroke: var(--accent); stroke-width: 2; }
+  svg .udp { fill: none; stroke: var(--accent2); stroke-width: 2; stroke-dasharray: 6 4; }
+  svg .line { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+  footer { margin-top: 3em; color: var(--muted); font-size: .9rem; border-top:1px solid var(--line); padding-top: 1em; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>gmweb</h1>
+<p class="lede">A Linux desktop in the browser, packaged as one container. Open a URL, log in once, and get the XFCE desktop, a web terminal, a file manager, and AgentGUI for running Claude Code and OpenCode agents.</p>
+
+<p>
+  <a href="https://github.com/AnEntrypoint/gmweb">Source on GitHub</a> ·
+  <a href="https://github.com/AnEntrypoint/gmweb/blob/main/readme.md">Readme</a> ·
+  <a href="https://github.com/AnEntrypoint/gmweb/blob/main/docker-compose.yaml">docker-compose.yaml</a>
+</p>
+
+<h2 id="what">What you get</h2>
+<div class="grid">
+  <div class="card"><h3>Desktop <span class="tag">/desk/</span></h3><p>The live XFCE session, streamed to the browser by Selkies.</p></div>
+  <div class="card"><h3>Terminal <span class="tag">/ssh/</span></h3><p>A shell in the browser, served by webssh2 on ttyd.</p></div>
+  <div class="card"><h3>Files <span class="tag">/files/</span></h3><p>A web file browser rooted at <code>/config/Desktop</code>.</p></div>
+  <div class="card"><h3>Agents <span class="tag">/gm/</span></h3><p>AgentGUI: a chat UI for Claude Code and OpenCode sessions.</p></div>
+  <div class="card"><h3>Logs <span class="tag">/logs/</span></h3><p>Plain-text listing of the boot and service logs.</p></div>
+  <div class="card"><h3>One password</h3><p>Every route is behind HTTP Basic Auth using the <code>PASSWORD</code> you set.</p></div>
+</div>
+
+<h2 id="stack">The stack</h2>
+<p>gmweb is a layer on top of projects that already exist. Each row below is an upstream project, what it does, and what gmweb does with it.</p>
+
+<svg viewBox="0 0 900 420" role="img" aria-label="Layers of the gmweb stack, from browser down to the base image" width="100%">
+  <rect data-layer="browser" class="box" x="20" y="16" width="860" height="46" rx="6"/>
+  <text x="36" y="44">Browser</text>
+  <text class="sub" x="150" y="44">HTTPS :443 (Basic Auth) · WebRTC UDP :59000 · WebSocket fallback over :443</text>
+  <rect data-layer="proxy" class="box" x="20" y="80" width="860" height="46" rx="6"/>
+  <text x="36" y="108">Coolify / Traefik</text>
+  <text class="sub" x="210" y="108">terminates TLS, routes to container port 80 via transport gmweb-h1@file</text>
+  <rect data-layer="nginx" class="hi" x="20" y="144" width="860" height="88" rx="6"/>
+  <text x="36" y="172">nginx (gmweb)</text>
+  <text class="sub" x="36" y="192">/desk/ → Selkies :8082 · /ssh/ → webssh2 :9999 · /files/ → fsbrowse :9998</text>
+  <text class="sub" x="36" y="210">/gm/ → AgentGUI :9897 · /logs/ → /config/logs · HTTP Basic Auth on every route</text>
+  <rect data-layer="services" class="box" x="20" y="250" width="420" height="78" rx="6"/>
+  <text x="36" y="278">Services (gmweb supervisor)</text>
+  <text class="sub" x="36" y="298">webssh2 · file-manager · log-viewer · agentgui · proxypilot · cron</text>
+  <text class="sub" x="36" y="314">started and health-checked by startup/index.js</text>
+  <rect class="box" x="460" y="250" width="420" height="78" rx="6"/>
+  <text x="476" y="278">Desktop (LinuxServer s6)</text>
+  <text class="sub" x="476" y="298">Selkies streaming server · XFCE session (xfce4-session, panel, desktop)</text>
+  <text class="sub" x="476" y="314">managed by s6-overlay, not by the gmweb supervisor</text>
+  <rect data-layer="base" class="box" x="20" y="344" width="860" height="56" rx="6"/>
+  <text x="36" y="370">LinuxServer webtop (ubuntu-xfce)</text>
+  <text class="sub" x="36" y="388">Ubuntu base · s6-overlay init · abc user · /custom-cont-init.d hooks · Selkies packaged in the image</text>
+</svg>
+
+<h3>Upstream parts</h3>
+<table>
+  <thead><tr><th>Part</th><th>What it does</th><th>Role in gmweb</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://github.com/linuxserver/docker-webtop">LinuxServer webtop</a></td><td>Ubuntu desktop image that serves a desktop through a browser, with s6-overlay for init.</td><td>Base image (<code>lscr.io/linuxserver/webtop:ubuntu-xfce</code>). gmweb adds its scripts through <code>/custom-cont-init.d</code>.</td></tr>
+    <tr><td><a href="https://xfce.org">XFCE</a></td><td>Lightweight desktop environment: session, panel, window manager.</td><td>The desktop that Selkies streams. Its components are launched by s6 and by a gmweb launcher.</td></tr>
+    <tr><td><a href="https://github.com/selkies-project/selkies">Selkies</a></td><td>Streams a Linux desktop to the browser over WebRTC or WebSockets.</td><td>Serves <code>/desk/</code>. WebRTC is the default; WebSockets is the fallback. Full ICE is on so media can get through an edge firewall.</td></tr>
+    <tr><td><a href="https://nginx.org">nginx</a></td><td>Web server and reverse proxy.</td><td>Ports 80 and 443, Basic Auth, and the route table above.</td></tr>
+    <tr><td><a href="https://github.com/tsl0922/ttyd">ttyd</a> + <a href="https://github.com/billchurch/webssh2">webssh2</a></td><td>Shell in the browser.</td><td>The <code>/ssh/</code> terminal.</td></tr>
+    <tr><td>fsbrowse</td><td>Web file browser.</td><td>The <code>/files/</code> file manager on port 9998.</td></tr>
+    <tr><td><a href="https://github.com/just-containers/s6-overlay">s6-overlay</a></td><td>Process supervisor and init for containers.</td><td>Starts nginx, Selkies and XFCE in the base image. gmweb ships its own s6 service overrides.</td></tr>
+    <tr><td><a href="https://claude.com/claude-code">Claude Code</a>, <a href="https://opencode.ai">OpenCode</a></td><td>Coding agents, one from Anthropic and one open source.</td><td>Run inside AgentGUI at <code>/gm/</code>.</td></tr>
+    <tr><td><a href="https://github.com/traefik/traefik">Traefik</a> / <a href="https://coolify.io">Coolify</a></td><td>Reverse proxy with automatic TLS. Coolify deploys containers from a Compose file.</td><td>gmweb's Compose file carries Traefik labels, so Coolify routes to it with no extra setup.</td></tr>
+  </tbody>
+</table>
+
+<p class="note">Moonlight is not part of this stack. Selkies handles desktop streaming directly in the browser.</p>
+
+<h2 id="ours">What gmweb adds on top</h2>
+<div class="grid">
+  <div class="card">
+    <h3>Supervisor</h3>
+    <p><code>startup/index.js</code> loads the services listed in <code>startup/config.json</code>, groups them by dependency, and restarts any that fail a health check.</p>
+  </div>
+  <div class="card">
+    <h3>Boot script</h3>
+    <p><code>docker/custom_startup.sh</code> prepares nginx, permissions, Node.js and npm caches, then starts the supervisor. Slow installs run in the background so they never block startup.</p>
+  </div>
+  <div class="card">
+    <h3>Fresh code every boot</h3>
+    <p>On each start the container clones this repo from <code>main</code>, so a push reaches the next restart without rebuilding the image.</p>
+  </div>
+  <div class="card">
+    <h3>One credential</h3>
+    <p><code>PASSWORD</code> generates the nginx Basic Auth file and is passed to every service that needs it.</p>
+  </div>
+  <div class="card">
+    <h3>Two persistent volumes</h3>
+    <p><code>/config</code> holds user data and service state. <code>/usr/local</code> keeps installed tools across restarts.</p>
+  </div>
+  <div class="card">
+    <h3>Two images</h3>
+    <p>The desktop image (<code>Dockerfile</code>) and a headless image (<code>Dockerfile.headless</code>, no desktop) for terminal, files and agents only.</p>
+  </div>
+</div>
+
+<h2 id="coolify">How it runs in Coolify</h2>
+<p>The Compose file is the deployment. Coolify reads it, routes HTTPS through Traefik, and runs one container.</p>
+
+<svg viewBox="0 0 900 330" role="img" aria-label="Deployment map: browser to Coolify Traefik to the gmweb container, with WebRTC UDP going direct" width="100%">
+  <rect class="box" x="20" y="120" width="170" height="90" rx="8"/>
+  <text x="40" y="152">Browser</text>
+  <text class="sub" x="40" y="172">any network</text>
+  <text class="sub" x="40" y="188">Basic Auth login</text>
+
+  <rect class="box" x="300" y="120" width="180" height="90" rx="8"/>
+  <text x="320" y="152">Coolify Traefik</text>
+  <text class="sub" x="320" y="172">TLS on 443</text>
+  <text class="sub" x="320" y="188">transport gmweb-h1@file</text>
+
+  <rect class="hi" x="590" y="30" width="290" height="270" rx="8"/>
+  <text x="610" y="60">gmweb container</text>
+  <text class="sub" x="610" y="82">nginx :80</text>
+  <text class="sub" x="610" y="100">Selkies :8082 (desk)</text>
+  <text class="sub" x="610" y="118">webssh2 :9999 · fsbrowse :9998</text>
+  <text class="sub" x="610" y="136">AgentGUI :9897 (gm)</text>
+  <text class="sub" x="610" y="166">volumes: gmweb-config → /config</text>
+  <text class="sub" x="610" y="184">        gmweb-local → /usr/local</text>
+  <text class="sub" x="610" y="214">shm_size 1gb · restart unless-stopped</text>
+  <text class="sub" x="610" y="250">image: almagest/gmweb (amd64, arm64)</text>
+
+  <line class="line" x1="190" y1="165" x2="300" y2="165"/>
+  <line class="line" x1="480" y1="165" x2="590" y2="165"/>
+  <text class="sub" x="200" y="150">HTTPS</text>
+  <text class="sub" x="490" y="150">HTTP :80</text>
+
+  <path class="udp" d="M 105 210 L 105 290 L 590 290"/>
+  <text class="sub" x="120" y="306">WebRTC media: UDP 59000 published directly, bypasses the proxy</text>
+</svg>
+
+<h3>Steps</h3>
+<ol>
+  <li>In Coolify, create a resource from the repo's <code>docker-compose.yaml</code>, or from the published image <code>almagest/gmweb:latest</code>.</li>
+  <li>Set <code>PASSWORD</code>. Leave the default and every route is open to anyone who knows <code>password</code>.</li>
+  <li>Make sure Traefik's file provider defines the <code>gmweb-h1@file</code> transport. The compose labels reference it.</li>
+  <li>Deploy. The container port is 80; Coolify maps the domain to it through the labels.</li>
+  <li>Open <code>https://&lt;your-domain&gt;/desk/</code> and log in as <code>abc</code>.</li>
+</ol>
+
+<h3>Ports and networking</h3>
+<table>
+  <thead><tr><th>Port</th><th>Protocol</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>80 / 443</td><td>TCP</td><td>nginx: the whole web UI (through Traefik in Coolify)</td></tr>
+    <tr><td>59000</td><td>UDP</td><td>Selkies WebRTC media. Optional: if blocked, the desktop falls back to WebSockets on 443</td></tr>
+  </tbody>
+</table>
+
+<h3>Transport choice</h3>
+<p>Selkies runs one transport at a time. <code>SELKIES_MODE=webrtc</code> is the default: media goes straight from the container to the browser over UDP, which is fastest when the network allows it. <code>websockets</code> sends the same stream over the HTTPS connection that is already open, so it works from any network that can reach 443. With <code>SELKIES_ENABLE_DUAL_MODE=true</code>, an operator can switch with <code>POST /desk/api/switch</code>.</p>
+
+<div class="note">Behind a 1:1 NAT, set <code>SELKIES_WEBRTC_PUBLIC_IP</code> to the host's public address, or leave it blank for autodetection at boot. Otherwise the browser is offered the container's private IP, which it cannot reach. For WebRTC through a firewall that forwards no UDP, see the notes in <a href="https://github.com/AnEntrypoint/gmweb/blob/main/CLAUDE.md">CLAUDE.md</a>.</div>
+
+<h3>Environment</h3>
+<table>
+  <thead><tr><th>Variable</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>PASSWORD</code></td><td>Basic Auth password for every route. Required; the fallback is <code>password</code>.</td></tr>
+    <tr><td><code>PUID</code>, <code>PGID</code></td><td>User and group that own <code>/config</code>. Default 1000.</td></tr>
+    <tr><td><code>TZ</code></td><td>Timezone, default <code>Etc/UTC</code>.</td></tr>
+    <tr><td><code>SELKIES_WEBRTC_PUBLIC_IP</code></td><td>Public IP for WebRTC candidates. Blank = autodetect.</td></tr>
+    <tr><td><code>SELKIES_ENABLE_CLOUDFLARE_TURN</code>, <code>SELKIES_CLOUDFLARE_TURN_TOKEN_ID</code>, <code>SELKIES_CLOUDFLARE_TURN_API_TOKEN</code></td><td>Optional Cloudflare TURN relay for networks that block direct UDP.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="local">Run it locally</h2>
+<pre><code>cp .env.example .env
+docker compose up -d --build</code></pre>
+<p>Set <code>PASSWORD</code> in <code>.env</code>, then open <code>https://localhost/</code> (accept the self-signed certificate) and log in as <code>abc</code>.</p>
+
+<footer>
+  gmweb is maintained at <a href="https://github.com/AnEntrypoint/gmweb">AnEntrypoint/gmweb</a>. Each upstream project above keeps its own license and documentation.
+</footer>
+
+</main>
+</body>
+</html>
