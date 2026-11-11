@@ -1,0 +1,282 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-11-11T11:47:54.810Z",
+  "ok": true,
+  "tool": "startup/check-release-readiness.mjs",
+  "sourceFingerprint": "7397241c7dabee04cf3ed190b4be4e2e741d3137d2fa0fc34c8cb075a8f753fe",
+  "gm": {
+    "head": "f6a655ded929762414377b686dc07df2312f37bf",
+    "dirty": false,
+    "status": "",
+    "installerSha256": "18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e"
+  },
+  "gmweb": {
+    "head": "6b646abcd39acc89b0bc38958abdb61a8ef96020",
+    "dirty": true,
+    "status": "M GM_INSTALL.md\n M docs/CONTAINER-ROLLOUT.md\n M docs/POST-RESTART.md\n M docs/ROLLOUT_REPORT.json\n M docs/ROLLOUT_REPORT.md\n M docs/SIMULATED_STARTUP_OUTPUT.txt\n M package.json\n M readme.md\n M startup/check-release-readiness.mjs\n M startup/package.json\n M startup/rollout-report.mjs\n M startup/validate-rollout-report.mjs\n?? docs/RELEASE_READINESS.json\n?? docs/RELEASE_READINESS.md\n?? startup/check-hidden-tokens.mjs\n?? startup/check-survivors.mjs\n?? startup/validate-release-readiness.mjs",
+    "vendoredInstallerSha256": "18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e"
+  },
+  "installerByteParity": true,
+  "gateCounts": [
+    "82/82",
+    "71/71",
+    "65/65",
+    "38/38",
+    "27/27",
+    "22/22",
+    "19/19",
+    "16/16",
+    "13/13",
+    "9/9",
+    "4/4"
+  ],
+  "commands": [
+    {
+      "label": "root-check",
+      "command": "npm run check",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [
+        "82/82",
+        "38/38",
+        "65/65",
+        "27/27",
+        "22/22",
+        "9/9",
+        "19/19"
+      ],
+      "outputTail": " | npm notice run check | npm notice run node startup/check-startup-sources.mjs && node startup/check-runtime-install.mjs && node startup/check-container-startup-path.mjs && node scripts/check-rollout-docs.mjs && node startup/check-post-restart.mjs --offline && node scripts/check-gm-upstream-drift.mjs && node startup/validate-rollout-report.mjs && node startup/check-live-probe-fixtures.mjs && node startup/check-simulated-startup.mjs"
+    },
+    {
+      "label": "startup-check",
+      "command": "npm --prefix startup run check",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [
+        "82/82",
+        "38/38",
+        "65/65",
+        "27/27",
+        "22/22",
+        "9/9",
+        "19/19"
+      ],
+      "outputTail": " | npm notice run gmweb-startup@1.0.0 check | npm notice run node check-startup-sources.mjs && node check-runtime-install.mjs && node check-container-startup-path.mjs && node ../scripts/check-rollout-docs.mjs && node check-post-restart.mjs --offline && node ../scripts/check-gm-upstream-drift.mjs && node validate-rollout-report.mjs && node check-live-probe-fixtures.mjs && node check-simulated-startup.mjs"
+    },
+    {
+      "label": "runtime-install",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-runtime-install.mjs",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [
+        "38/38"
+      ],
+      "outputTail": "PASS runtime smoke: no test service or install command survives |  | 38/38 runtime checks passed"
+    },
+    {
+      "label": "container-path",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-container-startup-path.mjs",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [
+        "65/65"
+      ],
+      "outputTail": "PASS bash -n ../startup.sh |  | 65/65 container-path checks passed"
+    },
+    {
+      "label": "rollout-docs",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node scripts/check-rollout-docs.mjs",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [
+        "27/27"
+      ],
+      "outputTail": "PASS docs includes this docs gate command |  | 27/27 rollout-docs checks passed"
+    },
+    {
+      "label": "post-restart-offline",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-post-restart.mjs --offline",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [
+        "22/22"
+      ],
+      "outputTail": "PASS offline mode performs no HTTP/log/container probes -- static command validation only |  | 22/22 post-restart checks passed; STATUS=OFFLINE_PLAN_VALID"
+    },
+    {
+      "label": "post-restart-live",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-post-restart.mjs --live",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "UNAVAILABLE",
+      "counts": [
+        "22/22"
+      ],
+      "outputTail": "PASS live probe was bounded and read-only -- 1200ms, GET only |  | 22/22 post-restart checks passed; STATUS=UNAVAILABLE"
+    },
+    {
+      "label": "gm-drift-watch-once",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node scripts/check-gm-upstream-drift.mjs --watch --once",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": "WATCH_RESULT once=true iterations=1 interval_ms=15000 duration_ms=0 gm_sha=18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e drift_exit=0 action=NONE | WATCH_GUARANTEE no files copied; no gm/gmweb source modified; no install/registration/restart/publish"
+    },
+    {
+      "label": "probe-selftest",
+      "command": "npm run probe:post-restart",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": " | npm notice run probe:post-restart | npm notice run node startup/live-post-restart-probe.mjs"
+    },
+    {
+      "label": "probe-fixtures",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-live-probe-fixtures.mjs",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": "PASS probe performs no writes/restarts/installs/registration |  | 16/16 live-probe fixture checks passed"
+    },
+    {
+      "label": "simulate-startup",
+      "command": "npm run simulate:startup",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [
+        "19/19"
+      ],
+      "outputTail": " | npm notice run simulate:startup | npm notice run node startup/simulate-container-startup.mjs"
+    },
+    {
+      "label": "simulation-gate",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-simulated-startup.mjs",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [
+        "19/19"
+      ],
+      "outputTail": " | 13/13 simulated-startup gate checks passed | SIMULATED_STARTUP_GATE=PASS output=docs/SIMULATED_STARTUP_OUTPUT.txt"
+    },
+    {
+      "label": "report-rollout",
+      "command": "npm run report:rollout",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": " | npm notice run report:rollout | npm notice run node startup/rollout-report.mjs"
+    },
+    {
+      "label": "validate-rollout-report",
+      "command": "npm run validate:rollout-report",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": " | npm notice run validate:rollout-report | npm notice run node startup/validate-rollout-report.mjs"
+    },
+    {
+      "label": "sha256-parity",
+      "command": "sha256sum docker/install-gm.sh /workspace/gm/scripts/install.sh",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": "18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e  docker/install-gm.sh | 18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e  /workspace/gm/scripts/install.sh"
+    },
+    {
+      "label": "node-check-js",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node --check startup/check-release-readiness.mjs",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": ""
+    },
+    {
+      "label": "bash-n-start",
+      "command": "bash -n startup/start.sh",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": ""
+    },
+    {
+      "label": "bash-n-root-startup",
+      "command": "bash -n startup.sh",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": ""
+    },
+    {
+      "label": "sh-n-installer",
+      "command": "sh -n docker/install-gm.sh",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": ""
+    },
+    {
+      "label": "git-diff-check",
+      "command": "git diff --check",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": ""
+    },
+    {
+      "label": "hidden-token-scan",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-hidden-tokens.mjs",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": "no hidden-token matches"
+    },
+    {
+      "label": "active-forbidden-grep",
+      "command": "grep -RInE agentgui@1\\.0\\.1126|agentgui@latest|bunx.*agentgui@|npx -y agentgui startup docker Dockerfile Dockerfile.headless --exclude=check-*.mjs --exclude=validate-*.mjs --exclude=rollout-report.mjs --exclude=live-post-restart-probe.mjs --exclude=gm-install.log",
+      "exitCode": 1,
+      "expectedExit": 1,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": ""
+    },
+    {
+      "label": "ps-survivor-scan",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-survivors.mjs",
+      "exitCode": 0,
+      "expectedExit": 0,
+      "status": "PASS",
+      "counts": [],
+      "outputTail": "no survivor processes"
+    }
+  ],
+  "livePostRestart": "UNAVAILABLE",
+  "rolloutAction": "READY: docker compose restart gmweb (or headless variant) after change is accepted on STARTUP_REF=main",
+  "guarantees": [
+    "no network",
+    "no real install",
+    "no MCP registration overwrite",
+    "no restart",
+    "no publish",
+    "no long-lived service"
+  ]
+}

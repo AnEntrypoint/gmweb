@@ -18,7 +18,7 @@ PASS dependency sort groups real gm-install and agentgui services -- GROUPS [["g
 PASS gm-install resolves detached dry-run command
 PASS AgentGUI service definition loaded from temp tree
 PASS AgentGUI bounded service start exits 0 -- exit=0
-PASS AgentGUI constructs npx -y github spec -- AGENTGUI_SPAWN {"bin":"/tmp/gmweb-simulated-startup-RwxIRL/mock-bin/npx","args":["-y","github:AnEntrypoint/agentgui#main"],"detached":true}
+PASS AgentGUI constructs npx -y github spec -- AGENTGUI_SPAWN {"bin":"/tmp/gmweb-simulated-startup-cMfdVi/mock-bin/npx","args":["-y","github:AnEntrypoint/agentgui#main"],"detached":true}
 PASS AgentGUI smoke test suppresses setup/network commands
 PASS mock npx accepts exact github argv -- exit=0
 PASS mock argv log records exact npx call
@@ -26,7 +26,7 @@ PASS no network command reached real curl/git/npm
 PASS no real ~/.gmnew/current target created
 PASS no MCP registration file created
 PASS simulation output is secret-free
-PASS temporary workspace cleaned -- /tmp/gmweb-simulated-startup-RwxIRL
+PASS temporary workspace cleaned -- /tmp/gmweb-simulated-startup-cMfdVi
 
 19/19 simulated-startup checks passed
 SIMULATED_STARTUP_STATUS=PASS timeout_ms=8000 tempDirHandling=removed noNetwork=true noMCP=true noInstall=true noSurvivors=true

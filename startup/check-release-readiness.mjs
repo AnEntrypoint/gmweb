@@ -37,9 +37,9 @@ const commands = [
   { label: 'bash-n-root-startup', argv: ['bash', ['-n', 'startup.sh']] },
   { label: 'sh-n-installer', argv: ['sh', ['-n', 'docker/install-gm.sh']] },
   { label: 'git-diff-check', argv: ['git', ['diff', '--check']] },
-  { label: 'hidden-token-scan', argv: [process.execPath, ['-e', 'const fs=require("fs");const r=/gh[pousr]_[A-Za-z0-9]{20,}|github_pat_|X-Amz-(Algorithm|Credential|Signature)|-----BEGIN .*PRIVATE KEY-----/i;const p="docs/RELEASE_READINESS.json";if(fs.existsSync(p)&&r.test(fs.readFileSync(p,"utf8")))process.exit(1)']] },
+  { label: 'hidden-token-scan', argv: [process.execPath, ['startup/check-hidden-tokens.mjs']] },
   { label: 'active-forbidden-grep', argv: ['grep', ['-RInE', 'agentgui@1\\.0\\.1126|agentgui@latest|bunx.*agentgui@|npx -y agentgui', 'startup', 'docker', 'Dockerfile', 'Dockerfile.headless', '--exclude=check-*.mjs', '--exclude=validate-*.mjs', '--exclude=rollout-report.mjs', '--exclude=live-post-restart-probe.mjs', '--exclude=gm-install.log']], expectExit: 1 },
-  { label: 'ps-survivor-scan', argv: ['bash', ['-c', "ps -eo pid=,args= | grep -E 'github:AnEntrypoint/agentgui#main|GM_INSTALL_DRY_RUN=1|gmweb-simulated-startup-|check-release-readiness.mjs' | grep -v 'grep -E' > /tmp/gmweb-release-ps.out; test ! -s /tmp/gmweb-release-ps.out"]] },
+  { label: 'ps-survivor-scan', argv: [process.execPath, ['startup/check-survivors.mjs']] },
 ];
 function sha(path) { return existsSync(path) ? createHash('sha256').update(readFileSync(path)).digest('hex') : 'UNAVAILABLE'; }
 function git(cwd, args) { const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 10000 }); return r.status === 0 ? r.stdout.trim() : 'UNAVAILABLE'; }
@@ -47,7 +47,13 @@ function fingerprint() {
   const paths = ['docker/install-gm.sh', 'startup/services/agentgui.js', 'startup/services/gm-install.js', 'startup/index.js', 'startup/config.json', 'docker/rest-of-startup.sh', 'docs/POST-RESTART.md', 'docs/CONTAINER-ROLLOUT.md', 'GM_INSTALL.md', 'readme.md', 'package.json', 'startup/package.json'];
   return createHash('sha256').update([GM_SOURCE, ...paths].map((p) => `${p}:${sha(p.startsWith('/') ? p : join(ROOT, p))}`).join('\n')).digest('hex');
 }
-function gateCounts(text) { return [...text.matchAll(/(\d+)\/(\d+) [A-Za-z-]*\s*checks passed/g)].map((m) => `${m[1]}/${m[2]}`); }
+function gateCounts(text) {
+  const plain = [...text.matchAll(/(\d+)\/(\d+) (?:[A-Za-z-]+\s*)*checks passed/g)].map((m) => `${m[1]}/${m[2]}`);
+  const probe = [...text.matchAll(/PROBE_CHECKS (\d+)\/(\d+)/g)].map((m) => `${m[1]}/${m[2]}`);
+  const drift = [...text.matchAll(/(\d+)\/(\d+) gm-drift checks passed/g)].map((m) => `${m[1]}/${m[2]}`);
+  const fixtures = [...text.matchAll(/(\d+)\/(\d+) live-probe fixture checks passed/g)].map((m) => `${m[1]}/${m[2]}`);
+  return [...new Set([...plain, ...probe, ...drift, ...fixtures])];
+}
 function runOnce() {
   const results = [];
   let ok = true;
@@ -111,7 +117,14 @@ if (watch || once) {
     iterations++;
     const current = fingerprint();
     const changed = current !== previous;
-    if (iterations === 1 || changed) last = runOnce();
+    if (once && iterations === 1 && !changed && existsSync(ART_JSON)) {
+      const existing = JSON.parse(readFileSync(ART_JSON, 'utf8'));
+      const valid = existing.ok === true && existing.sourceFingerprint === current;
+      if (valid) {
+        last = { ok: true, fingerprint: current };
+        console.log(`RELEASE_WATCH_ONCE reused valid artifact fingerprint=${current} action=none`);
+      } else last = runOnce();
+    } else if (iterations === 1 || changed) last = runOnce();
     previous = current;
     if (once || Date.now() - started >= DURATION_MS) break;
     const sleepMs = Math.min(INTERVAL_MS, Math.max(0, DURATION_MS - (Date.now() - started)));

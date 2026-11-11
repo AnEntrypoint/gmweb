@@ -1,0 +1,342 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-11-11T12:41:19.327Z",
+  "ok": true,
+  "sourceFingerprint": "9815a8caf6242aac7c3db793cd5e9dcb87fef4107b4c136a627c3654863319d5",
+  "mode": "read-only-peer-artifacts",
+  "core": {
+    "gmweb": "PASS",
+    "oscraft": "PASS",
+    "bitvoice": "PASS_OR_FALLBACK"
+  },
+  "decision": "WORKSPACE_CONTEXT_OK: gmweb release readiness remains READY; peers are reported but not modified",
+  "gm": {
+    "head": "6f57313df68d9dc897415e593111ffd311ec6657",
+    "dirty": false,
+    "installerSha256": "18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e"
+  },
+  "artifacts": [
+    {
+      "name": "gmweb-release-readiness",
+      "path": "/workspace/gmweb/docs/RELEASE_READINESS.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": [
+        "82/82",
+        "71/71",
+        "65/65",
+        "38/38",
+        "27/27",
+        "22/22",
+        "19/19",
+        "16/16",
+        "13/13",
+        "9/9",
+        "4/4"
+      ],
+      "sha256": "964bbc269e7664bbaa60ee0d922207a3b86abc6550601d8663b808080803c7a4",
+      "hashes": {
+        "sourceFingerprint": "7397241c7dabee04cf3ed190b4be4e2e741d3137d2fa0fc34c8cb075a8f753fe"
+      },
+      "redGates": [],
+      "nextAction": "None; rolloutAction READY"
+    },
+    {
+      "name": "oscraft-release",
+      "path": "/workspace/oscraft/docs/OSCRAFT_RELEASE.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": {
+        "gates": 78,
+        "ok": 78,
+        "failed": 0,
+        "drift": 0,
+        "skipped": 6
+      },
+      "sha256": "e8f5106d49dc5a33bfe0ba8111b5952d36fb30f00789a36726c33609d9f19106",
+      "hashes": {
+        "snapshotHash": "f3678b574c0ce52ba76eba13f24f125867c18cfdec456c8379463f4eb0417ada"
+      },
+      "redGates": [],
+      "nextAction": "None"
+    },
+    {
+      "name": "bitvoice-release",
+      "path": "/workspace/bitvoice/docs/BITVOICE_RELEASE.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": {
+        "gates": 8
+      },
+      "sha256": "2c7a138e2aae4a888c077a0ea14fccfeecf442f5f2ea3164ae51ee7f8e5f3b7a",
+      "hashes": {
+        "sourceFingerprint": {
+          "files": {
+            "bitvoice/asr.py": "df6dc92397119843b9620cad7d4732fa7ec6f1c691cac6d06afe33aa4770a5fb",
+            "bitvoice/server.py": "29d9de5a3c376900f33171e6d2db08fa7cf1db60dd99a26aa84d7e2197dc5a4c",
+            "bitvoice/tts.py": "af323fc72d6450cc491ab431b014ec8ecaa3553b1690e8c1fddee84a48a172ca",
+            "bitvoice/wsproto.py": "a5d62f6ad7c9d8a08949be7a52f346bde67d1ebbf3d63718edc602a841ca85fe",
+            "scripts/check-barge-in-regression.py": "3a5ad41e3eb75791e6771da75fda8af91a7354ea86f8e0c2f39cc357c10c91c9",
+            "scripts/check-downstream-contracts.py": "c44e433ab7db17246bbb0f6f2a4bdb11ca95c79ef2854db47575cd5023101574",
+            "scripts/full-duplex-benchmark.py": "84bdb0b8f87cd77f3c36a91f735903ba63f95f9473c3818cd14d99c70da61dcb",
+            "scripts/metrics-report.py": "6d1181b7799074b321fd8dd01ef4be8ad4347a635778647c95dc2210dd57fc82",
+            "scripts/service-contract-smoke.py": "9a6844f07f0338d08783cca4a87299a7f57c46cb03b8bb34cb8b5adf4fb926d2",
+            "scripts/validate-service-contract-lock.py": "9399ddcc7d68f9b5eb8b9e730c7faa2136bdc7facfd3225b44b0b0004ff890bb",
+            "scripts/validate-service-contract.py": "87fbd31e482bac8b5a2a7cd6f942802ccf276b23b61b4fda3be89150e25e0811",
+            "scripts/verify.sh": "85b4c3a6a99b9681fa0f244589f58c3f7558b96e1d086b3c9b61fb631c945d71",
+            "service-contract.json": "f26ca47439d610e244dff4166b5061e94f39039e29be16d83967309ceefdd567",
+            "service-contract.lock.json": "daaa59321c632c28eacebecb28328e9f0ec61ede2183437ba4691402a3f55fb0",
+            "tests/test_bitvoice.py": "e3426402af6cba4acbb80bae4cece43dfadb91f2c80209289e21406db651d3f9"
+          },
+          "sha256": "71b2778208bc6706b877b546c448be0df07c93db098c50bc9dcc9a84df20143d"
+        }
+      },
+      "redGates": [],
+      "nextAction": "Generate Bitvoice release artifact when ready"
+    },
+    {
+      "name": "bitvoice-service-contract",
+      "path": "/workspace/bitvoice/service-contract.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": {},
+      "sha256": "f26ca47439d610e244dff4166b5061e94f39039e29be16d83967309ceefdd567",
+      "hashes": {},
+      "redGates": [],
+      "nextAction": "Use as fallback contract until release artifact exists"
+    },
+    {
+      "name": "bitvoice-lock",
+      "path": "/workspace/bitvoice/bitvoice.lock",
+      "present": false,
+      "ok": null,
+      "status": "UNAVAILABLE",
+      "blocking": false,
+      "counts": {},
+      "sha256": null,
+      "hashes": {},
+      "redGates": [],
+      "nextAction": "Generate lock when peer release is finalized"
+    },
+    {
+      "name": "wscheppity-extraction",
+      "path": "/workspace/wscheppity/.local/extraction-manifest.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": {
+        "classes": 23,
+        "complete": 23,
+        "partial": 0,
+        "blocked": 0,
+        "trackedFiles": 189,
+        "activeAssets": 88,
+        "activeAssetsValid": 88,
+        "cdnNames": 402,
+        "cdnBad": 0,
+        "docsSections": 68,
+        "gitRefs": 7,
+        "gitCommits": 1600,
+        "gitNotes": 800,
+        "engineFiles": 27,
+        "apiDoorGroups": 42,
+        "apiCaptures": 37
+      },
+      "sha256": "aac38900903c95343a729ee81679c199348490cfc7d22ce11753b0ccb82ef91d",
+      "hashes": {},
+      "redGates": [],
+      "nextAction": "None"
+    },
+    {
+      "name": "wscheppity-vendor-ready",
+      "path": "/workspace/wscheppity/.local/vendor-prep/READY.json",
+      "present": false,
+      "ok": null,
+      "status": "PENDING",
+      "blocking": false,
+      "counts": {},
+      "sha256": null,
+      "hashes": {},
+      "redGates": [],
+      "nextAction": "247420 vendors wscheppity only after READY.json ok=true; no gmweb action"
+    },
+    {
+      "name": "extra-extraction",
+      "path": "/workspace/extra/.local/extraction-manifest.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": {
+        "classes": 22,
+        "complete": 22,
+        "partial": 0,
+        "blocked": 0,
+        "trackedFiles": 42,
+        "activeAssets": 35,
+        "activeAssetsValid": 35,
+        "cdnNames": 78,
+        "cdnBad": 0,
+        "docsSections": 68,
+        "gitRefs": 3,
+        "gitCommits": 84,
+        "gitNotes": 42,
+        "engineFiles": 27,
+        "apiDoorGroups": 42,
+        "apiCaptures": 37
+      },
+      "sha256": "279dfcf88a6111af0f0874d749b9154481a2ca503423ac0d8879ac38e216198f",
+      "hashes": {},
+      "redGates": [],
+      "nextAction": "None"
+    },
+    {
+      "name": "extra-status",
+      "path": "/workspace/extra/.local/extraction-status.json",
+      "present": false,
+      "ok": null,
+      "status": "UNAVAILABLE",
+      "blocking": false,
+      "counts": {},
+      "sha256": null,
+      "hashes": {},
+      "redGates": [],
+      "nextAction": "Generate status when extraction finalizes"
+    },
+    {
+      "name": "bota-coordination",
+      "path": "/workspace/bota/export/coordination-status.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": {
+        "UNAVAILABLE": 0,
+        "available": 439,
+        "hy3dQueue": 56,
+        "intentionally-open": 1,
+        "owner-decision": 1,
+        "requested-pooled-email": 50,
+        "requested-relay": 4,
+        "resolved": 439,
+        "rows": 536,
+        "spawn-generated": 41,
+        "spawnGaps": 480,
+        "unexplainedUnavailable": 0,
+        "unresolved": 97
+      },
+      "sha256": "327f78a0b8ff56b38bb1999b7f2db9b995ae6ed62864b038a393119bcdc52eed",
+      "hashes": {},
+      "redGates": [],
+      "nextAction": "None"
+    },
+    {
+      "name": "hy3d-content",
+      "path": "/workspace/hy3d/output/content-for-bota.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": {
+        "rows": 159,
+        "byCategory": {
+          "bota-hero": 26,
+          "relay-extra": 1,
+          "structure": 14,
+          "studio-substitute": 26,
+          "spawn-cdn": 88,
+          "clip-substitute": 4
+        },
+        "byMethod": {
+          "relay": 53,
+          "pooled-email studio": 14,
+          "wscheppity-read-only-extraction": 88,
+          "wscheppity-read-only-clip": 4
+        },
+        "byStatus": {
+          "ready": 107,
+          "prepared-only": 52
+        },
+        "ready": 107,
+        "blocked": 0,
+        "requested": 54,
+        "available": 234,
+        "pooled": 14,
+        "relay": 53,
+        "spawnCdn": 88,
+        "endpointBlocked": 50,
+        "preparedOnly": 52
+      },
+      "sha256": "ebbff59684d6fa4062c3cffd5e0b394e2560855b7364aba839f5a5a0727fd001",
+      "hashes": {},
+      "redGates": [],
+      "nextAction": "None"
+    },
+    {
+      "name": "hy3d-delivery",
+      "path": "/workspace/hy3d/output/asset-delivery-report.json",
+      "present": true,
+      "ok": true,
+      "status": "PASS",
+      "blocking": false,
+      "counts": {
+        "blocked": 26,
+        "substituted": 26,
+        "missing": 0,
+        "ready": 107,
+        "relayed": 15,
+        "preparedOnly": 52,
+        "rows": 159,
+        "totalsByCategory": {
+          "bota-hero": 26,
+          "relay-extra": 1,
+          "structure": 14,
+          "studio-substitute": 26,
+          "spawn-cdn": 88,
+          "clip-substitute": 4
+        },
+        "legacyInventoryReady": 15,
+        "legacyInventoryPreparedOnly": 52,
+        "legacyInventoryRows": 67,
+        "hy3dOwned": 67,
+        "wscheppityOwned": 92,
+        "oscraftDestinationRows": 71
+      },
+      "sha256": "d3e41343ad78be7ae9ff325745ee75504f305b47e541a3e55bba405794ab5d6e",
+      "hashes": {
+        "destinationHashSweep": {
+          "rows": 159,
+          "bad": []
+        }
+      },
+      "redGates": [],
+      "nextAction": "None"
+    }
+  ],
+  "pending": [
+    "wscheppity-vendor-ready"
+  ],
+  "unavailable": [
+    "bitvoice-lock",
+    "extra-status"
+  ],
+  "blocking": [],
+  "guarantees": [
+    "read-only peers",
+    "no network",
+    "no install",
+    "no MCP registration",
+    "no restart",
+    "no publish",
+    "no long-lived service"
+  ]
+}

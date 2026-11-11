@@ -60,7 +60,7 @@ const byteParity = upstreamSha === vendoredSha;
 const ok = results.every((r) => r.ok) && byteParity && activeAgentGuiSpec === 'github:AnEntrypoint/agentgui#main';
 
 const report = {
-  schema: 3,
+  schema: 4,
   generatedAt: new Date().toISOString(),
   ok,
   generatedBy: 'startup/rollout-report.mjs',
@@ -96,6 +96,15 @@ const report = {
     cleanup: true,
     timeoutMsMax: 19000,
   },
+  releaseReadiness: {
+    command: 'npm run check:release-readiness',
+    validator: 'npm run validate:release-readiness',
+    watchCommand: 'npm run check:release-readiness -- --watch --once',
+    artifacts: ['docs/RELEASE_READINESS.json', 'docs/RELEASE_READINESS.md'],
+    decision: 'READY only when all deterministic gates pass; UNAVAILABLE live post-restart is allowed',
+    offline: true,
+    boundedWatch: { durationMsMax: 600000, intervalMs: 20000, modifiesFiles: false },
+  },
   rollout: {
     productionCommand: 'docker compose restart gmweb',
     headlessCommand: 'docker compose -f docker-compose.headless.yaml restart gmweb-headless',
@@ -129,6 +138,7 @@ const lines = [
   `- explicit probe: \`${report.postRestartProbe.explicitCommand}\``,
   `- simulated startup: ${report.simulatedStartup.status} (${results.find((r) => r.name === 'simulated-startup')?.count || 'UNAVAILABLE'})`,
   `- simulation command: \`${report.simulatedStartup.command}\``,
+  `- release readiness: \`${report.releaseReadiness.command}\` -> \`${report.releaseReadiness.artifacts[0]}\``,
   '',
   '## Gate counts',
   '',

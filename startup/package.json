@@ -17,7 +17,10 @@
     "probe:post-restart": "node live-post-restart-probe.mjs",
     "check:live-probe-fixtures": "node check-live-probe-fixtures.mjs",
     "simulate:startup": "node simulate-container-startup.mjs",
-    "check:simulated-startup": "node check-simulated-startup.mjs"
+    "check:simulated-startup": "node check-simulated-startup.mjs",
+    "check:release-readiness": "node check-release-readiness.mjs",
+    "validate:release-readiness": "node validate-release-readiness.mjs",
+    "watch:release-readiness": "node check-release-readiness.mjs --watch --once"
   },
   "dependencies": {}
 }

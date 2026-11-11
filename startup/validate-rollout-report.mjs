@@ -31,6 +31,8 @@ const agentgui = file('startup/services/agentgui.js');
 const activeSpec = agentgui.match(/const AGENTGUI_PACKAGE = '([^']+)'/)?.[1];
 
 ok('report ok is true', report.ok === true, String(report.ok));
+ok('report schema includes releaseReadiness', report.schema >= 4 && report.releaseReadiness?.command === 'npm run check:release-readiness' && report.releaseReadiness?.validator === 'npm run validate:release-readiness' && report.releaseReadiness?.offline === true && report.releaseReadiness?.boundedWatch?.modifiesFiles === false);
+ok('release readiness artifacts exist', (report.releaseReadiness?.artifacts || []).every((p) => existsSync(join(ROOT, p))) && /RELEASE_READINESS/.test(md));
 ok('report schema includes simulatedStartup', report.schema >= 3 && report.simulatedStartup?.status === 'PASS' && report.simulatedStartup?.noNetwork === true && report.simulatedStartup?.cleanup === true && report.simulatedStartup?.timeoutMsMax < 20000);
 ok('report simulatedStartup exact command and output', report.simulatedStartup?.command === 'npm run simulate:startup' && report.simulatedStartup?.output === 'docs/SIMULATED_STARTUP_OUTPUT.txt' && existsSync(join(ROOT, report.simulatedStartup.output)));
 ok('report simulatedStartup evidence fields', /SUPERVISOR_READY/.test(report.simulatedStartup?.supervisorFirstEvidence || '') && /dry_run=1/.test(report.simulatedStartup?.gmInstallDryRunEvidence || '') && report.simulatedStartup?.agentGuiSpec === 'npx -y github:AnEntrypoint/agentgui#main');
@@ -83,10 +85,10 @@ const activeSources = ['startup/services/agentgui.js', 'startup/services/gm-inst
 ok('no forbidden active AgentGUI npm spec', !forbidden.some((p) => typeof p === 'string' ? activeSources.includes(p) : p.test(activeSources)));
 
 const secretPatterns = [/gh[pousr]_[A-Za-z0-9]{20,}/, /github_pat_[A-Za-z0-9_]{20,}/, /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, /AKIA[0-9A-Z]{16}/, /X-Amz-(Algorithm|Credential|Signature)/i, /(?:token|api[_-]?key|secret)\s*[:=]\s*['"][^'"$<{]{12,}['"]/i];
-const secretTargets = ['docs/ROLLOUT_REPORT.json', 'docs/ROLLOUT_REPORT.md', 'docs/POST-RESTART.md', 'docs/CONTAINER-ROLLOUT.md', 'GM_INSTALL.md', 'readme.md', 'docs/SIMULATED_STARTUP_OUTPUT.txt', 'package.json', 'startup/package.json'];
+const secretTargets = ['docs/ROLLOUT_REPORT.json', 'docs/ROLLOUT_REPORT.md', 'docs/POST-RESTART.md', 'docs/CONTAINER-ROLLOUT.md', 'GM_INSTALL.md', 'readme.md', 'docs/SIMULATED_STARTUP_OUTPUT.txt', 'docs/RELEASE_READINESS.json', 'docs/RELEASE_READINESS.md', 'package.json', 'startup/package.json'];
 ok('hidden-token scan clean on report/docs/manifests', !secretTargets.some((p) => secretPatterns.some((q) => q.test(file(p)))));
 
-for (const relative of ['startup/services/agentgui.js', 'startup/services/gm-install.js', 'startup/rollout-report.mjs', 'startup/validate-rollout-report.mjs', 'startup/watch-gm-drift.mjs', 'startup/live-post-restart-probe.mjs', 'startup/check-live-probe-fixtures.mjs', 'startup/simulate-container-startup.mjs', 'startup/check-simulated-startup.mjs']) {
+for (const relative of ['startup/services/agentgui.js', 'startup/services/gm-install.js', 'startup/rollout-report.mjs', 'startup/validate-rollout-report.mjs', 'startup/watch-gm-drift.mjs', 'startup/live-post-restart-probe.mjs', 'startup/check-live-probe-fixtures.mjs', 'startup/simulate-container-startup.mjs', 'startup/check-simulated-startup.mjs', 'startup/check-release-readiness.mjs', 'startup/validate-release-readiness.mjs', 'startup/check-hidden-tokens.mjs', 'startup/check-survivors.mjs']) {
   const r = run(process.execPath, ['--check', join(ROOT, relative)]);
   ok(`node --check ${relative}`, r.status === 0, (r.stderr || '').trim());
 }
@@ -101,11 +103,11 @@ ok('git diff --check', run('git', ['diff', '--check'], ROOT).status === 0);
 const ps = run('ps', ['-eo', 'pid=,args=']);
 const ownPid = String(process.pid);
 const ownParentPid = String(process.ppid);
-const fixtureGate = run(process.execPath, ['startup/check-live-probe-fixtures.mjs', 'startup/simulate-container-startup.mjs', 'startup/check-simulated-startup.mjs']);
+const fixtureGate = run(process.execPath, ['startup/check-live-probe-fixtures.mjs', 'startup/simulate-container-startup.mjs', 'startup/check-simulated-startup.mjs', 'startup/check-release-readiness.mjs', 'startup/validate-release-readiness.mjs', 'startup/check-hidden-tokens.mjs', 'startup/check-survivors.mjs']);
 ok('live-probe fixture gate passes', Number(fixtureGate.status) === 0 && /16\/16 live-probe fixture checks passed/.test(fixtureGate.stdout || ''));
 const probeSelfTest = run(process.execPath, ['startup/live-post-restart-probe.mjs']);
 ok('live-probe SELFTEST passes', Number(probeSelfTest.status) === 0 && /STATUS=SELFTEST/.test(probeSelfTest.stdout || ''));
-const simGate = run(process.execPath, ['startup/check-simulated-startup.mjs']);
+const simGate = run(process.execPath, ['startup/check-simulated-startup.mjs', 'startup/check-release-readiness.mjs', 'startup/validate-release-readiness.mjs', 'startup/check-hidden-tokens.mjs', 'startup/check-survivors.mjs']);
 ok('simulated-startup gate passes', Number(simGate.status) === 0 && /13\/13 simulated-startup gate checks passed/.test(simGate.stdout || ''));
 const isOwnTree = (line) => line.trimStart().startsWith(`${ownPid} `) || line.trimStart().startsWith(`${ownParentPid} `) || line.includes(`validate-rollout-report.mjs`);
 const survivors = (ps.stdout || '').split('\n').filter((line) => !isOwnTree(line) && /github:AnEntrypoint\/agentgui#main|GM_INSTALL_DRY_RUN=1|gmweb-container-path-|rollout-report\.mjs|watch-gm-drift\.mjs/.test(line));

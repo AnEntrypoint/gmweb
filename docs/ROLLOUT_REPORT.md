@@ -1,11 +1,11 @@
 # gmweb rollout report
 
-Generated: 2026-11-11T11:05:08.520Z
+Generated: 2026-11-11T12:12:43.928Z
 ok: true
 
 ## State
 
-- gmweb HEAD: `2eb6599e3d2bc0ec2f72413e4ca744b8105aa474` (dirty worktree)
+- gmweb HEAD: `6b646abcd39acc89b0bc38958abdb61a8ef96020` (dirty worktree)
 - gm HEAD: `f6a655ded929762414377b686dc07df2312f37bf`
 - gm installer SHA256: `18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e`
 - gmweb vendored installer SHA256: `18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e`
@@ -17,6 +17,7 @@ ok: true
 - explicit probe: `npm run probe:post-restart -- --url <base> --log <path>`
 - simulated startup: PASS (19/19)
 - simulation command: `npm run simulate:startup`
+- release readiness: `npm run check:release-readiness` -> `docs/RELEASE_READINESS.json`
 
 ## Gate counts
 

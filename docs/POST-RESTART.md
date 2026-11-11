@@ -156,3 +156,15 @@ node startup/check-simulated-startup.mjs
 
 Output artifact: `docs/SIMULATED_STARTUP_OUTPUT.txt` contains the exact command, exit code, status, and bounded output. This is a simulation: unlike the offline post-restart plan it exercises real modules in a temp tree; unlike the explicit `npm run probe:post-restart -- --url ... --log ...` live probe it never contacts a deployment. It never restarts production.
 
+## Single release-readiness decision
+
+Generate the one-command bounded decision artifact:
+
+```sh
+npm run check:release-readiness
+npm run validate:release-readiness
+npm run check:release-readiness -- --watch --once
+```
+
+Outputs: `docs/RELEASE_READINESS.json` and `docs/RELEASE_READINESS.md`. `ok: true` means every deterministic command passed (or `UNAVAILABLE` for the opt-in live post-restart probe), installer parity held, no active forbidden AgentGUI spec existed, hidden-token scan was clean, and no survivor process remained. `rolloutAction: READY: ...` is the decision to restart only after the change is accepted on `STARTUP_REF=main`. The watcher is bounded to 10 minutes / 20s (or `--once`) and reports changes without copying/modifying/restarting/installing/publishing.
+

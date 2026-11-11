@@ -14,6 +14,9 @@
     "probe:post-restart": "node startup/live-post-restart-probe.mjs",
     "check:live-probe-fixtures": "node startup/check-live-probe-fixtures.mjs",
     "simulate:startup": "node startup/simulate-container-startup.mjs",
-    "check:simulated-startup": "node startup/check-simulated-startup.mjs"
+    "check:simulated-startup": "node startup/check-simulated-startup.mjs",
+    "check:release-readiness": "node startup/check-release-readiness.mjs",
+    "validate:release-readiness": "node startup/validate-release-readiness.mjs",
+    "watch:release-readiness": "node startup/check-release-readiness.mjs --watch --once"
   }
 }

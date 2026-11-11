@@ -101,5 +101,6 @@ docs/                   project site (GitHub Pages) and notes
 - [`docs/ROLLOUT_REPORT.md`](docs/ROLLOUT_REPORT.md): single deterministic rollout report; generate with `npm run report:rollout`, validate with `npm run validate:rollout-report`, and use bounded `npm run watch:gm-drift` for upstream drift.
 - [`docs/POST-RESTART.md`](docs/POST-RESTART.md): bounded read-only live probe, fixtures, and `SELFTEST`/`PASS`/`FAIL`/`UNAVAILABLE` meanings (`npm run probe:post-restart`).
 - [`docs/SIMULATED_STARTUP_OUTPUT.txt`](docs/SIMULATED_STARTUP_OUTPUT.txt): bounded offline local startup simulation (`npm run simulate:startup`), with no network, install, registration, or restart.
+- [`docs/RELEASE_READINESS.md`](docs/RELEASE_READINESS.md): one combined deterministic decision artifact (`npm run check:release-readiness`, `npm run validate:release-readiness`, bounded `--watch --once`).
 - [`SETUP.md`](SETUP.md): an older VPS setup walkthrough.
 - [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md): operational facts and design decisions.
