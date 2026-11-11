@@ -1,0 +1,204 @@
+{
+  "schema": 3,
+  "generatedAt": "2026-11-11T11:05:08.520Z",
+  "ok": true,
+  "generatedBy": "startup/rollout-report.mjs",
+  "gmweb": {
+    "head": "2eb6599e3d2bc0ec2f72413e4ca744b8105aa474",
+    "dirty": true,
+    "status": "M AGENTGUI_FINAL_STATUS.md\n M AGENTGUI_STATUS.md\n M AGENTS.md\n M CLAUDE.md\n M Dockerfile\n M Dockerfile.headless\n M SETUP.md\n M docker/rest-of-startup.sh\n M package.json\n M readme.md\n M startup/config.json\n M startup/index.js\n M startup/package.json\n M startup/services/agentgui.js\n?? GM_INSTALL.md\n?? docker/install-gm.sh\n?? docs/CONTAINER-ROLLOUT.md\n?? docs/POST-RESTART.md\n?? docs/ROLLOUT_REPORT.json\n?? docs/ROLLOUT_REPORT.md\n?? docs/SIMULATED_STARTUP_OUTPUT.txt\n?? scripts/\n?? startup/check-container-startup-path.mjs\n?? startup/check-live-probe-fixtures.mjs\n?? startup/check-post-restart.mjs\n?? startup/check-runtime-install.mjs\n?? startup/check-simulated-startup.mjs\n?? startup/check-startup-sources.mjs\n?? startup/fixtures/\n?? startup/live-post-restart-probe.mjs\n?? startup/rollout-report.mjs\n?? startup/services/gm-install.js\n?? startup/simulate-container-startup.mjs\n?? startup/validate-rollout-report.mjs\n?? startup/watch-gm-drift.mjs"
+  },
+  "gm": {
+    "head": "f6a655ded929762414377b686dc07df2312f37bf",
+    "dirty": false,
+    "status": "",
+    "source": "/workspace/gm/scripts/install.sh",
+    "installerSha256": "18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e"
+  },
+  "installer": {
+    "vendoredPath": "docker/install-gm.sh",
+    "vendoredSha256": "18318fed9c32d6625d7512e45a3c92278597745ba26cb98cd60ae5fc56e3d62e",
+    "byteParity": true
+  },
+  "agentGui": {
+    "activeSpec": "github:AnEntrypoint/agentgui#main",
+    "requiredSpec": "github:AnEntrypoint/agentgui#main",
+    "npmPinsAllowed": false
+  },
+  "gates": [
+    {
+      "name": "static-source",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-startup-sources.mjs",
+      "exitCode": 0,
+      "passed": 82,
+      "total": 82,
+      "count": "82/82",
+      "status": "PASS",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "runtime-install",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-runtime-install.mjs",
+      "exitCode": 0,
+      "passed": 38,
+      "total": 38,
+      "count": "38/38",
+      "status": "PASS",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "container-startup-path",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-container-startup-path.mjs",
+      "exitCode": 0,
+      "passed": 65,
+      "total": 65,
+      "count": "65/65",
+      "status": "PASS",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "rollout-docs",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node scripts/check-rollout-docs.mjs",
+      "exitCode": 0,
+      "passed": 27,
+      "total": 27,
+      "count": "27/27",
+      "status": "PASS",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "post-restart-offline",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-post-restart.mjs --offline",
+      "exitCode": 0,
+      "passed": 22,
+      "total": 22,
+      "count": "22/22",
+      "status": "OFFLINE_PLAN_VALID",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "post-restart-live",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-post-restart.mjs --live",
+      "exitCode": 0,
+      "passed": 22,
+      "total": 22,
+      "count": "22/22",
+      "status": "UNAVAILABLE",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "gm-upstream-drift",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node scripts/check-gm-upstream-drift.mjs",
+      "exitCode": 0,
+      "passed": 9,
+      "total": 9,
+      "count": "9/9",
+      "status": "PASS",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "live-probe-selftest",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/live-post-restart-probe.mjs",
+      "exitCode": 0,
+      "passed": 4,
+      "total": 4,
+      "count": "4/4",
+      "status": "SELFTEST",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "live-probe-fixtures",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-live-probe-fixtures.mjs",
+      "exitCode": 0,
+      "passed": 16,
+      "total": 16,
+      "count": "16/16",
+      "status": "PASS",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "simulated-startup",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/simulate-container-startup.mjs",
+      "exitCode": 0,
+      "passed": 19,
+      "total": 19,
+      "count": "19/19",
+      "status": "PASS",
+      "ok": true,
+      "failures": []
+    },
+    {
+      "name": "simulated-startup-gate",
+      "command": "/data/cache/node/node-v24.22.0-linux-x64/bin/node startup/check-simulated-startup.mjs",
+      "exitCode": 0,
+      "passed": 13,
+      "total": 13,
+      "count": "13/13",
+      "status": "PASS",
+      "ok": true,
+      "failures": []
+    }
+  ],
+  "postRestart": {
+    "offlineStatus": "OFFLINE_PLAN_VALID",
+    "liveStatus": "UNAVAILABLE",
+    "liveEvidence": ""
+  },
+  "postRestartProbe": {
+    "selftestCommand": "npm run probe:post-restart",
+    "explicitCommand": "npm run probe:post-restart -- --url <base> --log <path>",
+    "statuses": [
+      "SELFTEST",
+      "PASS",
+      "FAIL",
+      "UNAVAILABLE"
+    ],
+    "fixtures": {
+      "healthy": "PASS",
+      "stale-npm-pin": "FAIL",
+      "unreachable": "UNAVAILABLE"
+    },
+    "offlineByDefault": true,
+    "timeoutMsMax": 2000,
+    "readOnly": true
+  },
+  "simulatedStartup": {
+    "command": "npm run simulate:startup",
+    "checker": "node startup/check-simulated-startup.mjs",
+    "output": "docs/SIMULATED_STARTUP_OUTPUT.txt",
+    "status": "PASS",
+    "tempDirHandling": "created under OS temp dir and removed in finally",
+    "supervisorFirstEvidence": "SUPERVISOR_READY before detached install resolution",
+    "gmInstallDryRunEvidence": "GM_DRY_RUN_EVIDENCE dry_run=1 registration_skipped=1 detached=true",
+    "agentGuiSpec": "npx -y github:AnEntrypoint/agentgui#main",
+    "noNetwork": true,
+    "cleanup": true,
+    "timeoutMsMax": 19000
+  },
+  "rollout": {
+    "productionCommand": "docker compose restart gmweb",
+    "headlessCommand": "docker compose -f docker-compose.headless.yaml restart gmweb-headless",
+    "startupRef": "main",
+    "reason": "Container boot re-fetches STARTUP_REF into /opt/gmweb-startup/ before supervisor starts."
+  },
+  "rollback": "Revert changed files on main (or deployment STARTUP_REF), then repeat the same container restart.",
+  "driftAction": "cp /workspace/gm/scripts/install.sh /workspace/gmweb/docker/install-gm.sh",
+  "guarantees": [
+    "no network",
+    "no real install",
+    "no MCP registration overwrite",
+    "no restart",
+    "no publish",
+    "no long-lived service"
+  ],
+  "failures": []
+}

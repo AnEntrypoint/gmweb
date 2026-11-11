@@ -31,6 +31,7 @@ async function main() {
         'log-viewer',
         'tmux',
         'proxypilot',
+        'gm-install',
         'agentgui',
         'moltbot',
         'playwriter',

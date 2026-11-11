@@ -1,0 +1,5 @@
+[agentgui] Starting agentgui with npx -y github:AnEntrypoint/agentgui#main
+[gm-install] AUTO GM INSTALL source=https://raw.githubusercontent.com/AnEntrypoint/gm/main/scripts/install.sh
+[gm-install] fetched manifest.json version=gmnew-1-x64-linux sha256=0123456789abcdef size=1234567
+[gm-install] installed gmnew at /config/.gmnew/current/gm
+[gm-install] gm install registration complete; no add-mcp relay used

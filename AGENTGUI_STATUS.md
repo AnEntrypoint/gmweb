@@ -151,6 +151,10 @@ For fresh deployment, ensure:
 - [ ] nginx htpasswd is regenerated with PASSWORD
 - [ ] Supervisor has health checks enabled for agentgui
 
+## Historical source note (2026-11-11)
+
+This file describes the older npm-package deployment. The active supervisor now launches AgentGUI from GitHub with `npx -y github:AnEntrypoint/agentgui#main`; see [`GM_INSTALL.md`](GM_INSTALL.md). No bare or version-pinned npm AgentGUI spec is active.
+
 ## Next Steps / Future Improvements
 
 ### High Priority

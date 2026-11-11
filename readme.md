@@ -61,6 +61,12 @@ Environment variables:
 | `FILE_MANAGER_PATH` | Root of the file manager | `/config/Desktop` |
 | `SELKIES_WEBRTC_PUBLIC_IP` | Public IP advertised for WebRTC. Blank = autodetected at boot | blank |
 | `SELKIES_ENABLE_CLOUDFLARE_TURN`, `SELKIES_CLOUDFLARE_TURN_TOKEN_ID`, `SELKIES_CLOUDFLARE_TURN_API_TOKEN` | Optional TURN relay for networks that block direct UDP | off |
+| `GMNEW_RELEASE_BASE` | Override gm release manifest/archive base URL | `https://github.com/AnEntrypoint/gm/releases/download/latest` |
+| `GMNEW_SKIP_REGISTER` | `1` skips native `gm install` registration | unset |
+| `GMNEW_AUTO_UPDATE` | `0` disables gm's native 15-minute auto-update | auto-update on |
+| `GMWEB_GM_MCP_CONFIG` | Optional MCP/playwriter config passed as `--mcp-config` | unset |
+
+The active AgentGUI service loads the latest `main` from GitHub with `npx -y github:AnEntrypoint/agentgui#main`, not from npm. AUTO GM INSTALL uses the native [`AnEntrypoint/gm`](https://github.com/AnEntrypoint/gm) release installer with sha256/size verification; see [`GM_INSTALL.md`](GM_INSTALL.md) for the exact commands, health/retry behavior, and live rollout.
 
 Deploy steps: create a Coolify resource from this repo's `docker-compose.yaml` (or from the published image `almagest/gmweb:latest`), set `PASSWORD`, and deploy. Images for `linux/amd64` and `linux/arm64` are built by `.github/workflows/docker-build-push.yml`.
 
@@ -91,5 +97,9 @@ docs/                   project site (GitHub Pages) and notes
 
 - [`docs/index.html`](docs/index.html): the project site, with the stack diagram and deployment map.
 - [`docs/version-check.md`](docs/version-check.md): the version-check service (currently disabled).
+- [`GM_INSTALL.md`](GM_INSTALL.md): canonical AUTO GM INSTALL and the GitHub-only AgentGUI source rule.
+- [`docs/ROLLOUT_REPORT.md`](docs/ROLLOUT_REPORT.md): single deterministic rollout report; generate with `npm run report:rollout`, validate with `npm run validate:rollout-report`, and use bounded `npm run watch:gm-drift` for upstream drift.
+- [`docs/POST-RESTART.md`](docs/POST-RESTART.md): bounded read-only live probe, fixtures, and `SELFTEST`/`PASS`/`FAIL`/`UNAVAILABLE` meanings (`npm run probe:post-restart`).
+- [`docs/SIMULATED_STARTUP_OUTPUT.txt`](docs/SIMULATED_STARTUP_OUTPUT.txt): bounded offline local startup simulation (`npm run simulate:startup`), with no network, install, registration, or restart.
 - [`SETUP.md`](SETUP.md): an older VPS setup walkthrough.
 - [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md): operational facts and design decisions.

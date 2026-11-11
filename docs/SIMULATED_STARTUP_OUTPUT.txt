@@ -1,0 +1,33 @@
+# Simulated startup output
+
+Command: /data/cache/node/node-v24.22.0-linux-x64/bin/node startup/simulate-container-startup.mjs
+Exit: 0
+Status: PASS
+Checks: 19/19 simulated-startup checks passed
+
+```text
+GM_DRY_RUN_EVIDENCE dry_run=1 registration_skipped=1 detached=true
+GM_DRY_RUN_COMMAND "sh" detached=true
+PASS simulation copied exact startup files
+PASS simulation deployed startup tree
+PASS simulation env skips registration and caps probe timeout
+PASS simulation mock PATH precedes system PATH
+PASS bounded simulation child exits 0 -- exit=0
+PASS supervisor/dependency sort starts before background installer
+PASS dependency sort groups real gm-install and agentgui services -- GROUPS [["gm-install","agentgui"]]
+PASS gm-install resolves detached dry-run command
+PASS AgentGUI service definition loaded from temp tree
+PASS AgentGUI bounded service start exits 0 -- exit=0
+PASS AgentGUI constructs npx -y github spec -- AGENTGUI_SPAWN {"bin":"/tmp/gmweb-simulated-startup-RwxIRL/mock-bin/npx","args":["-y","github:AnEntrypoint/agentgui#main"],"detached":true}
+PASS AgentGUI smoke test suppresses setup/network commands
+PASS mock npx accepts exact github argv -- exit=0
+PASS mock argv log records exact npx call
+PASS no network command reached real curl/git/npm
+PASS no real ~/.gmnew/current target created
+PASS no MCP registration file created
+PASS simulation output is secret-free
+PASS temporary workspace cleaned -- /tmp/gmweb-simulated-startup-RwxIRL
+
+19/19 simulated-startup checks passed
+SIMULATED_STARTUP_STATUS=PASS timeout_ms=8000 tempDirHandling=removed noNetwork=true noMCP=true noInstall=true noSurvivors=true
+```

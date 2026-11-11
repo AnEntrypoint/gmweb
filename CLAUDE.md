@@ -453,14 +453,7 @@ curl -u abc:password -X POST http://localhost/gm/api/conversations \
 
 **Root Cause:** Environment variables set in bash command strings weren't being inherited by child processes (bunx/bun). The bash `-c` execution context doesn't properly propagate environment variables to spawned children.
 
-**Fix:** Changed from bash string execution to direct process spawn with `env` object:
-```javascript
-spawn('bash', ['-c', `PORT=${PORT} HOT_RELOAD=false bunx --latest agentgui@latest`], { env: childEnv })
-
-spawn('bunx', ['agentgui@1.0.1126'], { env: childEnv })
-```
-
-This ensures all environment variables in `childEnv` (including `HOT_RELOAD`, `BASE_URL`, `NODE_ENV`) are properly passed to the bunx/agentgui process.
+**Fix:** Direct process spawn with an `env` object preserves `HOT_RELOAD`, `BASE_URL`, and `NODE_ENV`. The package pin shown in older history was retired on 2026-11-11: the active service now uses `spawn(npxBin, ['-y', 'github:AnEntrypoint/agentgui#main'], { env: childEnv })`. Any AgentGUI `npx` invocation must use `github:` syntax; see `GM_INSTALL.md`.
 
 **Verification:** After restart, `/gm/` page no longer includes hot-reload WebSocket injection and page functionality is fully enabled.
 

@@ -1,1 +1,19 @@
-{}
+{
+  "name": "gmweb",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node startup/check-startup-sources.mjs && node startup/check-runtime-install.mjs && node startup/check-container-startup-path.mjs && node scripts/check-rollout-docs.mjs && node startup/check-post-restart.mjs --offline && node scripts/check-gm-upstream-drift.mjs && node startup/validate-rollout-report.mjs && node startup/check-live-probe-fixtures.mjs && node startup/check-simulated-startup.mjs",
+    "test": "npm run check",
+    "check:post-restart": "node startup/check-post-restart.mjs --offline",
+    "check:post-restart:live": "node startup/check-post-restart.mjs --live",
+    "check:gm-drift": "node scripts/check-gm-upstream-drift.mjs",
+    "report:rollout": "node startup/rollout-report.mjs",
+    "validate:rollout-report": "node startup/validate-rollout-report.mjs",
+    "watch:gm-drift": "node startup/watch-gm-drift.mjs --once",
+    "probe:post-restart": "node startup/live-post-restart-probe.mjs",
+    "check:live-probe-fixtures": "node startup/check-live-probe-fixtures.mjs",
+    "simulate:startup": "node startup/simulate-container-startup.mjs",
+    "check:simulated-startup": "node startup/check-simulated-startup.mjs"
+  }
+}

@@ -93,6 +93,17 @@ services:
 docker-compose up -d --build
 ```
 
+At boot, gmweb installs the latest native gm with the canonical GitHub installer described in [`GM_INSTALL.md`](GM_INSTALL.md), and starts AgentGUI from GitHub with `npx -y github:AnEntrypoint/agentgui#main` (never an npm version pin). Both are non-blocking; supervisor and nginx remain available while downloads/retries proceed.
+
+```sh
+# Canonical manual install, if needed inside the container:
+curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gm/main/scripts/install.sh | sh
+
+# Optional MCP config path and opt-outs:
+# curl -fsSL https://raw.githubusercontent.com/AnEntrypoint/gm/main/scripts/install.sh | sh -s -- --mcp-config <path>
+# GMNEW_SKIP_REGISTER=1 disables `gm install` registration; GMNEW_AUTO_UPDATE=0 disables gm's 15-minute updates.
+```
+
 **Startup timeline:**
 - 0-30s: nginx starts, git clone
 - 30-60s: Node.js/NVM installation (first boot only)

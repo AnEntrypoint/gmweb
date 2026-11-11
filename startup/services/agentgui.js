@@ -1,16 +1,32 @@
 import { spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 import net from 'net';
+import { dirname } from 'path';
 
 const sleep = promisify(setTimeout);
 const NAME = 'agentgui';
 const PORT = 9897;
-const AGENTGUI_PACKAGE = 'agentgui@1.0.1126';
+const AGENTGUI_PACKAGE = 'github:AnEntrypoint/agentgui#main';
 
 let currentProcess = null;
 let lastRestartTime = 0;
 
 const log = (msg) => console.log(`[${NAME}] [${new Date().toISOString()}] ${msg}`);
+
+export const AGENTGUI_TEST_PORT = PORT;
+
+export function __setAgentGuiSpawnForTest(spawnFn) {
+  globalThis.__GMWEB_AGENTGUI_TEST_SPAWN__ = spawnFn;
+}
+
+function spawnAgentGui(bin, args, options) {
+  const testSpawn = globalThis.__GMWEB_AGENTGUI_TEST_SPAWN__;
+  return (testSpawn || spawn)(bin, args, options);
+}
+
+function isRuntimeSmokeTest(env) {
+  return env.GMWEB_AGENTGUI_SMOKE_TEST === '1' && Boolean(globalThis.__GMWEB_AGENTGUI_TEST_SPAWN__);
+}
 
 function getPortPids(port) {
   try {
@@ -74,44 +90,50 @@ async function killCurrentProcess() {
 async function startAgentGuiProcess(env) {
   const fs = await import('fs');
 
-  // Bun is not always installed under BUN_INSTALL. This image installs it into
-  // /usr/local/bin and leaves BUN_INSTALL unset, so the old hard-coded fallback
-  // (/config/.gmweb/cache/.bun/bin/bunx) never existed and spawn failed with ENOENT —
-  // agentgui never started. Take the first bunx that is actually there.
-  const bunxCandidates = [
-    env.BUN_INSTALL ? `${env.BUN_INSTALL}/bin/bunx` : null,
-    '/usr/local/bin/bunx',
-    '/config/.gmweb/cache/.bun/bin/bunx',
+  // AgentGUI must come from GitHub. Keep the historical binary candidates so a
+  // missing executable falls back through the same resilient resolution path.
+  const npxCandidates = [
+    env.NODE_BIN_DIR ? `${env.NODE_BIN_DIR}/npx` : null,
+    `${dirname(process.execPath)}/npx`,
+    '/config/.gmweb/npm-global/bin/npx',
+    '/usr/local/bin/npx',
+    '/config/nvm/versions/node/v24.13.0/bin/npx',
   ].filter(Boolean);
-  const bunxBin = bunxCandidates.find((candidate) => fs.existsSync(candidate)) || 'bunx';
-  log(`Using bunx at ${bunxBin}`);
+  const npxBin = npxCandidates.find((candidate) => fs.existsSync(candidate)) || 'npx';
+  log(`Using npx at ${npxBin}`);
 
-  try {
-    execSync('git config --global url."https://github.com/".insteadOf ssh://git@github.com/', { timeout: 5000 });
-    execSync('git config --global url."https://github.com/".insteadOf git@github.com:', { timeout: 5000 });
-  } catch (e) {}
-
-  try {
-    const gmExecDir = '/config/.gmweb/npm-global/lib/node_modules/gm-exec';
-    const pm2Path = `${gmExecDir}/node_modules/pm2`;
-    if (!fs.existsSync(pm2Path)) {
-      log('pm2 missing from gm-exec, installing...');
-      execSync(`cd "${gmExecDir}" && npm install --no-save 2>&1`, { timeout: 60000, shell: true });
-      log('pm2 installed');
-    }
-  } catch (e) {
-    log(`Warning: could not install pm2 for gm-exec: ${e.message}`);
+  if (!isRuntimeSmokeTest(env)) {
+    try {
+      execSync('git config --global url."https://github.com/".insteadOf ssh://git@github.com/', { timeout: 5000 });
+      execSync('git config --global url."https://github.com/".insteadOf git@github.com:', { timeout: 5000 });
+    } catch (e) {}
   }
 
-  try {
-    const ghBin = execSync('PATH="/config/.local/bin:/config/.gmweb/npm-global/bin:/config/.gmweb/cache/.bun/bin:/usr/local/bin:$PATH" which gh 2>/dev/null || find /config/.gmweb/cache/.config/AionUi/aionui -name gh -type f 2>/dev/null | head -1', { timeout: 10000, encoding: 'utf-8' }).trim();
-    if (ghBin) {
-      execSync('git config --global --unset-all credential.https://github.com.helper 2>/dev/null || true', { timeout: 5000, shell: true });
-      execSync(`git config --global credential.https://github.com.helper "!${ghBin} auth git-credential"`, { timeout: 5000 });
-      log(`Set gh credential helper: ${ghBin}`);
+  if (!isRuntimeSmokeTest(env)) {
+    try {
+      const gmExecDir = '/config/.gmweb/npm-global/lib/node_modules/gm-exec';
+      const pm2Path = `${gmExecDir}/node_modules/pm2`;
+      if (!fs.existsSync(pm2Path)) {
+        log('pm2 missing from gm-exec, installing...');
+        execSync(`cd "${gmExecDir}" && npm install --no-save 2>&1`, { timeout: 60000, shell: true });
+        log('pm2 installed');
+      }
+    } catch (e) {
+      log(`Warning: could not install pm2 for gm-exec: ${e.message}`);
     }
-  } catch (e) {
-    log(`Warning: could not set gh credential helper: ${e.message}`);
+  }
+
+  if (!isRuntimeSmokeTest(env)) {
+    try {
+      const ghBin = execSync('PATH="/config/.local/bin:/config/.gmweb/npm-global/bin:/config/.gmweb/cache/.bun/bin:/usr/local/bin:$PATH" which gh 2>/dev/null || find /config/.gmweb/cache/.config/AionUi/aionui -name gh -type f 2>/dev/null | head -1', { timeout: 10000, encoding: 'utf-8' }).trim();
+      if (ghBin) {
+        execSync('git config --global --unset-all credential.https://github.com.helper 2>/dev/null || true', { timeout: 5000, shell: true });
+        execSync(`git config --global credential.https://github.com.helper "!${ghBin} auth git-credential"`, { timeout: 5000 });
+        log(`Set gh credential helper: ${ghBin}`);
+      }
+    } catch (e) {
+      log(`Warning: could not set gh credential helper: ${e.message}`);
+    }
   }
 
   const extraPaths = [
@@ -123,7 +145,7 @@ async function startAgentGuiProcess(env) {
   ].join(':');
   const augmentedPath = env.PATH ? `${extraPaths}:${env.PATH}` : extraPaths;
 
-  const ps = spawn(bunxBin, [AGENTGUI_PACKAGE], {
+  const ps = spawnAgentGui(npxBin, ['-y', AGENTGUI_PACKAGE], {
     env: { ...env, PATH: augmentedPath, HOME: '/config', PORT: String(PORT), BASE_URL: '/gm', HOT_RELOAD: 'false', NODE_ENV: 'production', STARTUP_CWD: '/config' },
     cwd: '/config',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -143,7 +165,7 @@ export default {
   dependencies: [],
 
   async start(env) {
-    log(`Starting agentgui with bunx ${AGENTGUI_PACKAGE}...`);
+    log(`Starting agentgui with npx -y ${AGENTGUI_PACKAGE}...`);
     lastRestartTime = Date.now();
     try {
       const occupyingPids = getPortPids(PORT);
@@ -153,7 +175,7 @@ export default {
       }
       currentProcess = await startAgentGuiProcess(env);
       log(`Service started in background (PID: ${currentProcess.pid})`);
-      await sleep(3000);
+      if (!isRuntimeSmokeTest(env)) await sleep(3000);
       return {
         pid: currentProcess.pid,
         process: currentProcess,

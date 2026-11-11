@@ -1,0 +1,3 @@
+[agentgui] Starting agentgui with bunx agentgui@1.0.1126
+[gm-install] fetched manifest.json sha256=0123456789abcdef version=gmnew-1-x64-linux
+[gm-install] installed gmnew at /config/.gmnew/current/gm

@@ -6,7 +6,18 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node test.js"
+    "test": "node test.js",
+    "check": "node check-startup-sources.mjs && node check-runtime-install.mjs && node check-container-startup-path.mjs && node ../scripts/check-rollout-docs.mjs && node check-post-restart.mjs --offline && node ../scripts/check-gm-upstream-drift.mjs && node validate-rollout-report.mjs && node check-live-probe-fixtures.mjs && node check-simulated-startup.mjs",
+    "check:post-restart": "node check-post-restart.mjs --offline",
+    "check:post-restart:live": "node check-post-restart.mjs --live",
+    "check:gm-drift": "node ../scripts/check-gm-upstream-drift.mjs",
+    "report:rollout": "node rollout-report.mjs",
+    "validate:rollout-report": "node validate-rollout-report.mjs",
+    "watch:gm-drift": "node watch-gm-drift.mjs --once",
+    "probe:post-restart": "node live-post-restart-probe.mjs",
+    "check:live-probe-fixtures": "node check-live-probe-fixtures.mjs",
+    "simulate:startup": "node simulate-container-startup.mjs",
+    "check:simulated-startup": "node check-simulated-startup.mjs"
   },
   "dependencies": {}
 }

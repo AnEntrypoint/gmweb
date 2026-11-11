@@ -38,6 +38,10 @@
       "enabled": false,
       "type": "install"
     },
+    "gm-install": {
+      "enabled": true,
+      "type": "install"
+    },
     "agentgui": {
       "enabled": true,
       "type": "system"

@@ -134,6 +134,8 @@ log "✓ Startup revision verified: $(git -C /tmp/gmweb rev-parse HEAD)"
 
 cp -r /tmp/gmweb/startup/* /opt/gmweb-startup/
 cp /tmp/gmweb/docker/nginx-sites-enabled-default /opt/gmweb-startup/
+cp /tmp/gmweb/docker/install-gm.sh /opt/gmweb-startup/install-gm.sh
+chmod 644 /opt/gmweb-startup/install-gm.sh
 log "✓ Startup files copied to /opt/gmweb-startup"
 
 if [ ! -f /config/crontab ] && [ -f /opt/gmweb-startup/crontab.default ]; then
